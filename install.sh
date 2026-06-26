@@ -182,6 +182,15 @@ if ! command -v pgadmin4 &>/dev/null && ! dpkg -l pgadmin4 &>/dev/null 2>&1; the
 fi
 success "pgAdmin 4 installiert"
 
+# ─── Apache stoppen (wird von pgAdmin als Abhängigkeit installiert) ────────────
+# pgAdmin bringt Apache mit, der Port 80 belegt – wir nutzen Nginx statt Apache
+if systemctl is-active apache2 &>/dev/null || systemctl is-enabled apache2 &>/dev/null 2>&1; then
+  info "Apache2 wird gestoppt und deaktiviert (Port 80 wird für Nginx benötigt)"
+  systemctl stop apache2 2>/dev/null || true
+  systemctl disable apache2 2>/dev/null || true
+  success "Apache2 deaktiviert"
+fi
+
 # ─── Nginx ────────────────────────────────────────────────────────────────────
 step "Nginx installieren"
 apt-get install -y -qq nginx
