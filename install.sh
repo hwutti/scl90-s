@@ -149,6 +149,8 @@ sudo -u postgres psql -c "
 " | sudo -u postgres psql 2>/dev/null || true
 
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
+sudo -u postgres psql -c "ALTER USER $DB_USER CREATEDB;" 2>/dev/null || true
+sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO $DB_USER;" 2>/dev/null || true
 
 # pg_hba.conf – scram-sha-256 für lokale Verbindungen
 PG_HBA="/etc/postgresql/16/main/pg_hba.conf"
@@ -282,7 +284,7 @@ success "Datenbank-Schema angewendet"
 step "Next.js Build erstellen"
 sudo -u "$APP_USER" bash -c "
   cd '$APP_DIR'
-  pnpm build 2>&1 | tail -10
+  pnpm build
 "
 success "Next.js Build abgeschlossen"
 
