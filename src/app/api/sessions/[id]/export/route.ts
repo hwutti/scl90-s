@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const answersMap = answersArrayToMap(assessment.answers)
   const normValues = assessment.normTable?.values as any ?? null
-  const { scales, global: g } = computeScore(answersMap, normValues)
+  const { scales, global: g } = computeScore(answersMap, normValues, assessment.patientGender, assessment.patientDob)
   const age = calcAge(assessment.patientDob)
   const dt = new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())
 
@@ -71,7 +71,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   .warn{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-top:20px;}
   .clinical-yes{background:#fef2f2;border-left:4px solid #ef4444;padding:10px 14px;border-radius:4px;}
   .clinical-no{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:4px;}
-  @media print{body{padding:0;} .pagebreak{page-break-before:always;}}
+  @media print{body{padding:0;}.pagebreak{page-break-before:always;}}
 </style>
 </head>
 <body>
@@ -95,61 +95,75 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 <div class="${g.isClinicalCase ? 'clinical-yes' : 'clinical-no'}" style="margin-bottom:16px;">
   <strong>${g.isClinicalCase ? '⚠ Klinisch auffällig (Falldefinition erfüllt)' : '✓ Kein klinischer Befund (Falldefinition nicht erfüllt)'}</strong>
   ${g.clinicalReason !== '—' ? `<br/><span style="font-size:12px;">${g.clinicalReason}</span>` : ''}
-  <br/><span style="font-size:11px;color:#64748b;">Falldefinition: T(GSI) ≥ 63 oder ≥ 2 Skalen mit T ≥ 63</span>
 </div>
 
 <h2>Globale Kennwerte</h2>
 <div>
-  <div class="kpi"><div class="kpi-val">${g.gs}</div><div class="kpi-lbl">GS (Gesamtsumme)</div></div>
+  <div class="kpi"><div class="kpi-val">${g.gs}</div><div class="kpi-lbl">GS</div></div>
   <div class="kpi"><div class="kpi-val">${g.gsi?.toFixed(3) ?? '—'}${g.gsiT ? ` / T=${Math.round(g.gsiT)}` : ''}</div><div class="kpi-lbl">GSI</div></div>
   <div class="kpi"><div class="kpi-val">${g.pst}${g.pstT ? ` / T=${Math.round(g.pstT)}` : ''}</div><div class="kpi-lbl">PST</div></div>
-  <div class="kpi"><div class="kpi-val">${g.psdi?.toFixed(3) ?? '—'}${g.psdiT ? ` / T=${Math.round(g.psdiT)}` : ''}</div><div class="kpi-lbl">PSDI</div></div>
+  <div class="kpi"><div class="kpi-val">${g.psdi?.toFixed(3) ?? '—'}</div><div class="kpi-lbl">PSDI</div></div>
 </div>
 
 <h2>Skalenauswertung</h2>
-<p style="font-size:11px;color:#64748b;margin-bottom:6px;">Ampel: Grün &lt;0.50 · Gelb 0.50–1.49 · Rot ≥1.50 · T≥60 = auffällig (fett markiert)</p>
 <table>
   <thead>
     <tr>
-      <th>Skala</th><th>Bezeichnung</th><th>Items</th><th style="text-align:center;">Missing</th>
-      <th style="text-align:center;">S</th><th style="text-align:center;">G</th>
-      <th style="text-align:center;">Ampel</th><th style="text-align:center;">P</th>
-      <th style="text-align:center;">T</th><th>T-Interpretation</th>
+      <th>Skala</th><th>Bezeichnung</th><th>Items</th>
+      <th style="text-align:center;">Missing</th><th style="text-align:center;">S</th>
+      <th style="text-align:center;">G</th><th style="text-align:center;">Ampel</th>
+      <th style="text-align:center;">P</th><th style="text-align:center;">T</th>
+      <th>T-Interpretation</th>
     </tr>
   </thead>
   <tbody>${scaleRows}</tbody>
 </table>
 
-<p style="margin-top:6px;font-size:11px;color:#64748b;">
-  T-Interpretation (Richtwerte): &lt;40 unauffällig · 40–50 Durchschnitt · 50–60 leicht erhöht · 60–70 klinisch relevant möglich · &gt;70 sehr hohe Werte
-</p>
-
 <div class="pagebreak"></div>
-
 <h2>Itemantworten (1–90)</h2>
 <table>
-  <thead><tr><th style="width:6%;">Item</th><th>Frage</th><th style="width:8%;text-align:center;">Wert</th></tr></thead>
+  <thead><tr><th style="width:6%;">Item</th><th>Frage</th><th style="width:10%;text-align:center;">Wert</th></tr></thead>
   <tbody>${answerRows}</tbody>
 </table>
 
-<div class="warn" style="margin-top:16px;">
-  <strong>Wichtiger Hinweis:</strong> Die SCL-90-S ist kein Diagnoseinstrument. Sie dient ausschließlich der Verlaufs- und Erfolgskontrolle
-  sowie dem Screening. Eine Pathologisierung auf Basis dieser Ergebnisse ist ausdrücklich zu vermeiden (Franke, 2014).
-  Die Interpretation erfordert klinische Fachkompetenz.
+<div class="warn">
+  <strong>Hinweis:</strong> Die SCL-90-S ist kein Diagnoseinstrument. Sie dient der Verlaufs- und Erfolgskontrolle sowie dem Screening (Franke, 2014).
 </div>
-
-<script>window.addEventListener('load', () => setTimeout(() => window.print(), 100));</script>
 </body></html>`
 
-  await prisma.auditLog.create({
-    data: { userId: (session.user as any).id, sessionId: params.id, action: 'SESSION_EXPORTED' },
-  }).catch(() => {})
+  // Puppeteer für echtes PDF
+  try {
+    const puppeteer = await import('puppeteer')
+    const browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    })
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: 'networkidle0' })
+    const pdf = await page.pdf({
+      format: 'A4',
+      margin: { top: '15mm', bottom: '15mm', left: '12mm', right: '12mm' },
+      printBackground: true,
+    })
+    await browser.close()
 
-  // HTML direkt im Browser-Tab öffnen (nicht downloaden)
-  // Druckdialog öffnet automatisch → "Als PDF speichern" wählen
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  })
+    const filename = `SCL90S_${(assessment.patientName ?? 'Patient').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`
+
+    await prisma.auditLog.create({
+      data: { userId: (session.user as any).id, sessionId: params.id, action: 'SESSION_EXPORTED' },
+    }).catch(() => {})
+
+    return new NextResponse(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  } catch (err) {
+    // Fallback: HTML im Browser öffnen
+    console.error('Puppeteer Fehler:', err)
+    return new NextResponse(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  }
 }
