@@ -145,10 +145,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     data: { userId: (session.user as any).id, sessionId: params.id, action: 'SESSION_EXPORTED' },
   }).catch(() => {})
 
+  // HTML als Datei zurückgeben - im Browser öffnen und als PDF drucken
+  const filename = `SCL90S_${(assessment.patientName ?? 'Patient').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.html`
   return new NextResponse(html, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="SCL90S_${assessment.patientName?.replace(/\s+/g,'_')}.html"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
 }
