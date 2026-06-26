@@ -21,14 +21,14 @@ export const authOptions: NextAuthOptions = {
         if (!credentials) return null
 
         // PIN-Login (Patienten)
-        if (credentials.pin) {
+        if (credentials.pin && credentials.pin !== 'undefined') {
           const user = await prisma.user.findUnique({ where: { pin: credentials.pin, active: true } })
           if (!user) return null
           return { id: user.id, name: user.name, email: user.email, role: user.role }
         }
 
         // E-Mail + Passwort (Therapeuten / Admin)
-        if (credentials.email && credentials.password) {
+        if (credentials.email && credentials.email !== 'undefined' && credentials.password && credentials.password !== 'undefined') {
           const user = await prisma.user.findUnique({ where: { email: credentials.email, active: true } })
           if (!user?.passwordHash) return null
           const valid = await bcrypt.compare(credentials.password, user.passwordHash)
