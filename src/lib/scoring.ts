@@ -1,4 +1,9 @@
+// ============================================================
+// SCL-90-S Scoring – mit alters-/geschlechtsspez. T-Normen
+// Franke (2014), Anhang B (Männer) + Anhang C (Frauen)
+// ============================================================
 import { SCALES, RISK_THRESHOLDS, T_BANDS } from './constants'
+import { computeNormedScores } from './norms/index'
 
 export interface ScaleResult {
   id: string
@@ -28,6 +33,8 @@ export interface GlobalResult {
   psdiT: number | null
   isClinicalCase: boolean
   clinicalReason: string
+  ageGroup: string | null
+  genderUsed: string | null
 }
 
 export interface ScoringResult {
@@ -35,9 +42,9 @@ export interface ScoringResult {
   global: GlobalResult
 }
 
-export type AnswerMap = Map<number, number | null>  // itemNumber → value (null = missing)
+export type AnswerMap = Map<number, number | null>
 
-// Normtabellen-Block (aus DB geladen)
+// Legacy: Normblock aus DB (Mean/SD-Format) – optional
 export interface NormBlock {
   scales: Record<string, { mean: number; sd: number }>
   gsi:  { mean: number; sd: number }
@@ -45,7 +52,13 @@ export interface NormBlock {
   psdi: { mean: number; sd: number }
 }
 
-export function computeScore(answers: AnswerMap, normBlock?: NormBlock | null): ScoringResult {
+export function computeScore(
+  answers: AnswerMap,
+  normBlock?: NormBlock | null,
+  gender?: string | null,
+  dob?: string | null,
+): ScoringResult {
+
   const scales: ScaleResult[] = SCALES.map(s => {
     let sum = 0, pCount = 0, answered = 0
     const flaggedItems: number[] = []
@@ -61,23 +74,17 @@ export function computeScore(answers: AnswerMap, normBlock?: NormBlock | null): 
 
     const missing = s.items.length - answered
     const mean = answered > 0 ? sum / answered : null
-    const tScore = !s.isAddOn && mean !== null && normBlock?.scales[s.id]
-      ? calcTScore(mean, normBlock.scales[s.id])
-      : null
 
     return {
-      id: s.id,
-      name: s.name,
-      shortName: s.shortName,
-      items: s.items,
-      isAddOn: !!s.isAddOn,
-      sum, mean, pCount, missing, answered, tScore,
+      id: s.id, name: s.name, shortName: s.shortName,
+      items: s.items, isAddOn: !!s.isAddOn,
+      sum, mean, pCount, missing, answered,
+      tScore: null,  // wird unten befüllt
       risk: s.isAddOn ? null : riskForG(mean),
       flaggedItems,
     }
   })
 
-  // Globale Kennwerte
   const missingTotal = Array.from(answers.values()).filter(v => v === null || v === undefined).length
   const answeredTotal = 90 - missingTotal
   const gs = scales.reduce((acc, s) => acc + s.sum, 0)
@@ -85,27 +92,63 @@ export function computeScore(answers: AnswerMap, normBlock?: NormBlock | null): 
   const gsi = answeredTotal > 0 ? gs / answeredTotal : null
   const psdi = pst > 0 ? gs / pst : null
 
-  const gsiT  = gsi  !== null && normBlock?.gsi  ? calcTScore(gsi,  normBlock.gsi)  : null
-  const pstT  = pst  !== null && normBlock?.pst  ? calcTScore(pst,  normBlock.pst)  : null
-  const psdiT = psdi !== null && normBlock?.psdi ? calcTScore(psdi, normBlock.psdi) : null
+  // T-Score Berechnung
+  let gsiT: number | null = null
+  let pstT: number | null = null
+  let psdiT: number | null = null
+  let ageGroup: string | null = null
+  let genderUsed: string | null = null
+
+  // Priorität 1: Lookup-Tabellen (Franke 2014, Anhang B/C)
+  if (gender && dob) {
+    const mainScales = scales.filter(s => !s.isAddOn)
+    const normed = computeNormedScores(
+      mainScales.map(s => ({ id: s.id, sum: s.sum, mean: s.mean })),
+      gs, pst, gender, dob,
+    )
+
+    for (const s of scales) {
+      if (!s.isAddOn) s.tScore = normed.scaleTScores[s.id] ?? null
+    }
+    gsiT = normed.gsiT
+    pstT = normed.pstT
+    ageGroup = normed.ageGroup
+    genderUsed = normed.gender
+  }
+  // Priorität 2: Mean/SD aus DB (Legacy-Normtabellen)
+  else if (normBlock) {
+    for (const s of scales) {
+      if (!s.isAddOn && s.mean !== null && normBlock.scales[s.id]) {
+        s.tScore = calcTScore(s.mean, normBlock.scales[s.id])
+      }
+    }
+    if (gsi !== null && normBlock.gsi) gsiT = calcTScore(gsi, normBlock.gsi)
+    if (normBlock.pst) pstT = calcTScore(pst, normBlock.pst)
+    if (psdi !== null && normBlock.psdi) psdiT = calcTScore(psdi, normBlock.psdi)
+  }
 
   // Falldefinition (Schritt 1)
   let isClinicalCase = false
   let clinicalReason = '—'
   if (gsiT !== null && gsiT >= 63) {
     isClinicalCase = true
-    clinicalReason = `GSI T = ${gsiT.toFixed(0)} ≥ 63`
+    clinicalReason = `GSI T = ${Math.round(gsiT)} ≥ 63`
   } else {
-    const elevatedScales = scales.filter(s => !s.isAddOn && s.tScore !== null && s.tScore >= 63)
-    if (elevatedScales.length >= 2) {
+    const elevated = scales.filter(s => !s.isAddOn && s.tScore !== null && s.tScore >= 63)
+    if (elevated.length >= 2) {
       isClinicalCase = true
-      clinicalReason = `${elevatedScales.length} Skalen mit T ≥ 63 (${elevatedScales.map(s => s.id).join(', ')})`
+      clinicalReason = `${elevated.length} Skalen mit T ≥ 63 (${elevated.map(s => s.id).join(', ')})`
     }
   }
 
   return {
     scales,
-    global: { gs, gsi, pst, psdi, missingTotal, answeredTotal, gsiT, pstT, psdiT, isClinicalCase, clinicalReason },
+    global: {
+      gs, gsi, pst, psdi, missingTotal, answeredTotal,
+      gsiT, pstT, psdiT,
+      isClinicalCase, clinicalReason,
+      ageGroup, genderUsed,
+    },
   }
 }
 
@@ -123,9 +166,7 @@ export function riskForG(g: number | null): 'green' | 'yellow' | 'red' | null {
 
 export function tBandLabel(t: number | null): string {
   if (t === null) return '—'
-  for (const b of T_BANDS) {
-    if (t < b.max) return b.label
-  }
+  for (const b of T_BANDS) { if (t < b.max) return b.label }
   return '—'
 }
 

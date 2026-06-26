@@ -12,27 +12,23 @@ export default async function ResultsPage({ params }: { params: { id: string } }
 
   const assessment = await prisma.assessmentSession.findUnique({
     where: { id: params.id },
-    include: {
-      answers: { orderBy: { itemNumber: 'asc' } },
-      result: true,
-      normTable: true,
-      user: { select: { name: true } },
-    },
+    include: { answers: { orderBy: { itemNumber: 'asc' } }, result: true, normTable: true, user: { select: { name: true } } },
   })
   if (!assessment) notFound()
 
-  // Audit-Log
   await prisma.auditLog.create({
-    data: {
-      userId: (session.user as any).id,
-      sessionId: params.id,
-      action: 'SESSION_VIEWED',
-    },
+    data: { userId: (session.user as any).id, sessionId: params.id, action: 'SESSION_VIEWED' },
   }).catch(() => {})
 
   const answersMap = answersArrayToMap(assessment.answers)
   const normValues = assessment.normTable?.values as any ?? null
-  const scoring = computeScore(answersMap, normValues)
+
+  const scoring = computeScore(
+    answersMap,
+    normValues,
+    assessment.patientGender,
+    assessment.patientDob,
+  )
 
   return (
     <PageShell>

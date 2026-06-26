@@ -10,20 +10,23 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const assessment = await prisma.assessmentSession.findUnique({
     where: { id: params.id },
-    include: {
-      answers: { orderBy: { itemNumber: 'asc' } },
-      normTable: true,
-    },
+    include: { answers: { orderBy: { itemNumber: 'asc' } }, normTable: true },
   })
   if (!assessment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const answersMap = answersArrayToMap(assessment.answers)
   const normValues = assessment.normTable?.values as any ?? null
-  const result = computeScore(answersMap, normValues)
+
+  // Alters-/geschlechtsspezifische T-Normen (Franke 2014)
+  const result = computeScore(
+    answersMap,
+    normValues,
+    assessment.patientGender,  // 'männlich' | 'weiblich'
+    assessment.patientDob,     // 'YYYY-MM-DD'
+  )
 
   const { global: g, scales } = result
 
-  // Scaleresults als JSON für DB
   const scaleScores: Record<string, unknown> = {}
   for (const s of scales) {
     scaleScores[s.id] = {
@@ -33,7 +36,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  // Upsert Result
   await prisma.assessmentResult.upsert({
     where: { sessionId: params.id },
     create: {
@@ -65,7 +67,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       userId: (session.user as any).id,
       sessionId: params.id,
       action: 'SESSION_SCORED',
-      details: { gsi: g.gsi, isClinicalCase: g.isClinicalCase },
+      details: {
+        gsi: g.gsi, gsiT: g.gsiT,
+        isClinicalCase: g.isClinicalCase,
+        ageGroup: g.ageGroup, gender: g.genderUsed,
+        normSource: assessment.normTable ? 'db_norm_table' : (assessment.patientDob ? 'franke2014_lookup' : 'none'),
+      },
     },
   }).catch(() => {})
 

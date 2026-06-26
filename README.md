@@ -278,3 +278,23 @@ Diese Anwendung verarbeitet **besondere Kategorien personenbezogener Daten** (Ar
 - Hessel, A. et al. (2001). Symptom-Checkliste SCL-90-R: Testtheoretische Überprüfung und Normierung an einer bevölkerungsrepräsentativen Stichprobe. *Diagnostica*, 47(1), 27–39.
 
 Der Code dieser Webapp steht unter der **MIT-Lizenz**. Die SCL-90-S Testinhalte (Items, Normtabellen) sind urheberrechtlich geschützt (© Hogrefe Verlag) und nicht in diesem Repository enthalten.
+
+---
+
+## T-Normen (Franke 2014) – Digitalisiert
+
+Das System enthält die vollständig digitalisierten alters- und geschlechtsspezifischen T-Norm-Lookup-Tabellen aus:
+
+> Franke, G. H. (2014). *SCL-90®-S. Symptom-Checklist-90®-Standard – Manual*. Göttingen: Hogrefe Verlag.
+
+### Anhang B – Männer (N = 136–217 je Altersgruppe)
+Alle 9 Hauptskalen (AGG, ANG, DEP, PAR, PHO, PSY, SOM, UNS, ZWA) + GSI + PST
+
+### Anhang C – Frauen (N = 130–210 je Altersgruppe)
+Alle 9 Hauptskalen + GSI
+
+**Altersgruppen:** 16–24 · 25–34 · 35–44 · 45–54 · 55–64 · 65–74 Jahre
+
+**Methode:** Direkter Summe→T Lookup (Skalen), lineare Interpolation (GSI)
+
+Das System wählt automatisch die passende Normtabelle anhand von **Geschlecht** und **Geburtsdatum** des Patienten.
