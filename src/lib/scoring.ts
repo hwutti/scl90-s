@@ -3,7 +3,7 @@
 // Franke (2014), Anhang B (Männer) + Anhang C (Frauen)
 // ============================================================
 import { SCALES, RISK_THRESHOLDS, T_BANDS } from './constants'
-import { computeNormedScores } from './norms/index'
+import { computeNormedScores, getPsdiTScore } from './norms/index'
 
 export interface ScaleResult {
   id: string
