@@ -82,6 +82,19 @@ export function getPstTScore(
 }
 
 // Vollständige Norm-Berechnung
+
+function calcAgeFromDob(dobStr: string): number | null {
+  try {
+    const dob = new Date(dobStr + 'T00:00:00')
+    if (isNaN(dob.getTime())) return null
+    const now = new Date()
+    let age = now.getFullYear() - dob.getFullYear()
+    if (now.getMonth() - dob.getMonth() < 0 ||
+       (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--
+    return age
+  } catch { return null }
+}
+
 export function computeNormedScores(
   scales: { id: string; sum: number; mean: number | null }[],
   gs: number, pst: number,
