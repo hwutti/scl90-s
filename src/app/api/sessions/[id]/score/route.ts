@@ -27,7 +27,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const { global: g, scales } = result
 
-  const scaleScores: Record<string, unknown> = {}
+  const scaleScores: Record<string, object> = {}
   for (const s of scales) {
     scaleScores[s.id] = {
       sum: s.sum, mean: s.mean, missing: s.missing,
@@ -45,7 +45,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       gsiT: g.gsiT, pstT: g.pstT, psdiT: g.psdiT,
       isClinicalCase: g.isClinicalCase,
       clinicalReason: g.clinicalReason,
-      scaleScores,
+      scaleScores: scaleScores as object,
     },
     update: {
       gs: g.gs, gsi: g.gsi ?? 0, pst: g.pst, psdi: g.psdi,
@@ -53,7 +53,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       gsiT: g.gsiT, pstT: g.pstT, psdiT: g.psdiT,
       isClinicalCase: g.isClinicalCase,
       clinicalReason: g.clinicalReason,
-      scaleScores,
+      scaleScores: scaleScores as object,
     },
   })
 
