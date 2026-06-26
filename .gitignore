@@ -1,0 +1,38 @@
+# Abhängigkeiten
+node_modules/
+.pnpm-store/
+
+# Next.js Build
+.next/
+out/
+
+# Umgebungsvariablen – NIEMALS einchecken!
+.env
+.env.local
+.env.production
+.env*.local
+
+# Prisma
+prisma/migrations/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups
+*.sql.gz
+*.sql
+
+# Credentials
+scl90s_credentials.txt
