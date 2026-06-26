@@ -44,7 +44,7 @@ Alle Passwörter werden automatisch generiert und am Ende angezeigt.
 
 | Komponente | Version | Beschreibung |
 |---|---|---|
-| **Node.js** | 20 LTS | JavaScript-Runtime (via NodeSource) |
+| **Node.js** | 22 LTS | JavaScript-Runtime (via NodeSource) |
 | **pnpm** | latest | Paketmanager (schneller als npm) |
 | **Next.js** | 14 | Full-Stack React Framework |
 | **PostgreSQL** | 16 | Datenbank (offizielles pgdg-Repo) |

@@ -2,7 +2,7 @@
 # =============================================================================
 # SCL-90-S Webapp – Automatisches Installationsskript
 # Ubuntu 22.04 / 24.04 LTS
-# Installiert: Node.js 20, PostgreSQL 16, Nginx, Certbot (SSL),
+# Installiert: Node.js 22, PostgreSQL 16, Nginx, Certbot (SSL),
 #              pgAdmin 4, systemd-Service, automatische DB-Backups
 # =============================================================================
 set -euo pipefail
@@ -102,15 +102,15 @@ success "System aktualisiert"
 
 # ─── Node.js 20 (via NodeSource) ──────────────────────────────────────────────
 step "Node.js 20 installieren"
-if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 20 ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null
+if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 22 ]]; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - 2>/dev/null
   apt-get install -y -qq nodejs
 fi
 node -v && npm -v
 success "Node.js $(node -v) installiert"
 
 # pnpm (schneller als npm, empfohlen für Next.js)
-npm install -g pnpm@latest --quiet
+npm install -g pnpm@9 --quiet
 success "pnpm $(pnpm -v) installiert"
 
 # ─── PostgreSQL 16 ────────────────────────────────────────────────────────────
@@ -210,20 +210,22 @@ if [[ -f "$APP_DIR/package.json" ]]; then
   "
 else
   info "Klone Repository: $GITHUB_REPO"
-  # Verzeichnis leeren falls nötig (außer .env)
-  sudo -u "$APP_USER" bash -c "
-    shopt -s dotglob
-    ls '$APP_DIR'
-  " | grep -v '^$' | grep -v '^.env$' | while read f; do
-    [[ "$f" == ".env" ]] && continue
-    rm -rf "$APP_DIR/$f" 2>/dev/null || true
-  done
+  # Verzeichnis vollständig leeren (außer .env)
+  if [[ -f "$APP_DIR/.env" ]]; then
+    cp "$APP_DIR/.env" /tmp/scl90s_env_backup
+  fi
+  rm -rf "$APP_DIR"
+  mkdir -p "$APP_DIR"
+  chown "$APP_USER":"$APP_USER" "$APP_DIR"
+  if [[ -f /tmp/scl90s_env_backup ]]; then
+    cp /tmp/scl90s_env_backup "$APP_DIR/.env"
+    chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
+    chmod 600 "$APP_DIR/.env"
+    rm /tmp/scl90s_env_backup
+  fi
 
   sudo -u "$APP_USER" bash -c "
-    git clone '$GITHUB_REPO' '$APP_DIR' 2>&1 | tail -5 || \
-    git clone '$GITHUB_REPO' /tmp/scl90s_clone && \
-    cp -a /tmp/scl90s_clone/. '$APP_DIR/' && \
-    rm -rf /tmp/scl90s_clone
+    git clone '$GITHUB_REPO' '$APP_DIR' 2>&1 | tail -5
   " || error "Git Clone fehlgeschlagen. Netzwerk prüfen."
 fi
 success "App-Code bereit"
