@@ -138,7 +138,8 @@ export function getPsdiTScore(
 
   // PSDI-Lookup: key = Math.floor(psdi * 40) / 40 (0.025er Schritte)
   // Tabellen aus Anhang B (Männer) und Anhang C (Frauen)
-  const idx = Math.min(Math.floor(psdi / 0.025), PSDI_SAMPLES_MAENNLICH[ageGroup]?.length - 1 ?? 0)
+  const tableLen = PSDI_SAMPLES_MAENNLICH[ageGroup]?.length ?? 1
+  const idx = Math.min(Math.floor(psdi / 0.025), tableLen - 1)
 
   const table = gender === 'weiblich'
     ? PSDI_SAMPLES_WEIBLICH[ageGroup]
