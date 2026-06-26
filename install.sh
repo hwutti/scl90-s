@@ -198,270 +198,46 @@ mkdir -p "$APP_DIR"
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 success "User '$APP_USER' und Verzeichnis '$APP_DIR' angelegt"
 
-# ─── Next.js Projekt erstellen ────────────────────────────────────────────────
-step "Next.js Projekt initialisieren"
-if [[ ! -f "$APP_DIR/package.json" ]]; then
+# ─── App-Code von GitHub klonen ───────────────────────────────────────────────
+step "App-Code von GitHub klonen"
+GITHUB_REPO="https://github.com/hwutti/scl90-s.git"
+
+if [[ -f "$APP_DIR/package.json" ]]; then
+  info "package.json gefunden – Update via git pull"
   sudo -u "$APP_USER" bash -c "
     cd '$APP_DIR'
-    pnpm create next-app@latest . \
-      --typescript \
-      --tailwind \
-      --eslint \
-      --app \
-      --src-dir \
-      --import-alias '@/*' \
-      --no-git \
-      --yes 2>&1 | tail -5
+    git pull origin main 2>&1 | tail -5
   "
-  success "Next.js Projekt erstellt"
 else
-  info "package.json gefunden – Next.js Projekt existiert bereits, überspringe"
-fi
+  info "Klone Repository: $GITHUB_REPO"
+  # Verzeichnis leeren falls nötig (außer .env)
+  sudo -u "$APP_USER" bash -c "
+    shopt -s dotglob
+    ls '$APP_DIR'
+  " | grep -v '^$' | grep -v '^.env$' | while read f; do
+    [[ "$f" == ".env" ]] && continue
+    rm -rf "$APP_DIR/$f" 2>/dev/null || true
+  done
 
-# ─── Abhängigkeiten installieren ──────────────────────────────────────────────
-step "npm-Pakete installieren"
+  sudo -u "$APP_USER" bash -c "
+    git clone '$GITHUB_REPO' '$APP_DIR' 2>&1 | tail -5 || \
+    git clone '$GITHUB_REPO' /tmp/scl90s_clone && \
+    cp -a /tmp/scl90s_clone/. '$APP_DIR/' && \
+    rm -rf /tmp/scl90s_clone
+  " || error "Git Clone fehlgeschlagen. Netzwerk prüfen."
+fi
+success "App-Code bereit"
+
+# ─── Node.js Abhängigkeiten installieren ──────────────────────────────────────
+step "npm-Pakete installieren (pnpm install)"
 sudo -u "$APP_USER" bash -c "
   cd '$APP_DIR'
-  pnpm add \
-    @prisma/client \
-    prisma \
-    next-auth \
-    @auth/prisma-adapter \
-    recharts \
-    @react-pdf/renderer \
-    zod \
-    bcryptjs \
-    date-fns \
-    lucide-react \
-    clsx \
-    tailwind-merge \
-    2>&1 | tail -5
-
-  pnpm add -D \
-    @types/bcryptjs \
-    @types/node \
-    2>&1 | tail -3
+  pnpm install --frozen-lockfile 2>&1 | tail -8 || pnpm install 2>&1 | tail -8
 "
 success "npm-Pakete installiert"
 
-# ─── Prisma Schema erstellen ──────────────────────────────────────────────────
-step "Prisma Schema erstellen"
-mkdir -p "$APP_DIR/prisma"
+# Prisma Schema kommt aus Git-Repository
 
-cat > "$APP_DIR/prisma/schema.prisma" << 'PRISMA_EOF'
-// SCL-90-S Datenbank-Schema
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-// ─── Benutzer & Rollen ────────────────────────────────────────────────────────
-enum Role {
-  ADMIN
-  THERAPIST
-  PATIENT
-}
-
-model User {
-  id            String    @id @default(cuid())
-  email         String?   @unique
-  name          String?
-  role          Role      @default(PATIENT)
-  passwordHash  String?
-  // Patienten können auch per PIN angemeldet sein
-  pin           String?   @unique
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  // Therapeut → Patienten
-  patients      User[]    @relation("TherapistPatients")
-  therapist     User?     @relation("TherapistPatients", fields: [therapistId], references: [id])
-  therapistId   String?
-  // Sessions
-  sessions      AssessmentSession[]
-  // Audit-Log
-  auditLogs     AuditLog[]
-  nextAuthSessions Session[]
-  accounts      Account[]
-}
-
-// ─── NextAuth Tabellen ────────────────────────────────────────────────────────
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-  @@unique([identifier, token])
-}
-
-// ─── SCL-90-S Erhebung ────────────────────────────────────────────────────────
-enum SessionStatus {
-  IN_PROGRESS   // Begonnen, nicht abgeschlossen
-  COMPLETED     // Alle 90 Items beantwortet
-  SCORED        // Auswertung berechnet und gespeichert
-  LOCKED        // Gesperrt (Therapeut hat Bericht erstellt)
-}
-
-model AssessmentSession {
-  id           String        @id @default(cuid())
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status       SessionStatus @default(IN_PROGRESS)
-  // Anlass der Erhebung
-  occasion     String?       // z.B. "Ersterhebung", "Verlaufsmessung Woche 4"
-  // Metadaten (verschlüsselt on application level)
-  patientName  String?       // AES-256 verschlüsselt
-  patientDob   String?       // AES-256 verschlüsselt
-  patientGender String?
-  // Zeitstempel
-  startedAt    DateTime      @default(now())
-  completedAt  DateTime?
-  scoredAt      DateTime?
-  // Antworten und Ergebnisse
-  answers      Answer[]
-  result       AssessmentResult?
-  // Normstichprobe die für T-Scores verwendet wurde
-  normTableId  String?
-  normTable    NormTable?    @relation(fields: [normTableId], references: [id])
-  // Audit
-  auditLogs    AuditLog[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-}
-
-// Einzelne Item-Antworten (90 pro Erhebung)
-model Answer {
-  id          String            @id @default(cuid())
-  sessionId   String
-  session     AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  itemNumber  Int               // 1–90
-  value       Int?              // 0–4, null = nicht beantwortet (Missing)
-  answeredAt  DateTime?
-  @@unique([sessionId, itemNumber])
-  @@index([sessionId])
-}
-
-// ─── Auswertungsergebnis ──────────────────────────────────────────────────────
-model AssessmentResult {
-  id          String            @id @default(cuid())
-  sessionId   String            @unique
-  session     AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  // Globale Kennwerte (Rohwerte)
-  gs          Float             // Global Severity – Rohsumme
-  gsi         Float             // GSI = GS / (90 - Missing)
-  pst         Int               // Positive Symptom Total
-  psdi        Float?            // PSDI = GS / PST (null wenn PST=0)
-  missingTotal Int
-
-  // T-Scores (null wenn keine Normtabelle hinterlegt)
-  gsiT        Float?
-  pstT        Float?
-  psdiT       Float?
-
-  // Klinischer Befund (nach Falldefinition T≥63)
-  isClinicalCase   Boolean
-  clinicalReason   String?   // z.B. "GSI T ≥ 63" oder "≥ 2 Skalen T ≥ 63"
-
-  // Skalenwerte als JSON (flexibel für alle 10 Skalen)
-  // Format: { "S1": { "sum": 8, "mean": 1.33, "missing": 0, "pCount": 5, "tScore": 62 }, ... }
-  scaleScores Json
-
-  // Zusatzitems-Befunde (Schritt 5 der 5-Schritte-Interpretation)
-  // Format: { "item19": { "value": 3, "flagged": true }, ... }
-  additionalItemFlags Json?
-
-  createdAt   DateTime          @default(now())
-}
-
-// ─── Normtabellen ─────────────────────────────────────────────────────────────
-// Hogrefe-Lizenz erforderlich für offizielle Werte!
-enum NormPopulation {
-  GENERAL_POPULATION    // Allgemeinbevölkerung (Franke 2014, N=2025)
-  STUDENTS              // Studierende (Franke 2014, N=1016)
-  CLINICAL_INPATIENT    // Stationäre Psychotherapiepatienten
-  CLINICAL_REHAB        // Orthopädische Rehabilitationspatienten
-  CUSTOM                // Benutzerdefiniert
-}
-
-model NormTable {
-  id          String          @id @default(cuid())
-  name        String          // z.B. "Allgemeinbevölkerung männlich 18-65"
-  population  NormPopulation
-  gender      String?         // "männlich" | "weiblich" | null (gemischt)
-  ageMin      Int?
-  ageMax      Int?
-  sampleSize  Int?
-  source      String?         // z.B. "Franke, G.H. (2014). SCL-90-S Manual."
-  // Normwerte als JSON
-  // Format: { "S1": {"mean":0.42,"sd":0.55}, ..., "gsi":{"mean":0.35,"sd":0.35}, ... }
-  values      Json
-  isDefault   Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  sessions    AssessmentSession[]
-}
-
-// ─── Audit-Log (DSGVO Art. 30) ────────────────────────────────────────────────
-enum AuditAction {
-  SESSION_CREATED
-  SESSION_UPDATED
-  SESSION_COMPLETED
-  SESSION_SCORED
-  SESSION_VIEWED      // Therapeut hat Ergebnis angesehen
-  SESSION_EXPORTED    // PDF wurde erstellt
-  SESSION_DELETED
-  USER_CREATED
-  USER_LOGIN
-  USER_LOGOUT
-  DATA_DELETED        // Art. 17 DSGVO – Löschung auf Anfrage
-}
-
-model AuditLog {
-  id          String      @id @default(cuid())
-  userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
-  sessionId   String?
-  session     AssessmentSession? @relation(fields: [sessionId], references: [id])
-  action      AuditAction
-  ipAddress   String?
-  userAgent   String?
-  details     Json?
-  createdAt   DateTime    @default(now())
-  @@index([userId])
-  @@index([sessionId])
-  @@index([createdAt])
-}
-PRISMA_EOF
-
-chown "$APP_USER":"$APP_USER" "$APP_DIR/prisma/schema.prisma"
-success "Prisma Schema erstellt"
 
 # ─── Umgebungsvariablen (.env) ────────────────────────────────────────────────
 step ".env Datei erstellen"
@@ -511,6 +287,15 @@ sudo -u "$APP_USER" bash -c "
   pnpm build 2>&1 | tail -10
 "
 success "Next.js Build abgeschlossen"
+
+# ─── Datenbank-Seed (Demo-User) ───────────────────────────────────────────────
+step "Datenbank-Seed ausführen (Admin, Demo-Therapeut, Demo-Patient)"
+sudo -u "$APP_USER" bash -c "
+  cd '$APP_DIR'
+  # tsx für Seed installieren falls nötig
+  pnpm add -D tsx 2>/dev/null | tail -2 || true
+  npx tsx prisma/seed.ts 2>&1 | tail -10
+" && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen (DB evtl. schon befüllt – OK)"
 
 # ─── systemd Service ──────────────────────────────────────────────────────────
 step "systemd Service einrichten"
@@ -843,8 +628,8 @@ echo ""
 echo -e "  ${YELLOW}Zugangsdaten gespeichert in: ${CREDS_FILE}${NC}"
 echo ""
 echo -e "  ${BOLD}Nächste Schritte:${NC}"
-echo "  1. App-Code in ${APP_DIR}/src/ entwickeln (Prisma Schema ist fertig)"
-echo "  2. Ersten Admin-User in der DB anlegen"
+echo "  1. Browser öffnen: ${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
+echo "  2. Login: admin@scl90s.local / Admin1234!  (Passwort sofort ändern!)"
 if [[ -n "$DOMAIN" ]]; then
   echo "  3. DNS: A-Record ${DOMAIN} → $(hostname -I | awk '{print $1}')"
 fi
