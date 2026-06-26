@@ -55,13 +55,12 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
   async function handleExport() {
     setExporting(true)
     const res = await fetch(`/api/sessions/${sessionId}/export`, { method: 'POST' })
-    const blob = await res.blob()
+    const html = await res.text()
+    // In neuem Tab öffnen → Druckdialog erscheint automatisch → Als PDF speichern
+    const blob = new Blob([html], { type: 'text/html; charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `SCL90S_${patientName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
     setExporting(false)
   }
 
