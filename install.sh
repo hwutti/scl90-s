@@ -249,6 +249,11 @@ sudo -u "$APP_USER" bash -c "
 "
 success "npm-Pakete installiert"
 
+# ─── Chromium für Puppeteer (PDF-Export) ──────────────────────────────────────
+step "Chromium für PDF-Export installieren"
+apt-get install -y -qq chromium-browser 2>/dev/null ||   apt-get install -y -qq chromium 2>/dev/null ||   warn "Chromium nicht installiert – PDF Export nutzt HTML-Fallback"
+success "Chromium installiert"
+
 # Prisma Schema kommt aus Git-Repository
 
 
