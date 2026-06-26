@@ -214,10 +214,12 @@ step "App-Code von GitHub klonen"
 GITHUB_REPO="https://github.com/hwutti/scl90-s.git"
 
 if [[ -f "$APP_DIR/package.json" ]]; then
-  info "package.json gefunden – Update via git pull"
+  info "package.json gefunden – Update via git reset + pull"
   sudo -u "$APP_USER" bash -c "
     cd '$APP_DIR'
-    git pull origin main 2>&1 | tail -5
+    git fetch origin main 2>&1 | tail -3
+    git reset --hard origin/main 2>&1 | tail -3
+    git pull origin main 2>&1 | tail -3
   "
 else
   info "Klone Repository: $GITHUB_REPO"
