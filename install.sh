@@ -252,30 +252,17 @@ success "npm-Pakete installiert"
 
 # ─── Umgebungsvariablen (.env) ────────────────────────────────────────────────
 step ".env Datei erstellen"
+# .env OHNE Anführungszeichen schreiben (systemd EnvironmentFile-kompatibel)
+ENCRYPTION_KEY_VAL=$(openssl rand -hex 32)
+NEXTAUTH_URL_VAL="${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
+
 cat > "$APP_DIR/.env" << ENV_EOF
-# =============================================================================
-# SCL-90-S Webapp – Umgebungsvariablen
-# ACHTUNG: Diese Datei enthält Secrets – niemals in Git einchecken!
-# =============================================================================
-
-# Datenbank
-DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}?schema=public"
-
-# NextAuth
-NEXTAUTH_SECRET="${NEXTAUTH_SECRET}"
-NEXTAUTH_URL="${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://localhost:${APP_PORT}}"
-
-# App
-NODE_ENV="production"
-APP_PORT="${APP_PORT}"
-
-# Verschlüsselung für sensible Patientendaten (AES-256)
-# WICHTIG: Vor Produktiveinsatz mit starkem Key ersetzen!
-ENCRYPTION_KEY="$(openssl rand -hex 32)"
-
-# pgAdmin (nur für Referenz)
-# pgAdmin läuft auf Port ${PGADMIN_PORT}
-# Login: ${PGADMIN_EMAIL}
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}?schema=public
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+NEXTAUTH_URL=${NEXTAUTH_URL_VAL}
+NODE_ENV=production
+APP_PORT=${APP_PORT}
+ENCRYPTION_KEY=${ENCRYPTION_KEY_VAL}
 ENV_EOF
 
 chmod 600 "$APP_DIR/.env"
