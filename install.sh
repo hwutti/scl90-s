@@ -257,7 +257,7 @@ ENCRYPTION_KEY_VAL=$(openssl rand -hex 32)
 NEXTAUTH_URL_VAL="${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
 
 cat > "$APP_DIR/.env" << ENV_EOF
-DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}?schema=public
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
 NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
 NEXTAUTH_URL=${NEXTAUTH_URL_VAL}
 NODE_ENV=production

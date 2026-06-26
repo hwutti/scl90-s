@@ -27,15 +27,13 @@ export default function LoginPage() {
     })
 
     setLoading(false)
-    console.log('signIn result:', JSON.stringify(result))
-
     if (result?.error) {
-      setError('Anmeldedaten ungültig. (Error: ' + result.error + ')')
+      setError('Anmeldedaten ungültig. Bitte erneut versuchen.')
     } else if (result?.ok) {
       router.push('/dashboard')
       router.refresh()
     } else {
-      setError('Unbekannter Fehler: ' + JSON.stringify(result))
+      setError('Anmeldung fehlgeschlagen. Bitte erneut versuchen.')
     }
   }
 
