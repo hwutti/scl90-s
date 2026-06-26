@@ -273,7 +273,10 @@ success ".env Datei erstellt (chmod 600)"
 
 # ─── Prisma Migrations ────────────────────────────────────────────────────────
 step "Datenbank-Schema anwenden"
+# DATABASE_URL explizit setzen damit Prisma die DB findet
+DB_URL_EXPORT="export DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
 sudo -u "$APP_USER" bash -c "
+  ${DB_URL_EXPORT}
   cd '$APP_DIR'
   npx prisma generate 2>&1 | tail -3
   npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss 2>&1 | tail -5
@@ -283,6 +286,7 @@ success "Datenbank-Schema angewendet"
 # ─── Next.js Build ────────────────────────────────────────────────────────────
 step "Next.js Build erstellen"
 sudo -u "$APP_USER" bash -c "
+  ${DB_URL_EXPORT}
   cd '$APP_DIR'
   pnpm build
 "
@@ -291,9 +295,8 @@ success "Next.js Build abgeschlossen"
 # ─── Datenbank-Seed (Demo-User) ───────────────────────────────────────────────
 step "Datenbank-Seed ausführen (Admin, Demo-Therapeut, Demo-Patient)"
 sudo -u "$APP_USER" bash -c "
+  ${DB_URL_EXPORT}
   cd '$APP_DIR'
-  # tsx für Seed installieren falls nötig
-  pnpm add -D tsx 2>/dev/null | tail -2 || true
   npx tsx prisma/seed.ts 2>&1 | tail -10
 " && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen (DB evtl. schon befüllt – OK)"
 
