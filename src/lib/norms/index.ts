@@ -8,7 +8,8 @@ import {
   PST_NORM_MAENNLICH, PST_NORM_WEIBLICH, PST_NORM_GESAMT_D,
 } from './lookup'
 
-export { AgeGroup, AGE_GROUPS, getAgeGroup }
+export type { AgeGroup }
+export { AGE_GROUPS, getAgeGroup }
 
 export type Gender = 'männlich' | 'weiblich'
 export type NormSource = 'franke2014_alter_geschlecht' | 'franke2014_gesamt' | 'none'

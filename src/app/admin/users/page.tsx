@@ -11,10 +11,12 @@ export default async function UsersPage() {
   const role = (session.user as any).role
   if (!['ADMIN','THERAPIST'].includes(role)) redirect('/dashboard')
 
-  const users = await prisma.user.findMany({
+  const usersRaw = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },
     select: { id: true, name: true, email: true, role: true, pin: true, active: true, createdAt: true, _count: { select: { sessions: true } } },
   })
+
+  const users = usersRaw.map(u => ({ ...u, createdAt: u.createdAt.toISOString() }))
 
   return (
     <PageShell>
