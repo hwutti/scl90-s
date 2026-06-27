@@ -115,6 +115,29 @@ fi
 
 # ─── 6. Build ────────────────────────────────────────────────────────────────
 step "Next.js Build"
+# ─── NEXTAUTH_URL automatisch auf aktuelle Domain setzen ──────────────────────
+step "NEXTAUTH_URL prüfen"
+ENV_FILE="$APP_DIR/.env"
+NGINX_DOMAIN=$(grep -rh "server_name" /etc/nginx/sites-enabled/ 2>/dev/null | grep -v "localhost\|127\.0\.0\.1\|_" | awk '{print $2}' | tr -d ';' | grep "\." | head -1)
+
+if [[ -n "$NGINX_DOMAIN" ]]; then
+  if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
+    NEW_URL="https://$NGINX_DOMAIN"
+  else
+    NEW_URL="http://$NGINX_DOMAIN"
+  fi
+  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2-)
+  if [[ "$CURRENT_URL" != "$NEW_URL" ]]; then
+    warn "NEXTAUTH_URL: $CURRENT_URL → $NEW_URL"
+    sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
+    success "NEXTAUTH_URL aktualisiert: $NEW_URL"
+  else
+    success "NEXTAUTH_URL korrekt: $CURRENT_URL"
+  fi
+else
+  warn "Keine Nginx-Domain erkannt – NEXTAUTH_URL manuell prüfen"
+fi
+
 step "Next.js Build wird gestartet"
 sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
