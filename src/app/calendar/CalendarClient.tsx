@@ -96,9 +96,9 @@ function DayCell({ day, children, onClick, dragOver, onDragOver, onDragLeave, on
         'cursor-pointer hover:bg-slate-50/80'
       )}
       onClick={onClick}
-      onDragOver={e => { e.preventDefault(); setDragOver(dateStr) }}
-      onDragLeave={() => setDragOver(null)}
-      onDrop={e => { e.preventDefault(); handleDrop(dateStr) }}
+      onDragOver={e => { e.preventDefault(); onDragOver?.(dateStr) }}
+      onDragLeave={() => onDragLeave?.()}
+      onDrop={e => { e.preventDefault(); onDrop?.(dateStr) }}
     >
       <div className="flex items-start justify-between mb-1">
         <span className={cn(
