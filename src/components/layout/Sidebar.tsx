@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: '/my',                     label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
   { href: '/my/appointments',        label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
-  { href: '/admin',                  label: 'Administration',      icon: Shield,       roles: ['ADMIN'],
+  { href: '/admin/users',            label: 'Administration',      icon: Shield,       roles: ['ADMIN'],
     sub: [
       { href: '/admin/users',             label: 'Benutzer' },
       { href: '/admin/appointment-types', label: 'Termintypen' },
