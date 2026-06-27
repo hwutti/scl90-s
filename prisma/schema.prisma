@@ -7,17 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum Role {
   ADMIN
   THERAPIST
   PATIENT
 }
 
-enum SessionStatus {
-  IN_PROGRESS
-  COMPLETED
-  SCORED
-  LOCKED
+enum Gender {
+  MALE
+  FEMALE
+  DIVERSE
+}
+
+enum AssessmentStatus {
+  ASSIGNED    // Therapeut hat angelegt, Patient noch nicht gestartet
+  IN_PROGRESS // Patient hat begonnen
+  COMPLETED   // Alle Items beantwortet
+  SCORED      // Auswertung berechnet
+  LOCKED      // Gesperrt (archiviert)
+}
+
+enum NoteType {
+  PROGRESS    // Verlaufsnotiz (§16a)
+  ANAMNESIS   // Anamnesegespräch
+  GOAL        // Therapieziel
+  INTERVENTION
+  OTHER
 }
 
 enum NormPopulation {
@@ -29,18 +46,29 @@ enum NormPopulation {
 }
 
 enum AuditAction {
-  SESSION_CREATED
-  SESSION_UPDATED
-  SESSION_COMPLETED
-  SESSION_SCORED
-  SESSION_VIEWED
-  SESSION_EXPORTED
-  SESSION_DELETED
+  PATIENT_CREATED
+  PATIENT_UPDATED
+  PATIENT_VIEWED
+  PATIENT_DELETED
+  RECORD_UPDATED
+  ASSESSMENT_CREATED
+  ASSESSMENT_STARTED
+  ASSESSMENT_COMPLETED
+  ASSESSMENT_SCORED
+  ASSESSMENT_VIEWED
+  ASSESSMENT_EXPORTED
+  ASSESSMENT_DELETED
+  NOTE_CREATED
+  NOTE_UPDATED
+  NOTE_DELETED
   USER_CREATED
+  USER_UPDATED
   USER_LOGIN
   USER_LOGOUT
   DATA_DELETED
 }
+
+// ─── Auth (NextAuth) ──────────────────────────────────────────────────────────
 
 model User {
   id           String    @id @default(cuid())
@@ -53,14 +81,20 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Therapeut-Patient Hierarchie (für User-basierte Zuordnung, bleibt für Admin/Therapeut)
   therapistId  String?
-  therapist    User?     @relation("TherapistPatients", fields: [therapistId], references: [id])
-  patients     User[]    @relation("TherapistPatients")
+  therapist    User?     @relation("TherapistUsers", fields: [therapistId], references: [id])
+  subordinates User[]    @relation("TherapistUsers")
 
-  sessions     AssessmentSession[]
-  auditLogs    AuditLog[]
-  nextAuthSessions NextAuthSession[]
-  accounts     Account[]
+  // Relationen
+  createdPatients   Patient[]          @relation("CreatedByUser")
+  patientProfile    Patient?           @relation("PatientUser")
+  therapistPatients TherapistPatient[] @relation("TherapistRelation")
+  createdAssessments Assessment[]      @relation("AssessmentCreator")
+  sessionNotes      SessionNote[]      @relation("NoteAuthor")
+  auditLogs         AuditLog[]
+  nextAuthSessions  NextAuthSession[]
+  accounts          Account[]
 }
 
 model Account {
@@ -95,56 +129,200 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model AssessmentSession {
-  id            String        @id @default(cuid())
-  userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status        SessionStatus @default(IN_PROGRESS)
-  occasion      String?
-  patientName   String?
-  patientDob    String?
-  patientGender String?
-  startedAt     DateTime      @default(now())
-  completedAt   DateTime?
-  scoredAt      DateTime?
-  normTableId   String?
-  normTable     NormTable?    @relation(fields: [normTableId], references: [id])
-  answers       Answer[]
-  result        AssessmentResult?
-  auditLogs     AuditLog[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+// ─── Kern: Patient ────────────────────────────────────────────────────────────
+
+model Patient {
+  id              String    @id @default(cuid())
+
+  // Stammdaten
+  firstName       String
+  lastName        String
+  dob             String    // YYYY-MM-DD
+  gender          Gender
+  svnr            String?   // Sozialversicherungsnummer (optional, verschlüsselt)
+  phone           String?
+  email           String?
+  insuranceProvider String? // Versicherungsträger
+  referralSource  String?   // Zuweiser / Zuweisung durch
+
+  // Beziehungen zu Users
+  createdByUserId String
+  createdBy       User      @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+
+  patientUserId   String?   @unique  // falls Patient selbst einen Login hat (PIN)
+  patientUser     User?     @relation("PatientUser", fields: [patientUserId], references: [id])
+
+  // Status
+  active          Boolean   @default(true)
+  deletedAt       DateTime? // soft delete (Aufbewahrungspflicht 10 Jahre §16a)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationen
+  therapists      TherapistPatient[]
+  record          PatientRecord?
+  assessments     Assessment[]
+  sessionNotes    SessionNote[]
+  auditLogs       AuditLog[]
+
+  @@index([lastName, firstName])
+  @@index([dob])
+}
+
+// Therapeut ↔ Patient (many-to-many, ein Patient kann mehrere Behandler haben)
+model TherapistPatient {
+  id               String    @id @default(cuid())
+  therapistId      String
+  therapist        User      @relation("TherapistRelation", fields: [therapistId], references: [id])
+  patientId        String
+  patient          Patient   @relation(fields: [patientId], references: [id])
+  isPrimary        Boolean   @default(true)
+  since            DateTime  @default(now())
+  until            DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([therapistId, patientId])
+  @@index([therapistId])
+  @@index([patientId])
+}
+
+// ─── Patientenakte (klinischer Inhalt) ───────────────────────────────────────
+
+model PatientRecord {
+  id              String    @id @default(cuid())
+  patientId       String    @unique
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Anamnese
+  chiefComplaint  String?   // Hauptbeschwerde
+  medicalHistory  String?   // Psychiatrische/medizinische Vorgeschichte
+  medication      String?   // Aktuelle Medikation
+  allergies       String?   // Allergien / Unverträglichkeiten
+  familyHistory   String?   // Familienanamnese
+  socialHistory   String?   // Soziale Anamnese (Beruf, Beziehung, etc.)
+
+  // Diagnosen (ICD-10, als JSON-Array)
+  // Format: [{code: "F32.1", label: "Mittelgradige depressive Episode", date: "2024-01-15", isPrimary: true}]
+  diagnoses       Json      @default("[]")
+
+  // Therapie
+  therapyGoals    String?   // Therapieziele (Freitext)
+  therapyStart    DateTime?
+  therapyEnd      DateTime?
+  sessionFrequency String?  // z.B. "wöchentlich", "14-tägig"
+
+  // Sonstiges
+  notes           String?   // Interne Notizen des Therapeuten (nicht für Patient sichtbar)
+
+  // Versionierung (jede Änderung wird protokolliert)
+  version         Int       @default(1)
+  updatedAt       DateTime  @updatedAt
+  updatedByUserId String?
+}
+
+// ─── Instrumente (erweiterbar) ───────────────────────────────────────────────
+
+model Instrument {
+  id          String       @id @default(cuid())
+  code        String       @unique // "SCL90S", "BDI2", "PHQ9", "GAD7", …
+  name        String       // "SCL-90-S – Symptom-Checkliste 90 Standard"
+  shortName   String       // "SCL-90-S"
+  version     String       @default("1.0")
+  description String?
+  itemCount   Int
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+
+  assessments Assessment[]
+}
+
+// ─── Assessment (ein Test = eine Erhebung eines Instruments) ─────────────────
+
+model Assessment {
+  id              String           @id @default(cuid())
+  patientId       String
+  patient         Patient          @relation(fields: [patientId], references: [id])
+  instrumentId    String
+  instrument      Instrument       @relation(fields: [instrumentId], references: [id])
+  createdByUserId String
+  createdBy       User             @relation("AssessmentCreator", fields: [createdByUserId], references: [id])
+
+  status          AssessmentStatus @default(ASSIGNED)
+  occasion        String?          // z.B. "Ersterhebung", "Verlauf Woche 4"
+
+  // Norm-Kontext (wird aus Patientenstammdaten befüllt, kann überschrieben werden)
+  normTableId     String?
+  normTable       NormTable?       @relation(fields: [normTableId], references: [id])
+
+  // Zeitstempel
+  startedAt       DateTime?
+  completedAt     DateTime?
+  scoredAt        DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  answers         Answer[]
+  result          AssessmentResult?
+  auditLogs       AuditLog[]
+
+  @@index([patientId])
+  @@index([instrumentId])
 }
 
 model Answer {
-  id          String            @id @default(cuid())
-  sessionId   String
-  session     AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  itemNumber  Int
-  value       Int?
-  answeredAt  DateTime?
-  @@unique([sessionId, itemNumber])
-  @@index([sessionId])
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  itemNumber   Int
+  value        Int?
+  answeredAt   DateTime?
+
+  @@unique([assessmentId, itemNumber])
+  @@index([assessmentId])
 }
 
 model AssessmentResult {
-  id               String            @id @default(cuid())
-  sessionId        String            @unique
-  session          AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  gs               Float
-  gsi              Float
-  pst              Int
-  psdi             Float?
-  missingTotal     Int
-  gsiT             Float?
-  pstT             Float?
-  psdiT            Float?
-  isClinicalCase   Boolean
-  clinicalReason   String?
-  scaleScores      Json
-  additionalItemFlags Json?
-  createdAt        DateTime          @default(now())
+  id               String     @id @default(cuid())
+  assessmentId     String     @unique
+  assessment       Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  // Flexibles JSON — jedes Instrument speichert sein eigenes Format
+  // SCL-90-S: {gs, gsi, pst, psdi, gsiT, pstT, psdiT, isClinicalCase, clinicalReason, scales[]}
+  // BDI-II:   {totalScore, severity, subscales[]}
+  scores           Json
+
+  // Gemeinsame Felder über alle Instrumente
+  isClinicalCase   Boolean    @default(false)
+  clinicalSummary  String?    // Kurzzusammenfassung in Klartext
+
+  createdAt        DateTime   @default(now())
 }
+
+// ─── Verlaufsnotizen (§16a Psychotherapiegesetz) ─────────────────────────────
+
+model SessionNote {
+  id          String    @id @default(cuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  authorId    String
+  author      User      @relation("NoteAuthor", fields: [authorId], references: [id])
+
+  date        DateTime  // Datum der Sitzung
+  noteType    NoteType  @default(PROGRESS)
+  content     String    // Inhalt (Freitext, §16a konform)
+
+  // Soft-delete (Löschung protokollieren, aber 10 Jahre aufbewahren)
+  deletedAt   DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([patientId])
+  @@index([authorId])
+  @@index([date])
+}
+
+// ─── Normtabellen ────────────────────────────────────────────────────────────
 
 model NormTable {
   id          String         @id @default(cuid())
@@ -158,21 +336,28 @@ model NormTable {
   values      Json
   isDefault   Boolean        @default(false)
   createdAt   DateTime       @default(now())
-  sessions    AssessmentSession[]
+
+  assessments Assessment[]
 }
 
+// ─── Audit-Log (DSGVO Art. 30) ───────────────────────────────────────────────
+
 model AuditLog {
-  id        String      @id @default(cuid())
-  userId    String?
-  user      User?       @relation(fields: [userId], references: [id])
-  sessionId String?
-  session   AssessmentSession? @relation(fields: [sessionId], references: [id])
-  action    AuditAction
-  ipAddress String?
-  userAgent String?
-  details   Json?
-  createdAt DateTime    @default(now())
+  id           String      @id @default(cuid())
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id])
+  patientId    String?
+  patient      Patient?    @relation(fields: [patientId], references: [id])
+  assessmentId String?
+  assessment   Assessment? @relation(fields: [assessmentId], references: [id])
+  action       AuditAction
+  ipAddress    String?
+  userAgent    String?
+  details      Json?
+  createdAt    DateTime    @default(now())
+
   @@index([userId])
-  @@index([sessionId])
+  @@index([patientId])
+  @@index([assessmentId])
   @@index([createdAt])
 }

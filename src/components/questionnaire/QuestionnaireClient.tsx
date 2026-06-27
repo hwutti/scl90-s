@@ -12,6 +12,7 @@ interface Props {
   patientDob: string
   occasion: string
   initialAnswers: Record<number, number | null>
+  apiBase?: string  // '/api/assessments' (neu) oder '/api/sessions' (legacy)
 }
 
 const SCORE_COLORS = [
@@ -29,7 +30,7 @@ const SCORE_COLORS_ACTIVE = [
   'bg-red-600 border-red-700 text-white',
 ]
 
-export function QuestionnaireClient({ sessionId, patientName, patientDob, patientGender, occasion, initialAnswers }: Props) {
+export function QuestionnaireClient({ sessionId, patientName, patientDob, patientGender, occasion, initialAnswers, apiBase = '/api/assessments' }: Props) {
   const router = useRouter()
   const [answers, setAnswers] = useState<Record<number, number | null>>(initialAnswers)
   const [currentIdx, setCurrentIdx] = useState(0)  // 0-basiert
@@ -77,7 +78,7 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
     const t = setTimeout(async () => {
       saveTimeouts.current.delete(itemNumber)
       setSaving(true)
-      await fetch(`/api/sessions/${sessionId}/answers`, {
+      await fetch(`${apiBase}/${sessionId}/answers`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemNumber, value }),
@@ -95,7 +96,7 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
 
   async function handleScore() {
     setScoring(true)
-    const res = await fetch(`/api/sessions/${sessionId}/score`, { method: 'POST' })
+    const res = await fetch(`${apiBase}/${sessionId}/score`, { method: 'POST' })
     const data = await res.json()
     setScoring(false)
     if (data.ok) router.push(`/session/${sessionId}/results`)

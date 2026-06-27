@@ -18,6 +18,8 @@ interface Props {
   startedAt: string
   scoring: ScoringResult
   answers: Record<number, number | null>
+  backUrl?: string
+  exportUrl?: string
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -35,7 +37,7 @@ function RiskBadge({ risk }: { risk: string | null }) {
 
 type ChartMode = 'bar' | 'radar'
 
-export function ResultsClient({ sessionId, patientName, patientGender, patientDob, occasion, startedAt, scoring, answers }: Props) {
+export function ResultsClient({ sessionId, patientName, patientGender, patientDob, occasion, startedAt, scoring, answers, backUrl = '/dashboard', exportUrl }: Props) {
   const router = useRouter()
   const [chartMode, setChartMode] = useState<ChartMode>('bar')
   const [exporting, setExporting] = useState(false)
@@ -54,7 +56,8 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
 
   async function handleExport() {
     setExporting(true)
-    const res = await fetch(`/api/sessions/${sessionId}/export`, { method: 'POST' })
+    const url = exportUrl ?? `/api/assessments/${sessionId}/export`
+    const res = await fetch(url, { method: 'POST' })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
