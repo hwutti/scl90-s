@@ -19,11 +19,16 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/patients',        label: 'Patienten',         icon: Users,    roles: ['ADMIN','THERAPIST'] },
-  { href: '/my',              label: 'Meine Tests',       icon: Activity, roles: ['PATIENT'] },
-  { href: '/admin/users',     label: 'Benutzer',          icon: Shield,   roles: ['ADMIN','THERAPIST'] },
-  { href: '/admin/branding',  label: 'Branding & Praxis', icon: Settings, roles: ['ADMIN'] },
-  { href: '/admin/norm-tables', label: 'Normwerte',       icon: Settings, roles: ['ADMIN'] },
+  { href: '/patients',                label: 'Patienten',          icon: Users,        roles: ['ADMIN','THERAPIST'] },
+  { href: '/calendar',                 label: 'Kalender',           icon: CalendarDays, roles: ['ADMIN','THERAPIST'] },
+  { href: '/my',                       label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
+  { href: '/my/appointments',          label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
+  { href: '/admin/users',              label: 'Benutzer',           icon: Shield,       roles: ['ADMIN','THERAPIST'] },
+  { href: '/admin/appointment-types',  label: 'Termintypen',        icon: Clock8,       roles: ['ADMIN','THERAPIST'] },
+  { href: '/admin/availability',       label: 'Verfügbarkeit',      icon: Clock8,       roles: ['ADMIN','THERAPIST'] },
+  { href: '/calendar/stats',           label: 'Auslastung',         icon: BarChart3,    roles: ['ADMIN','THERAPIST'] },
+  { href: '/admin/branding',           label: 'Branding & Praxis',  icon: Settings,     roles: ['ADMIN'] },
+  { href: '/admin/norm-tables',        label: 'Normwerte',          icon: Settings,     roles: ['ADMIN'] },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
