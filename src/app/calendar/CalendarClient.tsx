@@ -136,7 +136,7 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ startAt: newStart.toISOString() }),
     })
-    load()
+    await Promise.all([load(), loadStats()])
   }
 
   function newApptUrl(dateStr: string): string {

@@ -1,4 +1,7 @@
 'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { RefreshCw } from 'lucide-react'
+
 const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So']
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Ausstehend', CONFIRMED: 'Bestätigt', CANCELLED: 'Abgesagt',
@@ -9,16 +12,65 @@ const STATUS_COLORS: Record<string, string> = {
   NO_SHOW: '#ef4444', COMPLETED: '#6366f1',
 }
 
-export function CalendarStatsClient({ byStatus, byType, byDay, month }: any) {
+export function CalendarStatsClient() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/calendar/stats/full')
+      const json = await res.json()
+      setData(json)
+      setLastUpdated(new Date())
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    // Auto-Refresh alle 30 Sekunden
+    const interval = setInterval(load, 30_000)
+    return () => clearInterval(interval)
+  }, [load])
+
+  if (!data && loading) {
+    return <div className="text-slate-400 text-sm p-8 text-center">Lade Statistiken…</div>
+  }
+
+  if (!data) return null
+
+  const { byStatus, byType, byDay } = data
   const total = byStatus.reduce((s: number, b: any) => s + b._count, 0)
   const maxDay = Math.max(...byDay, 1)
   const maxType = Math.max(...byType.map((b: any) => b._count), 1)
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Auslastung & Statistiken</h1>
-        <p className="text-slate-400 text-sm mt-0.5">{month} · {total} Termine gesamt</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Auslastung & Statistiken</h1>
+          <p className="text-slate-400 text-sm mt-0.5">{month} · {total} Termine gesamt</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="text-xs text-slate-400">
+              Stand: {lastUpdated.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="btn-secondary p-2"
+            title="Jetzt aktualisieren"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Status-Übersicht */}
