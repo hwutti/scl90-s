@@ -252,7 +252,8 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
           <div className="card p-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Diagnosen (ICD-10)</p>
             {(() => {
-              const diagnoses: any[] = patient.record?.diagnoses ?? []
+              const raw = patient.record?.diagnoses ?? []
+              const diagnoses: any[] = typeof raw === 'string' ? JSON.parse(raw) : Array.isArray(raw) ? raw : []
               return diagnoses.length === 0
                 ? <p className="text-sm text-slate-300">Keine Diagnose eingetragen</p>
                 : diagnoses.map((d: any, i: number) => (
