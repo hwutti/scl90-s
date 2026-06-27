@@ -2,75 +2,365 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Branding CSS-Variablen (werden vom Layout überschrieben) ─── */
+/* ─── Design Tokens ────────────────────────────────────────────── */
 :root {
-  --color-primary:       #166534;
-  --color-primary-light: #dcfce7;
-  --color-accent:        #14532d;
-  --sidebar-width:       260px;
+  --color-primary:        #4f46e5;   /* Indigo */
+  --color-primary-light:  #eef2ff;
+  --color-primary-dark:   #3730a3;
+  --color-accent:         #6366f1;
+  --sidebar-width:        240px;
+
+  /* Surfaces */
+  --surface-0:  #f1f5f9;   /* page bg */
+  --surface-1:  #f8fafc;   /* subtle card */
+  --surface-2:  #ffffff;   /* card / panel */
+
+  /* Text */
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+
+  /* Border */
+  --border:        #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* Status */
+  --green:  #16a34a; --green-bg:  #f0fdf4; --green-border:  #bbf7d0;
+  --yellow: #d97706; --yellow-bg: #fffbeb; --yellow-border: #fde68a;
+  --red:    #dc2626; --red-bg:    #fef2f2; --red-border:    #fecaca;
+  --blue:   #2563eb; --blue-bg:   #eff6ff; --blue-border:   #bfdbfe;
 }
 
+/* ─── Base ──────────────────────────────────────────────────────── */
 @layer base {
+  * { box-sizing: border-box; }
+
   body {
-    @apply bg-slate-100 text-slate-800 antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    @apply antialiased;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
   }
+
+  h1 { @apply text-xl font-semibold tracking-tight; color: var(--text-primary); }
+  h2 { @apply text-base font-semibold; color: var(--text-primary); }
+  h3 { @apply text-sm font-semibold; color: var(--text-primary); }
 }
 
+/* ─── Components ────────────────────────────────────────────────── */
 @layer components {
+
+  /* ── Layout ── */
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  .page-title {
+    @apply text-lg font-semibold;
+    color: var(--text-primary);
+  }
+  .page-subtitle {
+    @apply text-xs mt-0.5;
+    color: var(--text-muted);
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+  }
+  .card-header {
+    @apply flex items-center justify-between px-4 py-3;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .card-title {
+    @apply text-sm font-semibold;
+    color: var(--text-secondary);
+  }
+  .card-body {
+    @apply p-4;
+  }
+
+  /* ── Stat / KPI cards ── */
+  .stat-card {
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    @apply p-4;
+  }
+  .stat-value {
+    @apply text-2xl font-semibold tabular-nums;
+    color: var(--text-primary);
+  }
+  .stat-label {
+    @apply text-xs mt-0.5;
+    color: var(--text-muted);
+  }
+
   /* ── Buttons ── */
   .btn {
-    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium
-           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium
+           transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed
+           active:scale-95 whitespace-nowrap;
   }
   .btn-primary {
-    @apply btn text-white hover:opacity-90 active:scale-95 shadow-sm;
+    @apply btn text-white shadow-sm;
     background-color: var(--color-primary);
   }
+  .btn-primary:hover { background-color: var(--color-primary-dark); }
+
   .btn-secondary {
-    @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 active:scale-95 shadow-sm;
+    @apply btn shadow-sm;
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border-strong);
   }
+  .btn-secondary:hover {
+    background: var(--surface-1);
+    color: var(--text-primary);
+  }
+
   .btn-danger {
-    @apply btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:scale-95;
+    @apply btn;
+    background: var(--red-bg);
+    color: var(--red);
+    border: 0.5px solid var(--red-border);
+  }
+  .btn-danger:hover { background: #fee2e2; }
+
+  .btn-ghost {
+    @apply btn;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-1);
+    color: var(--text-primary);
   }
 
-  /* ── Karten ── */
-  .card {
-    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
-  }
-
-  /* ── Formular ── */
+  /* ── Form Elements ── */
   .input {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm
-           placeholder:text-slate-400 focus:outline-none transition-all;
+    @apply w-full rounded-lg text-sm px-3 py-2;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border-strong);
+    color: var(--text-primary);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
+  .input::placeholder { color: var(--text-muted); }
   .input:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-primary);
     border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
   }
+  .input:disabled {
+    background: var(--surface-1);
+    color: var(--text-muted);
+  }
+
   .label {
-    @apply block text-sm font-medium text-slate-700 mb-1.5;
+    @apply block text-xs font-medium mb-1;
+    color: var(--text-secondary);
+  }
+
+  .form-section {
+    @apply space-y-4;
+  }
+  .form-row {
+    @apply grid gap-4;
+  }
+  .form-row-2 { @apply grid grid-cols-2 gap-4; }
+  .form-row-3 { @apply grid grid-cols-3 gap-4; }
+
+  /* ── Tables ── */
+  .table-wrap {
+    @apply overflow-x-auto;
+  }
+  table.data-table {
+    @apply w-full text-sm;
+  }
+  table.data-table thead {
+    border-bottom: 0.5px solid var(--border);
+  }
+  table.data-table thead th {
+    @apply px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide;
+    color: var(--text-muted);
+    background: var(--surface-1);
+  }
+  table.data-table tbody tr {
+    border-bottom: 0.5px solid var(--border);
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  table.data-table tbody tr:last-child { border-bottom: none; }
+  table.data-table tbody tr:hover { background: var(--surface-1); }
+  table.data-table tbody td {
+    @apply px-4 py-2.5;
+    color: var(--text-secondary);
+  }
+  table.data-table tbody td.td-primary {
+    @apply font-medium;
+    color: var(--text-primary);
   }
 
   /* ── Badges ── */
-  .badge-green  { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800; }
-  .badge-yellow { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800; }
-  .badge-red    { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800; }
-  .badge-gray   { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-600; }
-  .badge-blue   { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800; }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-green  { @apply badge; background: var(--green-bg);  color: var(--green);  border: 0.5px solid var(--green-border); }
+  .badge-yellow { @apply badge; background: var(--yellow-bg); color: var(--yellow); border: 0.5px solid var(--yellow-border); }
+  .badge-red    { @apply badge; background: var(--red-bg);    color: var(--red);    border: 0.5px solid var(--red-border); }
+  .badge-blue   { @apply badge; background: var(--blue-bg);   color: var(--blue);   border: 0.5px solid var(--blue-border); }
+  .badge-gray   { @apply badge; background: var(--surface-1); color: var(--text-muted); border: 0.5px solid var(--border); }
+  .badge-indigo { @apply badge; background: var(--color-primary-light); color: var(--color-primary); border: 0.5px solid #c7d2fe; }
 
-  /* ── Sidebar Nav-Link ── */
+  /* ── Tabs ── */
+  .tab-bar {
+    @apply flex gap-1 p-1 rounded-lg mb-4;
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+  }
+  .tab-item {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
+           cursor-pointer transition-all duration-150;
+    color: var(--text-muted);
+  }
+  .tab-item:hover { color: var(--text-secondary); }
+  .tab-item.active {
+    background: var(--surface-2);
+    color: var(--color-primary);
+    border: 0.5px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .tab-count {
+    @apply text-xs px-1.5 py-0.5 rounded-full;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  /* ── Sidebar Nav ── */
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-           text-slate-600 hover:bg-slate-100 transition-all duration-150 cursor-pointer;
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium
+           cursor-pointer transition-all duration-150;
+    color: var(--text-secondary);
+  }
+  .nav-link:hover {
+    background: var(--surface-1);
+    color: var(--text-primary);
   }
   .nav-link.active {
-    @apply font-semibold;
+    background: var(--color-primary-light);
     color: var(--color-primary);
-    background-color: var(--color-primary-light);
   }
-  .nav-link.active svg {
+  .nav-link.active svg, .nav-link.active i { color: var(--color-primary); }
+
+  .nav-section-label {
+    @apply text-xs font-semibold uppercase tracking-wider px-3 py-2 mt-2;
+    color: var(--text-muted);
+    letter-spacing: 0.07em;
+  }
+
+  /* ── Modal / Dialog ── */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(2px);
+  }
+  .modal {
+    @apply w-full max-w-lg;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  }
+  .modal-header {
+    @apply flex items-center justify-between px-5 py-4;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .modal-body { @apply px-5 py-4 space-y-4; }
+  .modal-footer {
+    @apply flex gap-3 px-5 py-4;
+    border-top: 0.5px solid var(--border);
+  }
+
+  /* ── Empty State ── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-center;
+  }
+  .empty-state-icon {
+    @apply mb-3 opacity-25;
+    color: var(--text-muted);
+  }
+  .empty-state-text {
+    @apply text-sm;
+    color: var(--text-muted);
+  }
+
+  /* ── Divider ── */
+  .divider {
+    border: none;
+    border-top: 0.5px solid var(--border);
+  }
+
+  /* ── Field Row (detail views) ── */
+  .field-row {
+    @apply flex items-center justify-between py-2;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-label {
+    @apply text-xs;
+    color: var(--text-muted);
+  }
+  .field-value {
+    @apply text-sm font-medium text-right;
+    color: var(--text-primary);
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    @apply flex items-center gap-2 px-5 py-3;
+    background: var(--surface-2);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .breadcrumb {
+    @apply flex items-center gap-1.5 text-xs;
+    color: var(--text-muted);
+  }
+  .breadcrumb-link {
+    cursor: pointer;
     color: var(--color-primary);
+    transition: opacity 0.15s;
+  }
+  .breadcrumb-link:hover { opacity: 0.75; }
+
+  /* ── Avatar ── */
+  .avatar {
+    @apply flex items-center justify-center rounded-lg font-semibold flex-shrink-0;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+  .avatar-sm  { @apply avatar w-7 h-7 text-xs; }
+  .avatar-md  { @apply avatar w-9 h-9 text-sm; }
+  .avatar-lg  { @apply avatar w-12 h-12 text-base; }
+  .avatar-xl  { @apply avatar w-16 h-16 text-xl; }
+
+  /* ── Search Input ── */
+  .search-wrap {
+    @apply relative;
+  }
+  .search-wrap .search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5;
+    color: var(--text-muted);
+  }
+  .search-wrap input {
+    @apply input pl-8;
+  }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    @apply animate-spin rounded-full border-2;
+    border-color: var(--border);
+    border-top-color: var(--color-primary);
   }
 }
