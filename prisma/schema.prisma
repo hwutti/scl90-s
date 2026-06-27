@@ -71,6 +71,19 @@ enum AuditAction {
   APPOINTMENT_CANCELLED
   APPOINTMENT_NO_SHOW
   APPOINTMENT_COMPLETED
+  DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
+  DOCUMENT_VIEWED
+  DIAGNOSIS_CREATED
+  DIAGNOSIS_UPDATED
+  DIAGNOSIS_DELETED
+  GOAL_CREATED
+  GOAL_UPDATED
+  FINANCE_CREATED
+  FINANCE_UPDATED
+  FINANCE_DELETED
+  MILEAGE_CREATED
+  MILEAGE_DELETED
 }
 
 // ─── Auth (NextAuth) ──────────────────────────────────────────────────────────
@@ -180,6 +193,12 @@ model Patient {
   auditLogs       AuditLog[]
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
+  photo           PatientPhoto?
+  documents       PatientDocument[]
+  therapyGoals    TherapyGoal[]
+  diagnoses       PatientDiagnosis[]
+  transactions    FinanceTransaction[]
+  mileageLogs     MileageLog[]
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -600,4 +619,208 @@ model NotificationSetting {
   reminderHours   Int[]   @default([24, 1])   // Erinnerung X Stunden vorher
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Patientenfoto ───────────────────────────────────────────────────────────
+
+model PatientPhoto {
+  id          String   @id @default(cuid())
+  patientId   String   @unique
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  data        Bytes    // binary image data
+  mimeType    String   // "image/jpeg", "image/png"
+  uploadedAt  DateTime @default(now())
+  uploadedBy  String   // userId
+}
+
+// ─── Patientendokumente ──────────────────────────────────────────────────────
+
+enum DocumentCategory {
+  REFERRAL        // Zuweisung
+  REPORT          // Befund
+  CERTIFICATE     // Attest
+  THERAPY_REPORT  // Therapiebericht
+  INSURANCE       // Versicherungsdokument
+  CONSENT         // Einverständniserklärung
+  OTHER           // Sonstiges
+}
+
+model PatientDocument {
+  id          String           @id @default(cuid())
+  patientId   String
+  patient     Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploadedBy  String           // userId
+  category    DocumentCategory @default(OTHER)
+  name        String           // Dateiname / Bezeichnung
+  mimeType    String
+  size        Int              // Bytes
+  data        Bytes            // binary file data
+  note        String?          // optionale Bemerkung
+  uploadedAt  DateTime         @default(now())
+
+  @@index([patientId])
+  @@index([category])
+}
+
+// ─── Therapieplan & Ziele ────────────────────────────────────────────────────
+
+enum TherapyGoalStatus {
+  OPEN
+  IN_PROGRESS
+  ACHIEVED
+  ABANDONED
+}
+
+model TherapyGoal {
+  id          String            @id @default(cuid())
+  patientId   String
+  patient     Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy   String            // userId
+  title       String
+  description String?
+  status      TherapyGoalStatus @default(OPEN)
+  priority    Int               @default(1)  // 1=hoch, 2=mittel, 3=niedrig
+  targetDate  DateTime?
+  achievedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([patientId])
+}
+
+// ─── Diagnosen (ICD-10) ──────────────────────────────────────────────────────
+
+enum DiagnosisType {
+  PRIMARY     // Hauptdiagnose
+  SECONDARY   // Nebendiagnose
+  EXCLUSION   // Ausschlussdiagnose
+}
+
+model PatientDiagnosis {
+  id          String        @id @default(cuid())
+  patientId   String
+  patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy   String        // userId
+  icdCode     String        // z.B. "F32.1"
+  icdLabel    String        // z.B. "Mittelgradige depressive Episode"
+  diagnosisType DiagnosisType @default(PRIMARY)
+  certainty   String?       // "gesichert", "Verdacht", "Ausschluss"
+  note        String?
+  diagnosedAt DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+
+  @@index([patientId])
+  @@index([icdCode])
+}
+
+// ─── Finanzen ────────────────────────────────────────────────────────────────
+
+enum TransactionType {
+  INCOME      // Einnahme
+  EXPENSE     // Ausgabe
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING     // Noch nicht bezahlt
+  PAID        // Bezahlt
+  OVERDUE     // Überfällig
+  CANCELLED   // Storniert
+}
+
+enum IncomeCategory {
+  HONORAR           // Honorare (Therapiesitzungen)
+  OTHER_INCOME      // Sonstige Einnahmen
+}
+
+enum ExpenseCategory {
+  MISC_BUSINESS     // Sonstiger betr. Aufwand
+  GENERAL           // Allg. Ausgabe
+  SESSION_TRANS     // Sessiontransaktion
+  CANCELLATION      // Storno
+  CONTINUING_ED     // Fortbildung
+  THERAPY_TRAINING  // Lehrtherapie
+  TRAVEL            // Reisekosten
+  OFFICE            // Büroartikel
+  MARKETING         // Werbung
+  LITERATURE        // Literatur
+  FEES_TAXES        // Gebühren und Abgaben
+  SVA               // SVA
+  RENT              // Miete
+  INSURANCE         // Versicherung
+  CAR               // Aufwand PKW
+  OPERATIONS        // Betriebskosten
+  ELECTRICITY       // Strom
+  PHONE_INTERNET    // Telefon/Internet
+  CLEANING          // Reinigung/Verbrauchsmaterial
+  PERSONNEL         // Personal
+  SUPERVISION       // Supervision
+  DAILY_ALLOWANCE   // Taggeld
+  ACCOMMODATION     // Nächtigungsgeld
+  MILEAGE           // Kilometergeld
+  DECOR             // Deko
+}
+
+model FinanceTransaction {
+  id            String          @id @default(cuid())
+  createdBy     String          // userId (Therapeut/Admin)
+  type          TransactionType
+  amount        Decimal         @db.Decimal(10, 2)
+  date          DateTime        // Bezahldatum
+  createdAt     DateTime        @default(now())  // Erstellungsdatum
+  description   String?
+  paymentMethod PaymentMethod   @default(BANK_TRANSFER)
+  paymentStatus PaymentStatus   @default(PAID)
+
+  // Kategorie — entweder income oder expense, nicht beide
+  incomeCategory  IncomeCategory?
+  expenseCategory ExpenseCategory?
+
+  // Verknüpfungen (optional)
+  patientId     String?
+  patient       Patient?        @relation(fields: [patientId], references: [id])
+  appointmentId String?         // Verknüpfung mit Termin
+
+  note          String?
+  invoiceNumber String?         // Belegnummer
+
+  @@index([createdBy])
+  @@index([date])
+  @@index([type])
+  @@index([patientId])
+}
+
+// ─── Fahrtenbuch ─────────────────────────────────────────────────────────────
+
+enum TripPurpose {
+  PATIENT_VISIT    // Hausbesuch
+  TRAINING         // Fortbildung
+  SUPERVISION      // Supervision
+  OFFICE           // Büro/Verwaltung
+  OTHER
+}
+
+model MileageLog {
+  id          String      @id @default(cuid())
+  createdBy   String      // userId
+  date        DateTime
+  departure   String      // Abfahrtsort
+  destination String      // Zielort
+  purpose     TripPurpose @default(OTHER)
+  purposeNote String?     // Freitext-Beschreibung
+  kilometers  Decimal     @db.Decimal(8, 2)
+  ratePerKm   Decimal     @db.Decimal(5, 4) @default(0.42)  // österreichischer Kilometersatz
+  totalAmount Decimal     @db.Decimal(10, 2)                // km × rate
+  patientId   String?     // optional bei Hausbesuchen
+  patient     Patient?    @relation(fields: [patientId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([createdBy])
+  @@index([date])
 }
