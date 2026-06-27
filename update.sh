@@ -115,17 +115,12 @@ fi
 
 # ─── 6. Build ────────────────────────────────────────────────────────────────
 step "Next.js Build"
-BUILD_OUTPUT=$(sudo -u "$APP_USER" bash -c "
+step "Next.js Build wird gestartet"
+sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
   cd $APP_DIR
   pnpm build 2>&1
-")
-
-if echo "$BUILD_OUTPUT" | grep -q "Build failed\|Error:"; then
-  echo "$BUILD_OUTPUT" | grep -A 5 "Error:" | head -20
-  fail "Build fehlgeschlagen! Service wird NICHT neu gestartet."
-fi
-success "Build erfolgreich"
+" && success "Build erfolgreich" || fail "Build fehlgeschlagen! Service wird NICHT neu gestartet."
 
 # ─── 7. Service neu starten ──────────────────────────────────────────────────
 step "Service neu starten"

@@ -171,11 +171,14 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
         <div className="flex items-center gap-2 flex-wrap">
           {/* View-Tabs */}
           <div className="flex rounded-xl bg-slate-100 p-1">
-            {[['week','Woche',Calendar],['month','Monat',LayoutGrid],['overview','Übersicht',Users]].map(([v,l,I]) => (
-              <button key={v as string} onClick={() => setView(v as ViewMode)}
+            {([['week','Woche'] , ['month','Monat'], ['overview','Übersicht']] as [ViewMode,string][]).map(([v,l]) => (
+              <button key={v} onClick={() => setView(v)}
                 className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
                   view === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
-                <(I as any) className="w-3.5 h-3.5" />{l as string}
+                {v === 'week' && <Calendar className="w-3.5 h-3.5" />}
+                {v === 'month' && <LayoutGrid className="w-3.5 h-3.5" />}
+                {v === 'overview' && <Users className="w-3.5 h-3.5" />}
+                {l}
               </button>
             ))}
           </div>
