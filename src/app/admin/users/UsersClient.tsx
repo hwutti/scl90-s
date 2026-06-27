@@ -6,7 +6,7 @@ import { Plus, Copy, Check } from 'lucide-react'
 interface UserRow {
   id: string; name: string | null; email: string | null
   role: string; pin: string | null; active: boolean
-  createdAt: string; _count: { sessions: number }
+  createdAt: string; _count: { createdPatients: number }
 }
 
 export function UsersClient({ users, currentRole }: { users: UserRow[]; currentRole: string }) {
@@ -106,7 +106,7 @@ export function UsersClient({ users, currentRole }: { users: UserRow[]; currentR
                     <span className="text-slate-500">{u.email ?? '—'}</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">{u._count.sessions}</td>
+                <td className="px-4 py-3 text-center">{u._count.createdPatients}</td>
                 <td className="px-4 py-3">
                   {u.active ? <span className="badge-green">Aktiv</span> : <span className="badge-red">Gesperrt</span>}
                 </td>
