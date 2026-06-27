@@ -108,28 +108,60 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => router.push('/patients')} className="btn-secondary p-2">
-          <ChevronLeft className="w-4 h-4" />
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <button onClick={() => router.push('/patients')} className="hover:text-indigo-600 transition-colors flex items-center gap-1">
+          <ChevronLeft className="w-3.5 h-3.5" /> Patienten
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-800">{patientName}</h1>
-            {isClinical === true && <span className="badge-red flex items-center gap-1"><AlertCircle className="w-3 h-3" /> klinisch auffällig</span>}
-            {isClinical === false && <span className="badge-green flex items-center gap-1"><CheckCircle className="w-3 h-3" /> unauffällig</span>}
+        <span>/</span>
+        <span className="text-slate-600 font-medium">{patientName}</span>
+      </div>
+
+      {/* Header-Karte */}
+      <div className="card p-5">
+        <div className="flex items-start gap-5">
+          {/* Avatar */}
+          <div className={cn(
+            'w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0',
+            isClinical === true  ? 'bg-red-100 text-red-700'
+            : isClinical === false ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-indigo-100 text-indigo-700'
+          )}>
+            {patient.firstName[0]}{patient.lastName[0]}
           </div>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {GENDER_LABEL[patient.gender]} · {age} Jahre · geb. {formatDate(patient.dob + 'T00:00:00')}
-            {patient.patientUser && <span className="ml-2 text-indigo-500">· PIN: {patient.patientUser.pin}</span>}
-          </p>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-xl font-bold text-slate-800">{patient.lastName}, {patient.firstName}</h1>
+              {isClinical === true  && <span className="badge-red flex items-center gap-1"><AlertCircle className="w-3 h-3" /> klinisch auffällig</span>}
+              {isClinical === false && <span className="badge-green flex items-center gap-1"><CheckCircle className="w-3 h-3" /> unauffällig</span>}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-slate-500">
+              <span>{GENDER_LABEL[patient.gender]}</span>
+              <span>{age} Jahre · geb. {formatDate(patient.dob + 'T00:00:00')}</span>
+              {patient.patientUser && (
+                <span className="text-indigo-500 font-mono">PIN: {patient.patientUser.pin}</span>
+              )}
+              {patient.therapists?.[0] && (
+                <span>Behandler: {patient.therapists[0].therapist.name}</span>
+              )}
+            </div>
+          </div>
+
+          {/* GSI-Wert */}
+          {latestScores?.gsiT && (
+            <div className={cn(
+              'text-center px-4 py-3 rounded-xl shrink-0',
+              isClinical ? 'bg-red-50' : 'bg-emerald-50'
+            )}>
+              <p className={cn('text-2xl font-bold tabular-nums', isClinical ? 'text-red-600' : 'text-emerald-600')}>
+                T={Math.round(latestScores.gsiT)}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">GSI aktuell</p>
+            </div>
+          )}
         </div>
-        {latestScores?.gsiT && (
-          <div className="text-right">
-            <p className="text-2xl font-bold text-slate-800">T={Math.round(latestScores.gsiT)}</p>
-            <p className="text-xs text-slate-400">GSI aktuell</p>
-          </div>
-        )}
       </div>
 
       {/* Tabs */}
