@@ -9,7 +9,7 @@ export default async function UsersPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
   const role = (session.user as any).role
-  if (!['ADMIN','THERAPIST'].includes(role)) redirect('/dashboard')
+  if (role !== 'ADMIN') redirect('/patients')
 
   const usersRaw = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },

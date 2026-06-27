@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: '/my',                     label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
   { href: '/my/appointments',        label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
-  { href: '/admin/users',            label: 'Benutzer',           icon: Shield,       roles: ['ADMIN','THERAPIST'] },
+  { href: '/admin/users',            label: 'Benutzer',           icon: Shield,       roles: ['ADMIN'] },
   { href: '/admin/branding',         label: 'Branding & Praxis',  icon: Settings,     roles: ['ADMIN'] },
   { href: '/admin/norm-tables',      label: 'Normwerte',          icon: Settings,     roles: ['ADMIN'] },
 ]
