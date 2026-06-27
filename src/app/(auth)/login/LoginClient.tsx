@@ -29,7 +29,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
       pin:      mode === 'pin'         ? pin       : undefined,
     })
     setLoading(false)
-    if (res?.ok) router.push('/dashboard')
+    if (res?.ok) window.location.href = '/dashboard'
     else setError('Ungültige Anmeldedaten. Bitte erneut versuchen.')
   }
 
@@ -113,7 +113,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
             style={{ backgroundColor: branding.colorPrimary }}
           >
             {loading
-              ? '<span>Anmelden...</span>'
+              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" /> Anmelden…</>
               : 'Anmelden'}
           </button>
         </div>
