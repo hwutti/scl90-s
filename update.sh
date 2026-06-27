@@ -1,8 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# SCL-90-S – Update-Script (vollautomatisch, kein manueller Eingriff nötig)
+# SCL-90-S – Update-Script (vollautomatisch)
 # =============================================================================
-set -euo pipefail
+set -uo pipefail
+# KEIN set -e damit einzelne Fehler nicht das ganze Script abbrechen
 
 APP_DIR="/opt/scl90s"
 APP_USER="scl90s"
@@ -23,17 +24,24 @@ echo -e "${GREEN}═════════════════════
 # ─── 1. Git ───────────────────────────────────────────────────────────────────
 step "Git: Änderungen holen"
 sudo -u "$APP_USER" git -C "$APP_DIR" config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
-sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard origin/main
-sudo -u "$APP_USER" git -C "$APP_DIR" pull origin main
+sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard origin/main || fail "git reset fehlgeschlagen"
+sudo -u "$APP_USER" git -C "$APP_DIR" pull origin main || fail "git pull fehlgeschlagen"
 COMMIT=$(sudo -u "$APP_USER" git -C "$APP_DIR" log --oneline -1)
 success "Commit: $COMMIT"
 
-# ─── 2. NEXTAUTH_URL aus Nginx-Konfiguration setzen ──────────────────────────
+# ─── 2. NEXTAUTH_URL ──────────────────────────────────────────────────────────
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
-NGINX_DOMAIN=$(grep -rh "server_name" /etc/nginx/sites-enabled/ 2>/dev/null \
-  | grep -v "localhost\|127\.0\.0\.1\|_" \
-  | awk '{print $2}' | tr -d ';' | grep "\." | head -1)
+
+# Nginx-Domain suchen (|| true verhindert Abbruch wenn nichts gefunden)
+NGINX_DOMAIN=""
+if [[ -d /etc/nginx/sites-enabled ]]; then
+  NGINX_DOMAIN=$(grep -rh "server_name" /etc/nginx/sites-enabled/ 2>/dev/null \
+    | grep -v "localhost\|127\.0\.0\.1\| _\b" \
+    | awk '{print $2}' | tr -d ';' \
+    | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
+    | head -1 || true)
+fi
 
 if [[ -n "$NGINX_DOMAIN" ]]; then
   if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
@@ -49,55 +57,41 @@ if [[ -n "$NGINX_DOMAIN" ]]; then
     success "NEXTAUTH_URL korrekt: $CURRENT_URL"
   fi
 else
-  warn "Keine Nginx-Domain erkannt – NEXTAUTH_URL bleibt unverändert"
+  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || echo "nicht gesetzt")
+  success "NEXTAUTH_URL unverändert: $CURRENT_URL"
 fi
 
 # ─── 3. Dependencies ──────────────────────────────────────────────────────────
 step "pnpm install"
-sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --frozen-lockfile 2>&1 | tail -3 || pnpm install 2>&1 | tail -3"
+sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --frozen-lockfile 2>&1 | tail -3" \
+  || sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install 2>&1 | tail -3" \
+  || fail "pnpm install fehlgeschlagen"
 success "Abhängigkeiten installiert"
 
-# ─── 4. Prisma Client generieren ──────────────────────────────────────────────
+# ─── 4. Prisma Client ─────────────────────────────────────────────────────────
 step "Prisma Client generieren"
 sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
   cd $APP_DIR && npx prisma generate 2>&1 | tail -3
-"
+" || fail "Prisma generate fehlgeschlagen"
 success "Prisma Client generiert"
 
-# ─── 5. Schema-Migration (OHNE Datenverlust) ──────────────────────────────────
+# ─── 5. Schema-Migration ──────────────────────────────────────────────────────
 step "Datenbank-Schema migrieren"
-# db push --accept-data-loss fügt neue Tabellen/Felder hinzu
-# ohne --force-reset → bestehende Daten bleiben erhalten
 sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
   cd $APP_DIR && npx prisma db push --accept-data-loss 2>&1 | tail -5
-"
-success "Schema aktualisiert"
+" && success "Schema aktualisiert" || warn "Schema-Update fehlgeschlagen – App läuft mit altem Schema weiter"
 
-# ─── 6. Seed: fehlende Basisdaten automatisch ergänzen ────────────────────────
+# ─── 6. Seed ──────────────────────────────────────────────────────────────────
 step "Seed: Basisdaten prüfen"
 
-# Hilfsfunktion: Tabellenzeilen zählen
-count_table() {
-  sudo -u "$APP_USER" bash -c "
-    set -a; source $APP_DIR/.env; set +a
-    cd $APP_DIR
-    npx prisma db execute --stdin 2>/dev/null <<SQL
-SELECT COUNT(*)::text FROM \"$1\";
-SQL
-  " 2>/dev/null | grep -E '^[0-9]+$' | tail -1 || echo "0"
-}
-
 NEED_SEED=0
-
-# Jede kritische Tabelle prüfen
 for TABLE in "Instrument" "AppointmentType" "PraxisConfig"; do
-  COUNT=$(count_table "$TABLE")
+  COUNT=$(sudo -u postgres psql scl90s_db -t -c "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null | tr -d ' \n' || echo "0")
   if [[ "$COUNT" == "0" ]] || [[ -z "$COUNT" ]]; then
-    warn "Tabelle $TABLE ist leer → Seed nötig"
+    warn "Tabelle $TABLE ist leer"
     NEED_SEED=1
-    break
   fi
 done
 
@@ -105,7 +99,7 @@ if [[ $NEED_SEED -eq 1 ]]; then
   sudo -u "$APP_USER" bash -c "
     set -a; source $APP_DIR/.env; set +a
     cd $APP_DIR && pnpm db:seed 2>&1 | tail -20
-  " && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen – App funktioniert trotzdem"
+  " && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen"
 else
   success "Alle Basisdaten vorhanden – Seed übersprungen"
 fi
@@ -117,7 +111,7 @@ sudo -u "$APP_USER" bash -c "
   cd $APP_DIR && pnpm build 2>&1
 " && success "Build erfolgreich" || fail "Build fehlgeschlagen – Service wird NICHT neu gestartet"
 
-# ─── 8. Service neu starten ───────────────────────────────────────────────────
+# ─── 8. Restart ───────────────────────────────────────────────────────────────
 step "Service neu starten"
 systemctl restart "$SERVICE"
 sleep 3
@@ -125,13 +119,13 @@ systemctl is-active --quiet "$SERVICE" && success "Service läuft" || fail "Serv
 
 # ─── 9. Healthcheck ───────────────────────────────────────────────────────────
 step "Healthcheck"
-PORT=$(grep "^APP_PORT=" "$APP_DIR/.env" | cut -d= -f2 | tr -d '"' || echo "3000")
 sleep 2
-curl -sf "http://localhost:${PORT}/api/auth/session" -o /dev/null 2>/dev/null \
-  && success "App antwortet auf Port $PORT" \
+curl -sf "http://localhost:3000/api/auth/session" -o /dev/null 2>/dev/null \
+  && success "App antwortet" \
   || warn "Healthcheck fehlgeschlagen – App läuft evtl. noch hoch"
 
 echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"
-echo -e "${GREEN}  Update abgeschlossen ✓  |  $COMMIT${NC}"
+echo -e "${GREEN}  Update abgeschlossen ✓${NC}"
+echo -e "${GREEN}  $COMMIT${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════${NC}\n"
 systemctl status "$SERVICE" --no-pager -l | head -6
