@@ -36,6 +36,84 @@ interface Appt { id:string; startAt:string; endAt:string; status:string; type:{n
 
 interface Props { currentUserId:string; role:string; types:any[]; therapists:any[]; patients:any[]; bundesland:string }
 
+
+function HolidayBadge({ holidays }: { holidays: Holiday[] }) {
+  const pub  = holidays.filter(h => h.type==='public')
+  const sch  = holidays.filter(h => h.type==='school')
+  return (
+    <div className="flex flex-col gap-0.5">
+      {pub.map((h,i) => <span key={i} className="text-[10px] px-1 rounded bg-red-100 text-red-700 font-medium truncate">{h.name}</span>)}
+      {sch.length>0 && <span className="text-[10px] px-1 rounded bg-amber-50 text-amber-700 truncate">{sch[0].name}</span>}
+    </div>
+  )
+}
+
+function ApptBlock({ a, compact=false, onDragStart, onDragEnd, onClick }: {
+  a: Appt; compact?: boolean
+  onDragStart?: () => void; onDragEnd?: () => void; onClick?: () => void
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={onClick}
+      className={cn(
+        'rounded-lg border text-xs cursor-grab active:cursor-grabbing transition-all hover:shadow-sm select-none',
+        compact ? 'px-1.5 py-0.5 mb-0.5 truncate' : 'px-2 py-1 mb-0.5',
+        dragAppt?.id === a.id && 'opacity-40'
+      )}
+      style={{ backgroundColor: a.type.color+'20', borderColor: a.type.color+'60', color: a.type.color }}
+    >
+      {!compact && <span className="font-semibold">{formatTime(new Date(a.startAt))} </span>}
+      {a.isBlocker ? (a.blockerNote||'Blockiert') : a.patient ? `${a.patient.lastName}` : a.type.name}
+    </div>
+  )
+}
+
+function DayCell({ day, children, onClick, dragOver, onDragOver, onDragLeave, onDrop, holidayMap }: {
+  day: Date; children?: React.ReactNode; onClick?: ()=>void
+  dragOver?: string|null; onDragOver?: (dateStr:string)=>void
+  onDragLeave?: ()=>void; onDrop?: (dateStr:string)=>void
+  holidayMap?: Map<string, Holiday[]>
+}) {
+  const dateStr = fmt(day)
+  const holidays = (holidayMap ?? new Map()).get(dateStr) ?? []
+  const isPublic = holidays.some(h => h.type==='public')
+  const isSchool = holidays.some(h => h.type==='school')
+  const isToday  = isSameDay(day, new Date())
+  const isOver   = dragOver === dateStr
+  const isWeekend = day.getDay()===0 || day.getDay()===6
+
+  return (
+    <div
+      className={cn(
+        'relative min-h-[100px] border-b border-r border-slate-100 p-1.5 transition-colors',
+        isPublic && 'bg-red-50/60',
+        isSchool && !isPublic && 'bg-amber-50/40',
+        isWeekend && !isPublic && !isSchool && 'bg-slate-50/60',
+        isOver && 'bg-indigo-50 ring-2 ring-indigo-300 ring-inset',
+        'cursor-pointer hover:bg-slate-50/80'
+      )}
+      onClick={onClick}
+      onDragOver={e => { e.preventDefault(); setDragOver(dateStr) }}
+      onDragLeave={() => setDragOver(null)}
+      onDrop={e => { e.preventDefault(); handleDrop(dateStr) }}
+    >
+      <div className="flex items-start justify-between mb-1">
+        <span className={cn(
+          'text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full',
+          isToday ? 'text-white' : isPublic ? 'text-red-700' : isWeekend ? 'text-slate-400' : 'text-slate-700'
+        )} style={isToday ? { backgroundColor: 'var(--color-primary)' } : {}}>
+          {day.getDate()}
+        </span>
+        <HolidayBadge holidays={holidays} />
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export function CalendarClient({ currentUserId, role, types, therapists, patients, bundesland }: Props) {
   const router = useRouter()
   const [view, setView] = useState<ViewMode>('month')
@@ -114,75 +192,6 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
   function apptForDay(day: Date) {
     return appointments.filter(a => isSameDay(new Date(a.startAt), day))
       .sort((a,b) => new Date(a.startAt).getTime()-new Date(b.startAt).getTime())
-  }
-
-  function HolidayBadge({ holidays }: { holidays: Holiday[] }) {
-    const pub  = holidays.filter(h => h.type==='public')
-    const sch  = holidays.filter(h => h.type==='school')
-    return (
-      <div className="flex flex-col gap-0.5">
-        {pub.map((h,i) => <span key={i} className="text-[10px] px-1 rounded bg-red-100 text-red-700 font-medium truncate">{h.name}</span>)}
-        {sch.length>0 && <span className="text-[10px] px-1 rounded bg-amber-50 text-amber-700 truncate">{sch[0].name}</span>}
-      </div>
-    )
-  }
-
-  function ApptBlock({ a, compact=false }: { a: Appt; compact?: boolean }) {
-    return (
-      <div
-        draggable
-        onDragStart={() => setDragAppt(a)}
-        onDragEnd={() => { setDragAppt(null); setDragOver(null) }}
-        onClick={() => router.push(`/appointments/${a.id}/edit`)}
-        className={cn(
-          'rounded-lg border text-xs cursor-grab active:cursor-grabbing transition-all hover:shadow-sm select-none',
-          compact ? 'px-1.5 py-0.5 mb-0.5 truncate' : 'px-2 py-1 mb-0.5',
-          dragAppt?.id === a.id && 'opacity-40'
-        )}
-        style={{ backgroundColor: a.type.color+'20', borderColor: a.type.color+'60', color: a.type.color }}
-      >
-        {!compact && <span className="font-semibold">{formatTime(new Date(a.startAt))} </span>}
-        {a.isBlocker ? (a.blockerNote||'Blockiert') : a.patient ? `${a.patient.lastName}` : a.type.name}
-      </div>
-    )
-  }
-
-  function DayCell({ day, children, onClick }: { day: Date; children?: React.ReactNode; onClick?: ()=>void }) {
-    const dateStr = fmt(day)
-    const holidays = holidayMap.get(dateStr) ?? []
-    const isPublic = holidays.some(h => h.type==='public')
-    const isSchool = holidays.some(h => h.type==='school')
-    const isToday  = isSameDay(day, new Date())
-    const isOver   = dragOver === dateStr
-    const isWeekend = day.getDay()===0 || day.getDay()===6
-
-    return (
-      <div
-        className={cn(
-          'relative min-h-[100px] border-b border-r border-slate-100 p-1.5 transition-colors',
-          isPublic && 'bg-red-50/60',
-          isSchool && !isPublic && 'bg-amber-50/40',
-          isWeekend && !isPublic && !isSchool && 'bg-slate-50/60',
-          isOver && 'bg-indigo-50 ring-2 ring-indigo-300 ring-inset',
-          'cursor-pointer hover:bg-slate-50/80'
-        )}
-        onClick={onClick}
-        onDragOver={e => { e.preventDefault(); setDragOver(dateStr) }}
-        onDragLeave={() => setDragOver(null)}
-        onDrop={e => { e.preventDefault(); handleDrop(dateStr) }}
-      >
-        <div className="flex items-start justify-between mb-1">
-          <span className={cn(
-            'text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full',
-            isToday ? 'text-white' : isPublic ? 'text-red-700' : isWeekend ? 'text-slate-400' : 'text-slate-700'
-          )} style={isToday ? { backgroundColor: 'var(--color-primary)' } : {}}>
-            {day.getDate()}
-          </span>
-          <HolidayBadge holidays={holidays} />
-        </div>
-        {children}
-      </div>
-    )
   }
 
   const headerLabel = view==='week'
@@ -274,9 +283,14 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
               const dayAppts = apptForDay(d)
               return (
                 <DayCell key={day} day={d}
-                  onClick={() => router.push(`/appointments/new?date=${fmt(d)}&therapistId=${selectedTherapist!=='ALL'?selectedTherapist:currentUserId}`)}>
+                  onClick={() => router.push(`/appointments/new?date=${fmt(d)}&therapistId=${selectedTherapist!=='ALL'?selectedTherapist:currentUserId}`)}
+                  dragOver={dragOver}
+                  onDragOver={setDragOver}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={handleDrop}
+                  holidayMap={holidayMap}>
                   <div onClick={e => e.stopPropagation()}>
-                    {dayAppts.slice(0,3).map(a => <ApptBlock key={a.id} a={a} compact />)}
+                    {dayAppts.slice(0,3).map(a => <ApptBlock key={a.id} a={a} compact onDragStart={() => setDragAppt(a)} onDragEnd={() => {setDragAppt(null);setDragOver(null)}} onClick={() => router.push(`/appointments/${a.id}/edit`)} />)}
                     {dayAppts.length>3 && <span className="text-xs text-slate-400 pl-1">+{dayAppts.length-3}</span>}
                   </div>
                 </DayCell>
@@ -375,7 +389,7 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
                   const ta = appointments.filter(a => isSameDay(new Date(a.startAt),d) && a.therapist?.name===t.name)
                   return (
                     <div key={t.id} className="p-1.5 border-l border-slate-50 min-h-12">
-                      {ta.map(a => <ApptBlock key={a.id} a={a} compact />)}
+                      {ta.map(a => <ApptBlock key={a.id} a={a} compact onDragStart={() => setDragAppt(a)} onDragEnd={() => {setDragAppt(null);setDragOver(null)}} onClick={() => router.push(`/appointments/${a.id}/edit`)} />)}
                     </div>
                   )
                 })}
