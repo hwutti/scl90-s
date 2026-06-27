@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+// generateMetadata ersetzt statisches metadata export
 import './globals.css'
 import { Providers } from './providers'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -6,9 +7,13 @@ import { getBranding, brandingToCssVars } from '@/lib/branding'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-export const metadata: Metadata = {
-  title: 'Klinische Diagnostik',
-  description: 'Klinisches Dokumentationssystem für Psychotherapie',
+export async function generateMetadata(): Promise<Metadata> {
+  const b = await getBranding()
+  return {
+    title: b.praxisName ?? 'Klinische Diagnostik',
+    description: 'Klinisches Dokumentationssystem für Psychotherapie',
+    icons: { icon: '/favicon.svg' },
+  }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

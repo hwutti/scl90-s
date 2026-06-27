@@ -10,25 +10,31 @@ import {
 import { cn } from '@/lib/utils'
 import type { BrandingConfig } from '@/lib/branding'
 
+interface NavSubItem { href: string; label: string }
 interface NavItem {
   href: string
   label: string
   icon: React.ElementType
   roles: string[]
   badge?: string
+  sub?: NavSubItem[]
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/patients',                label: 'Patienten',          icon: Users,        roles: ['ADMIN','THERAPIST'] },
-  { href: '/calendar',                 label: 'Kalender',           icon: CalendarDays, roles: ['ADMIN','THERAPIST'] },
-  { href: '/my',                       label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
-  { href: '/my/appointments',          label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
-  { href: '/admin/users',              label: 'Benutzer',           icon: Shield,       roles: ['ADMIN','THERAPIST'] },
-  { href: '/admin/appointment-types',  label: 'Termintypen',        icon: Clock8,       roles: ['ADMIN','THERAPIST'] },
-  { href: '/admin/availability',       label: 'Verfügbarkeit',      icon: Clock8,       roles: ['ADMIN','THERAPIST'] },
-  { href: '/calendar/stats',           label: 'Auslastung',         icon: BarChart3,    roles: ['ADMIN','THERAPIST'] },
-  { href: '/admin/branding',           label: 'Branding & Praxis',  icon: Settings,     roles: ['ADMIN'] },
-  { href: '/admin/norm-tables',        label: 'Normwerte',          icon: Settings,     roles: ['ADMIN'] },
+  { href: '/patients',               label: 'Patienten',         icon: Users,        roles: ['ADMIN','THERAPIST'] },
+  { href: '/calendar',               label: 'Kalender',           icon: CalendarDays, roles: ['ADMIN','THERAPIST'],
+    sub: [
+      { href: '/calendar',                label: 'Übersicht' },
+      { href: '/calendar/stats',          label: 'Auslastung' },
+      { href: '/admin/appointment-types', label: 'Termintypen' },
+      { href: '/admin/availability',      label: 'Verfügbarkeit' },
+    ]
+  },
+  { href: '/my',                     label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
+  { href: '/my/appointments',        label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
+  { href: '/admin/users',            label: 'Benutzer',           icon: Shield,       roles: ['ADMIN','THERAPIST'] },
+  { href: '/admin/branding',         label: 'Branding & Praxis',  icon: Settings,     roles: ['ADMIN'] },
+  { href: '/admin/norm-tables',      label: 'Normwerte',          icon: Settings,     roles: ['ADMIN'] },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -114,6 +120,37 @@ export function Sidebar({ branding }: Props) {
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {visibleNav.map(item => {
           const active = pathname.startsWith(item.href)
+          const subActive = item.sub?.some(s => pathname.startsWith(s.href))
+          const isOpen = active || subActive
+
+          if (item.sub) {
+            return (
+              <div key={item.href}>
+                <Link href={item.href} className={cn('nav-link', isOpen && 'active')}>
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  <ChevronRight className={cn('w-3.5 h-3.5 opacity-50 transition-transform', isOpen && 'rotate-90')} />
+                </Link>
+                {isOpen && (
+                  <div className="ml-7 mt-0.5 space-y-0.5 mb-1">
+                    {item.sub.map(s => (
+                      <Link key={s.href} href={s.href}
+                        className={cn('block px-3 py-1.5 rounded-lg text-xs transition-colors',
+                          pathname === s.href || (s.href !== '/calendar' && pathname.startsWith(s.href))
+                            ? 'font-semibold'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                        )}
+                        style={pathname === s.href || (s.href !== '/calendar' && pathname.startsWith(s.href))
+                          ? { color: 'var(--color-primary)' } : {}}>
+                        {s.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return (
             <Link
               key={item.href}
