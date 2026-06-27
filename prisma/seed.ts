@@ -161,14 +161,8 @@ async function main() {
   ]
 
   for (const t of appointmentTypes) {
-    await prisma.appointmentType.upsert({
-      where: { id: t.name },
-      create: { id: t.name, ...t },
-      update: {},
-    }).catch(async () => {
-      const exists = await prisma.appointmentType.findFirst({ where: { name: t.name } })
-      if (!exists) await prisma.appointmentType.create({ data: t })
-    })
+    const exists = await prisma.appointmentType.findFirst({ where: { name: t.name } })
+    if (!exists) await prisma.appointmentType.create({ data: t })
   }
   console.log('✓ Termintypen angelegt')
 

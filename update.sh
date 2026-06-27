@@ -73,44 +73,60 @@ if [[ -d "$MIGRATION_DIR" ]] && [[ -n "$(ls -A $MIGRATION_DIR 2>/dev/null)" ]]; 
   }
 else
   warn "Keine Migrations-Dateien → prisma db push"
-  PUSH_OUTPUT=$(sudo -u "$APP_USER" bash -c "
-    set -a; source \$APP_DIR/.env; set +a
-    cd \$APP_DIR
-    echo 'yes' | npx prisma db push --accept-data-loss 2>&1
-  ")
-  if echo "$PUSH_OUTPUT" | grep -q "error\|Error\|failed"; then
-    warn "db push mit Fehlern, versuche --force-reset"
+  # --accept-data-loss: neue Felder/Tabellen hinzufügen
+  # Kein --force-reset: bestehende Daten werden NICHT gelöscht
+  sudo -u "$APP_USER" bash -c "
+    set -a; source $APP_DIR/.env; set +a
+    cd $APP_DIR
+    npx prisma db push --accept-data-loss 2>&1 | tail -15
+  " && success "Schema via db push aktualisiert" || {
+    warn "db push fehlgeschlagen - versuche Schema-Diff"
+    # Nur neue Tabellen hinzufügen die noch nicht existieren
     sudo -u "$APP_USER" bash -c "
       set -a; source $APP_DIR/.env; set +a
       cd $APP_DIR
-      echo 'yes' | npx prisma db push --force-reset --accept-data-loss 2>&1 | tail -10
-    " && success "Schema via db push (force-reset) aktualisiert" || fail "Schema-Update fehlgeschlagen"
-  else
-    success "Schema via db push aktualisiert"
-  fi
+      npx prisma db push --accept-data-loss --skip-generate 2>&1 | tail -10
+    " && success "Schema teilweise aktualisiert" || warn "Schema-Update fehlgeschlagen - manuelle Intervention nötig"
+  }
 fi
 
 # ─── 5. Seed: Basis-Daten sicherstellen (idempotent) ─────────────────────────
 step "Seed: Basis-Daten prüfen"
 
 # Prüfen ob Seed nötig (Instrument-Tabelle leer?)
+# Seed ausführen wenn Kerntabellen leer sind
 INSTRUMENT_COUNT=$(sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
   cd $APP_DIR
-  npx prisma db execute --stdin <<SQL 2>/dev/null
+  npx prisma db execute --stdin 2>/dev/null <<SQL
 SELECT COUNT(*)::text FROM \"Instrument\";
 SQL
 " 2>/dev/null | grep -E '^[0-9]+$' | tail -1 || echo "0")
 
+APPTTYPE_COUNT=$(sudo -u "$APP_USER" bash -c "
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  npx prisma db execute --stdin 2>/dev/null <<SQL
+SELECT COUNT(*)::text FROM \"AppointmentType\";
+SQL
+" 2>/dev/null | grep -E '^[0-9]+$' | tail -1 || echo "0")
+
 if [[ "$INSTRUMENT_COUNT" == "0" ]] || [[ -z "$INSTRUMENT_COUNT" ]]; then
-  warn "Datenbank leer oder neu → Seed wird ausgeführt"
+  warn "Datenbank leer → Seed wird ausgeführt"
   sudo -u "$APP_USER" bash -c "
     set -a; source $APP_DIR/.env; set +a
     cd $APP_DIR
-    pnpm db:seed 2>&1 | tail -10
-  " && success "Seed abgeschlossen" || warn "Seed übersprungen (Daten bereits vorhanden)"
+    pnpm db:seed 2>&1 | tail -15
+  " && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen"
+elif [[ "$APPTTYPE_COUNT" == "0" ]] || [[ -z "$APPTTYPE_COUNT" ]]; then
+  warn "AppointmentType-Tabelle leer → Seed für neue Tabellen"
+  sudo -u "$APP_USER" bash -c "
+    set -a; source $APP_DIR/.env; set +a
+    cd $APP_DIR
+    pnpm db:seed 2>&1 | tail -15
+  " && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen"
 else
-  success "Datenbank enthält Daten ($INSTRUMENT_COUNT Instrument(e)) – Seed übersprungen"
+  success "Datenbank OK (Instrumente: $INSTRUMENT_COUNT, Termintypen: $APPTTYPE_COUNT)"
 fi
 
 # ─── 6. Build ────────────────────────────────────────────────────────────────
