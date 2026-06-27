@@ -29,18 +29,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   for (let i = 1; i <= 90; i++) answersRecord[i] = answersMap.get(i) ?? null
 
   // PDF generieren
-  const pdfBuffer = await renderToBuffer(
-    React.createElement(AuswertungPdf, {
-      patientName:   assessment.patientName   ?? '—',
-      patientGender: assessment.patientGender ?? '—',
-      patientDob:    assessment.patientDob    ?? '—',
-      patientAge:    age,
-      occasion:      assessment.occasion      ?? '—',
-      date,
-      scoring,
-      answers: answersRecord,
-    })
-  )
+  const element = React.createElement(AuswertungPdf, {
+    patientName:   assessment.patientName   ?? '—',
+    patientGender: assessment.patientGender ?? '—',
+    patientDob:    assessment.patientDob    ?? '—',
+    patientAge:    age,
+    occasion:      assessment.occasion      ?? '—',
+    date,
+    scoring,
+    answers: answersRecord,
+  }) as unknown as React.ReactElement<import('@react-pdf/renderer').DocumentProps>
+
+  const pdfBuffer = await renderToBuffer(element)
 
   const filename = `SCL90S_${(assessment.patientName ?? 'Patient').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`
 
