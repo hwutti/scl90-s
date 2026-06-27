@@ -6,7 +6,7 @@ import { computeScore, answersArrayToMap } from '@/lib/scoring'
 import { calcAge } from '@/lib/utils'
 import React from 'react'
 import { renderToBuffer } from '@react-pdf/renderer'
-import { AuswertungPdf } from '@/lib/pdf/AuswertungPdf'
+import { AuswertungPdf, type PreviousSession } from '@/lib/pdf/AuswertungPdf'
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -14,30 +14,56 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const assessment = await prisma.assessmentSession.findUnique({
     where: { id: params.id },
-    include: { answers: { orderBy: { itemNumber: 'asc' } }, normTable: true },
+    include: { answers: { orderBy: { itemNumber: 'asc' } }, normTable: true, result: true },
   })
   if (!assessment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const answersMap = answersArrayToMap(assessment.answers)
-  const normValues = assessment.normTable?.values as any ?? null
-  const scoring = computeScore(answersMap, normValues, assessment.patientGender, assessment.patientDob)
-  const age = calcAge(assessment.patientDob)
-  const date = new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())
+  // ─── Vorherige Messungen desselben Patienten ───────────────────────────────
+  // Identifikation über userId + patientName + patientDob
+  const previousRaw = await prisma.assessmentSession.findMany({
+    where: {
+      userId:       assessment.userId,
+      patientName:  assessment.patientName,
+      patientDob:   assessment.patientDob,
+      status:       'SCORED',
+      id:           { not: params.id },
+    },
+    include: { result: true },
+    orderBy: { scoredAt: 'asc' },
+    take: 6,  // max. 6 Vorwerte anzeigen
+  })
 
-  // Answers als Record für PDF
+  const previousSessions: PreviousSession[] = previousRaw
+    .filter(p => p.result !== null)
+    .map(p => ({
+      date: new Intl.DateTimeFormat('de-AT', { dateStyle: 'short' }).format(p.scoredAt ?? p.createdAt),
+      occasion: p.occasion ?? '—',
+      gsi: p.result!.gsi,
+      gsiT: p.result!.gsiT,
+      isClinicalCase: p.result!.isClinicalCase,
+    }))
+
+  // ─── Scoring ──────────────────────────────────────────────────────────────
+  const answersMap  = answersArrayToMap(assessment.answers)
+  const normValues  = assessment.normTable?.values as any ?? null
+  const scoring     = computeScore(answersMap, normValues, assessment.patientGender, assessment.patientDob)
+  const age         = calcAge(assessment.patientDob)
+  const date        = new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())
+
   const answersRecord: Record<number, number | null> = {}
   for (let i = 1; i <= 90; i++) answersRecord[i] = answersMap.get(i) ?? null
 
-  // PDF generieren
+  // ─── PDF rendern ──────────────────────────────────────────────────────────
   const element = React.createElement(AuswertungPdf, {
-    patientName:   assessment.patientName   ?? '—',
-    patientGender: assessment.patientGender ?? '—',
-    patientDob:    assessment.patientDob    ?? '—',
-    patientAge:    age,
-    occasion:      assessment.occasion      ?? '—',
+    patientName:       assessment.patientName   ?? '—',
+    patientGender:     assessment.patientGender ?? '—',
+    patientDob:        assessment.patientDob    ?? '—',
+    patientAge:        age,
+    occasion:          assessment.occasion      ?? '—',
     date,
     scoring,
-    answers: answersRecord,
+    answers:           answersRecord,
+    previousSessions,
   }) as unknown as React.ReactElement<import('@react-pdf/renderer').DocumentProps>
 
   const pdfBuffer = await renderToBuffer(element)
