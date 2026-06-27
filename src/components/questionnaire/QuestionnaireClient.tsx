@@ -35,7 +35,7 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
   const [currentIdx, setCurrentIdx] = useState(0)  // 0-basiert
   const [saving, setSaving] = useState(false)
   const [scoring, setScoring] = useState(false)
-  const saveTimeout = useRef<NodeJS.Timeout | null>(null)
+  const saveTimeouts = useRef<Map<number, NodeJS.Timeout>>(new Map())
   const listRef = useRef<HTMLDivElement>(null)
 
   const answered = Object.values(answers).filter(v => v !== null).length
@@ -70,8 +70,12 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
   }, [currentIdx, answers])
 
   const saveAnswer = useCallback(async (itemNumber: number, value: number) => {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(async () => {
+    // Pro-Item-Debounce: cancelt nur Doppelklick auf dasselbe Item,
+    // löscht NICHT den Speicher-Timer für andere Items
+    const existing = saveTimeouts.current.get(itemNumber)
+    if (existing) clearTimeout(existing)
+    const t = setTimeout(async () => {
+      saveTimeouts.current.delete(itemNumber)
       setSaving(true)
       await fetch(`/api/sessions/${sessionId}/answers`, {
         method: 'PATCH',
@@ -79,7 +83,8 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
         body: JSON.stringify({ itemNumber, value }),
       })
       setSaving(false)
-    }, 400)
+    }, 300)
+    saveTimeouts.current.set(itemNumber, t)
   }, [sessionId])
 
   function selectAnswer(itemNo: number, value: number) {
