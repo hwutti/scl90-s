@@ -5,9 +5,9 @@
 set -u
 # KEIN set -e damit einzelne Fehler nicht das ganze Script abbrechen
 
-APP_DIR="/opt/scl90s"
-APP_USER="scl90s"
-SERVICE="scl90s"
+APP_DIR="/opt/kds"
+APP_USER="kds"
+SERVICE="kds"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 step()    { echo -e "\n${GREEN}▶ $1${NC}"; }
@@ -88,7 +88,7 @@ step "Seed: Basisdaten prüfen"
 
 NEED_SEED=0
 for TABLE in "Instrument" "AppointmentType" "PraxisConfig"; do
-  COUNT=$(sudo -u postgres psql scl90s_db -t -c "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null | tr -d ' \n' || echo "0")
+  COUNT=$(sudo -u postgres psql kds_db -t -c "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null | tr -d ' \n' || echo "0")
   if [[ "$COUNT" == "0" ]] || [[ -z "$COUNT" ]]; then
     warn "Tabelle $TABLE ist leer"
     NEED_SEED=1

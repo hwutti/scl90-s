@@ -9,10 +9,10 @@ async function main() {
   // ─── Admin ────────────────────────────────────────────────────────────────
   const adminHash = await bcrypt.hash('Admin1234!', 12)
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@scl90s.local' },
+    where: { email: 'admin@kds.local' },
     update: {},
     create: {
-      email: 'admin@scl90s.local',
+      email: 'admin@kds.local',
       name: 'Administrator',
       role: 'ADMIN',
       passwordHash: adminHash,
@@ -23,10 +23,10 @@ async function main() {
   // ─── Demo-Therapeut ────────────────────────────────────────────────────────
   const therapistHash = await bcrypt.hash('Therapeut1234!', 12)
   const therapist = await prisma.user.upsert({
-    where: { email: 'therapeut@scl90s.local' },
+    where: { email: 'therapeut@kds.local' },
     update: {},
     create: {
-      email: 'therapeut@scl90s.local',
+      email: 'therapeut@kds.local',
       name: 'Dr. Maria Muster',
       role: 'THERAPIST',
       passwordHash: therapistHash,
@@ -35,19 +35,19 @@ async function main() {
   console.log('✓ Therapeut:', therapist.email)
 
   // ─── SCL-90-S Instrument ──────────────────────────────────────────────────
-  const scl90s = await prisma.instrument.upsert({
+  const kds = await prisma.instrument.upsert({
     where: { code: 'SCL90S' },
     update: {},
     create: {
       code: 'SCL90S',
-      name: 'SCL-90-S – Symptom-Checkliste 90 Standard',
+      name: 'KDS – Klinisches Dokumentationssystem (SCL-90-S) 90 Standard',
       shortName: 'SCL-90-S',
       version: 'Franke 2014',
       description: 'Selbstbeurteilungsinstrument zur Erfassung der subjektiv empfundenen psychischen Belastung.',
       itemCount: 90,
     },
   })
-  console.log('✓ Instrument:', scl90s.code)
+  console.log('✓ Instrument:', kds.code)
 
   // ─── Demo-Patient-User (PIN-Login) ────────────────────────────────────────
   const patientUser = await prisma.user.upsert({
@@ -123,7 +123,7 @@ async function main() {
     await prisma.assessment.create({
       data: {
         patientId: patient.id,
-        instrumentId: scl90s.id,
+        instrumentId: kds.id,
         createdByUserId: therapist.id,
         status: AssessmentStatus.ASSIGNED,
         occasion: 'Ersterhebung',
@@ -140,7 +140,7 @@ async function main() {
     create: {
       key: 'default',
       praxisName: 'Psychotherapeutische Praxis',
-      slogan: 'Klinische Diagnostik & Dokumentation',
+      slogan: 'KDS – Klinisches Dokumentationssystem',
       colorPrimary: '#166534',
       colorPrimaryLight: '#dcfce7',
       colorAccent: '#14532d',
@@ -193,8 +193,8 @@ async function main() {
   console.log('✓ Notification-Einstellungen angelegt')
 
   console.log('\n✓ Seed abgeschlossen')
-  console.log('  Admin:      admin@scl90s.local     / Admin1234!')
-  console.log('  Therapeut:  therapeut@scl90s.local / Therapeut1234!')
+  console.log('  Admin:      admin@kds.local     / Admin1234!')
+  console.log('  Therapeut:  therapeut@kds.local / Therapeut1234!')
   console.log('  Patient-PIN: 123456')
 }
 

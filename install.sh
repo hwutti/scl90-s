@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# SCL-90-S Webapp – Automatisches Installationsskript
+# KDS – Klinisches Dokumentationssystem – Automatisches Installationsskript
 # Ubuntu 22.04 / 24.04 LTS
 # Installiert: Node.js 22, PostgreSQL 16, Nginx, Certbot (SSL),
 #              pgAdmin 4, systemd-Service, automatische DB-Backups
@@ -31,17 +31,17 @@ fi
 # =============================================================================
 # KONFIGURATION – hier anpassen
 # =============================================================================
-APP_NAME="scl90s"
-APP_USER="scl90s"
-APP_DIR="/opt/scl90s"
+APP_NAME="kds"
+APP_USER="kds"
+APP_DIR="/opt/kds"
 APP_PORT="3000"
 
 # Domain (ohne https://) – leer lassen für IP-only ohne SSL
 DOMAIN=""
 
 # PostgreSQL
-DB_NAME="scl90s_db"
-DB_USER="scl90s_user"
+DB_NAME="kds_db"
+DB_USER="kds_user"
 DB_PASS=""   # wird zufällig generiert wenn leer
 
 # pgAdmin
@@ -50,7 +50,7 @@ PGADMIN_PASS=""     # wird zufällig generiert wenn leer
 PGADMIN_PORT="5050"
 
 # Backup-Verzeichnis
-BACKUP_DIR="/var/backups/scl90s"
+BACKUP_DIR="/var/backups/kds"
 BACKUP_KEEP_DAYS="30"
 
 # NextAuth Secret (wird generiert)
@@ -60,7 +60,7 @@ NEXTAUTH_SECRET=""
 echo ""
 echo -e "${BOLD}"
 echo "  ╔══════════════════════════════════════════════════════╗"
-echo "  ║     SCL-90-S Webapp – Installationsskript           ║"
+echo "  ║     KDS – Klinisches Dokumentationssystem – Installationsskript           ║"
 echo "  ║     Ubuntu $UBUNTU_VERSION – $(date '+%d.%m.%Y %H:%M')                    ║"
 echo "  ╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
@@ -225,16 +225,16 @@ else
   info "Klone Repository: $GITHUB_REPO"
   # Verzeichnis vollständig leeren (außer .env)
   if [[ -f "$APP_DIR/.env" ]]; then
-    cp "$APP_DIR/.env" /tmp/scl90s_env_backup
+    cp "$APP_DIR/.env" /tmp/kds_env_backup
   fi
   rm -rf "$APP_DIR"
   mkdir -p "$APP_DIR"
   chown "$APP_USER":"$APP_USER" "$APP_DIR"
-  if [[ -f /tmp/scl90s_env_backup ]]; then
-    cp /tmp/scl90s_env_backup "$APP_DIR/.env"
+  if [[ -f /tmp/kds_env_backup ]]; then
+    cp /tmp/kds_env_backup "$APP_DIR/.env"
     chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
     chmod 600 "$APP_DIR/.env"
-    rm /tmp/scl90s_env_backup
+    rm /tmp/kds_env_backup
   fi
 
   sudo -u "$APP_USER" bash -c "
@@ -311,7 +311,7 @@ sudo -u "$APP_USER" bash -c "
 step "systemd Service einrichten"
 cat > "/etc/systemd/system/${APP_NAME}.service" << SYSTEMD_EOF
 [Unit]
-Description=SCL-90-S Webapp (Next.js)
+Description=KDS – Klinisches Dokumentationssystem (Next.js)
 Documentation=https://nextjs.org/
 After=network.target postgresql.service
 Requires=postgresql.service
@@ -357,7 +357,7 @@ NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
 if [[ -n "$DOMAIN" ]]; then
   # Mit Domain – zunächst HTTP (SSL kommt nach Certbot)
   cat > "$NGINX_CONF" << NGINX_EOF
-# SCL-90-S Webapp – Nginx Konfiguration
+# KDS – Klinisches Dokumentationssystem – Nginx Konfiguration
 # Domain: ${DOMAIN}
 
 # Rate Limiting (Schutz vor Brute-Force)
@@ -519,7 +519,7 @@ mkdir -p "$BACKUP_DIR"
 chown postgres:postgres "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
-cat > "/usr/local/bin/scl90s-backup.sh" << BACKUP_EOF
+cat > "/usr/local/bin/kds-backup.sh" << BACKUP_EOF
 #!/usr/bin/env bash
 # SCL-90-S – PostgreSQL Backup
 set -euo pipefail
@@ -541,12 +541,12 @@ echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Backup erstellt: \$BACKUP_FILE"
 echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Backup-Größe: \$(du -sh \$BACKUP_FILE | cut -f1)"
 BACKUP_EOF
 
-chmod +x "/usr/local/bin/scl90s-backup.sh"
+chmod +x "/usr/local/bin/kds-backup.sh"
 
 # Cron-Job: täglich um 02:30 Uhr als postgres-User
 (crontab -u postgres -l 2>/dev/null || echo "") | \
-  grep -v "scl90s-backup" | \
-  { cat; echo "30 2 * * * /usr/local/bin/scl90s-backup.sh >> /var/log/scl90s-backup.log 2>&1"; } | \
+  grep -v "kds-backup" | \
+  { cat; echo "30 2 * * * /usr/local/bin/kds-backup.sh >> /var/log/kds-backup.log 2>&1"; } | \
   crontab -u postgres -
 
 success "Tägliches DB-Backup um 02:30 Uhr eingerichtet (${BACKUP_KEEP_DAYS} Tage aufbewahrung)"
@@ -587,10 +587,10 @@ success "Fail2ban eingerichtet"
 
 # ─── Sofort-Backup nach Installation ─────────────────────────────────────────
 step "Initiales Backup erstellen"
-sudo -u postgres /usr/local/bin/scl90s-backup.sh || warn "Initiales Backup fehlgeschlagen (DB möglicherweise noch leer)"
+sudo -u postgres /usr/local/bin/kds-backup.sh || warn "Initiales Backup fehlgeschlagen (DB möglicherweise noch leer)"
 
 # ─── Credentials-Datei speichern ─────────────────────────────────────────────
-CREDS_FILE="/root/scl90s_credentials.txt"
+CREDS_FILE="/root/kds_credentials.txt"
 cat > "$CREDS_FILE" << CREDS_EOF
 # ============================================================
 # SCL-90-S – Zugangsdaten (sicher aufbewahren!)
@@ -614,7 +614,7 @@ Nützliche Befehle:
   Service-Status:   systemctl status ${APP_NAME}
   Logs anzeigen:    journalctl -u ${APP_NAME} -f
   Nginx-Logs:       tail -f /var/log/nginx/${APP_NAME}_error.log
-  Manuelles Backup: sudo -u postgres /usr/local/bin/scl90s-backup.sh
+  Manuelles Backup: sudo -u postgres /usr/local/bin/kds-backup.sh
   DB-Konsole:       sudo -u postgres psql ${DB_NAME}
   App neu starten:  systemctl restart ${APP_NAME}
   App deployen:     cd ${APP_DIR} && git pull && pnpm install && pnpm build && systemctl restart ${APP_NAME}
@@ -639,7 +639,7 @@ echo -e "  ${YELLOW}Zugangsdaten gespeichert in: ${CREDS_FILE}${NC}"
 echo ""
 echo -e "  ${BOLD}Nächste Schritte:${NC}"
 echo "  1. Browser öffnen: ${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
-echo "  2. Login: admin@scl90s.local / Admin1234!  (Passwort sofort ändern!)"
+echo "  2. Login: admin@kds.local / Admin1234!  (Passwort sofort ändern!)"
 if [[ -n "$DOMAIN" ]]; then
   echo "  3. DNS: A-Record ${DOMAIN} → $(hostname -I | awk '{print $1}')"
 fi
