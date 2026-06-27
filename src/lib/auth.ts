@@ -7,8 +7,6 @@ import { Role } from '@prisma/client'
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
-  trustHost: true,
-  useSecureCookies: false,
   providers: [
     CredentialsProvider({
       name: 'credentials',
