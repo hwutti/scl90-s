@@ -2,7 +2,7 @@
 # =============================================================================
 # SCL-90-S – Update-Script (vollautomatisch)
 # =============================================================================
-set -uo pipefail
+set -u
 # KEIN set -e damit einzelne Fehler nicht das ganze Script abbrechen
 
 APP_DIR="/opt/scl90s"
