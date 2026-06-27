@@ -26,15 +26,19 @@ const NAV_ITEMS: NavItem[] = [
     sub: [
       { href: '/calendar',                label: 'Übersicht' },
       { href: '/calendar/stats',          label: 'Auslastung' },
-      { href: '/admin/appointment-types', label: 'Termintypen' },
-      { href: '/admin/availability',      label: 'Verfügbarkeit' },
     ]
   },
   { href: '/my',                     label: 'Meine Tests',        icon: Activity,     roles: ['PATIENT'] },
   { href: '/my/appointments',        label: 'Meine Termine',      icon: CalendarDays, roles: ['PATIENT'] },
-  { href: '/admin/users',            label: 'Benutzer',           icon: Shield,       roles: ['ADMIN'] },
-  { href: '/admin/branding',         label: 'Branding & Praxis',  icon: Settings,     roles: ['ADMIN'] },
-  { href: '/admin/norm-tables',      label: 'Normwerte',          icon: Settings,     roles: ['ADMIN'] },
+  { href: '/admin',                  label: 'Administration',      icon: Shield,       roles: ['ADMIN'],
+    sub: [
+      { href: '/admin/users',             label: 'Benutzer' },
+      { href: '/admin/appointment-types', label: 'Termintypen' },
+      { href: '/admin/availability',      label: 'Verfügbarkeit' },
+      { href: '/admin/norm-tables',       label: 'Normwerte' },
+      { href: '/admin/branding',          label: 'Branding & Praxis' },
+    ]
+  },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
