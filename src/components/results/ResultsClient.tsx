@@ -56,8 +56,8 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
 
   async function handleExport() {
     setExporting(true)
-    const url = exportUrl ?? `/api/assessments/${sessionId}/export`
-    const res = await fetch(url, { method: 'POST' })
+    const apiUrl = exportUrl ?? `/api/assessments/${sessionId}/export`
+    const res = await fetch(apiUrl, { method: 'POST' })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
