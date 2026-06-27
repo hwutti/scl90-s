@@ -37,5 +37,3 @@ export default async function PatientsPage() {
     </PageShell>
   )
 }
-EOSX
-echo "✓ /patients page.tsx"
