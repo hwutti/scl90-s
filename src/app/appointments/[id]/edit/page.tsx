@@ -1,19 +1,22 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PageShell } from '@/components/layout/PageShell'
-import { CalendarClient } from './CalendarClient'
-import { getBranding } from '@/lib/branding'
+import { AppointmentFormClient } from '@/components/calendar/AppointmentFormClient'
 
-export default async function CalendarPage() {
+export default async function EditAppointmentPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
   const userId = (session.user as any).id
   const role   = (session.user as any).role
-  if (role === 'PATIENT') redirect('/my/appointments')
+  if (!['ADMIN','THERAPIST'].includes(role)) redirect('/my/appointments')
 
-  const branding = await getBranding()
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: params.id },
+    include: { type: true, patient: true },
+  })
+  if (!appointment) notFound()
 
   const [types, therapists, patients] = await Promise.all([
     prisma.appointmentType.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
@@ -29,13 +32,26 @@ export default async function CalendarPage() {
 
   return (
     <PageShell>
-      <CalendarClient
-        currentUserId={userId}
-        role={role}
+      <AppointmentFormClient
+        mode="edit"
+        appointment={{
+          id: appointment.id,
+          patientId: appointment.patientId ?? '',
+          therapistId: appointment.therapistId,
+          typeId: appointment.typeId,
+          startAt: appointment.startAt.toISOString(),
+          status: appointment.status,
+          isBlocker: appointment.isBlocker,
+          blockerNote: appointment.blockerNote ?? '',
+          therapistNote: appointment.therapistNote ?? '',
+          patientNote: appointment.patientNote ?? '',
+          recurrenceId: appointment.recurrenceId ?? null,
+        }}
         types={types}
         therapists={therapists}
         patients={patients}
-        bundesland={branding.bundesland ?? 'Kärnten'}
+        currentUserId={userId}
+        role={role}
       />
     </PageShell>
   )

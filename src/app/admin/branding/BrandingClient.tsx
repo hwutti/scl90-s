@@ -15,7 +15,7 @@ const PRESET_COLORS = [
 export function BrandingClient({ initial }: { initial: BrandingConfig }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [form, setForm] = useState({ ...initial })
+  const [form, setForm] = useState({ ...initial, bundesland: initial.bundesland ?? 'Kärnten' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
   const [preview, setPreview] = useState(false)
@@ -120,6 +120,15 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                     onChange={e => set('contactPhone', e.target.value)}
                     placeholder="+43 1 234 567 890" />
                 </div>
+              </div>
+              <div>
+                <label className="label">Bundesland (für Schulferien im Kalender)</label>
+                <select className="input" value={form.bundesland ?? 'Kärnten'}
+                  onChange={e => set('bundesland', e.target.value)}>
+                  {['Burgenland','Kärnten','Niederösterreich','Oberösterreich','Salzburg','Steiermark','Tirol','Vorarlberg','Wien'].map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="label">Adresse</label>

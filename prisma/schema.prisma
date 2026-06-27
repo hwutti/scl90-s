@@ -401,6 +401,7 @@ model PraxisConfig {
   contactPhone    String?
   address         String?
 
+  bundesland      String   @default("Kärnten")  // für Schulferien
   updatedAt       DateTime @updatedAt
   updatedBy       String?
 }

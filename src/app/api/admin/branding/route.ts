@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest) {
   const {
     praxisName, slogan, logoBase64, logoMimeType,
     colorPrimary, colorPrimaryLight, colorAccent,
-    imprintHtml, contactEmail, contactPhone, address,
+    imprintHtml, contactEmail, contactPhone, address, bundesland,
   } = body
 
   const config = await prisma.praxisConfig.upsert({
@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest) {
       contactEmail: contactEmail ?? '',
       contactPhone: contactPhone ?? '',
       address: address ?? '',
+      bundesland: bundesland ?? 'Kärnten',
       updatedBy: (session.user as any).id,
     },
     update: {
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest) {
       ...(contactEmail    !== undefined && { contactEmail }),
       ...(contactPhone    !== undefined && { contactPhone }),
       ...(address         !== undefined && { address }),
+      ...(bundesland      !== undefined && { bundesland }),
       updatedBy: (session.user as any).id,
     },
   })

@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!appt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()
-  const { status, therapistNote, cancelReason, affectSeries } = body
+  const { status, therapistNote, cancelReason, affectSeries, startAt, typeId, patientId } = body
 
   // Stornierung einer ganzen Serie
   if (status === 'CANCELLED' && affectSeries && appt.recurrenceId) {
@@ -33,11 +33,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ cancelled: future.count })
   }
 
+  // Für Drag & Drop: startAt + endAt neu berechnen
+  let newEndAt: Date | undefined
+  if (startAt) {
+    const apptType = await prisma.appointmentType.findUnique({ where: { id: appt.typeId } })
+    newEndAt = new Date(new Date(startAt).getTime() + (apptType?.durationMin ?? 50) * 60000)
+  }
+
   const updated = await prisma.appointment.update({
     where: { id: params.id },
     data: {
-      ...(status && { status }),
+      ...(status        && { status }),
       ...(therapistNote !== undefined && { therapistNote }),
+      ...(startAt       && { startAt: new Date(startAt), endAt: newEndAt }),
+      ...(typeId        && { typeId }),
+      ...(patientId     !== undefined && { patientId: patientId || null }),
       ...(status === 'CANCELLED' && {
         cancelledAt: new Date(),
         cancelledBy: userId,

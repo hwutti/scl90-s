@@ -12,6 +12,7 @@ export interface BrandingConfig {
   contactEmail: string | null
   contactPhone: string | null
   address: string | null
+  bundesland: string
 }
 
 export const DEFAULT_BRANDING: BrandingConfig = {
@@ -26,6 +27,7 @@ export const DEFAULT_BRANDING: BrandingConfig = {
   contactEmail: null,
   contactPhone: null,
   address: null,
+  bundesland: 'Kärnten',
 }
 
 export async function getBranding(): Promise<BrandingConfig> {
