@@ -66,6 +66,11 @@ enum AuditAction {
   USER_LOGIN
   USER_LOGOUT
   DATA_DELETED
+  APPOINTMENT_CREATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_NO_SHOW
+  APPOINTMENT_COMPLETED
 }
 
 // ─── Auth (NextAuth) ──────────────────────────────────────────────────────────
@@ -95,6 +100,15 @@ model User {
   auditLogs         AuditLog[]
   nextAuthSessions  NextAuthSession[]
   accounts          Account[]
+
+  // Kalender-Relationen
+  therapistAppointments Appointment[]       @relation("TherapistAppointments")
+  therapistAvailability AvailabilitySlot[]  @relation("TherapistAvailability")
+  therapistAbsences     Absence[]           @relation("TherapistAbsences")
+  therapistWaitlist     WaitlistEntry[]     @relation("TherapistWaitlist")
+  appointmentTypes      AppointmentType[]   @relation("TherapistAppointmentTypes")
+  notifications         Notification[]      @relation("UserNotifications")
+  notificationSetting   NotificationSetting?
 }
 
 model Account {
@@ -164,6 +178,8 @@ model Patient {
   assessments     Assessment[]
   sessionNotes    SessionNote[]
   auditLogs       AuditLog[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -387,4 +403,200 @@ model PraxisConfig {
 
   updatedAt       DateTime @updatedAt
   updatedBy       String?
+}
+
+// ─── Terminplanung ────────────────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  PENDING     // Patient hat Anfrage gestellt
+  CONFIRMED   // Therapeut hat bestätigt (oder direkt vom Therapeuten angelegt)
+  CANCELLED   // Abgesagt
+  NO_SHOW     // Patient nicht erschienen
+  COMPLETED   // Stattgefunden
+}
+
+enum RecurrenceFreq {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum AbsenceReason {
+  HOLIDAY
+  SICK
+  TRAINING
+  OTHER
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED    // Slot wurde angeboten
+  ACCEPTED
+  EXPIRED
+}
+
+// Termintypen (konfigurierbar im Admin)
+model AppointmentType {
+  id           String   @id @default(cuid())
+  name         String
+  color        String   @default("#166534")
+  durationMin  Int      @default(50)
+  description  String?
+  isActive     Boolean  @default(true)
+  isBlocker    Boolean  @default(false)  // kein Patientenbezug (Supervision etc.)
+  therapistId  String?  // null = praxisweit, sonst nur für diesen Therapeuten
+  therapist    User?    @relation("TherapistAppointmentTypes", fields: [therapistId], references: [id])
+  appointments Appointment[]
+  createdAt    DateTime @default(now())
+
+  @@index([therapistId])
+}
+
+// Wiederkehrende Regel (Terminserie)
+model RecurringRule {
+  id           String          @id @default(cuid())
+  freq         RecurrenceFreq  @default(WEEKLY)
+  dayOfWeek    Int             // 0=Mo, 1=Di, ..., 6=So
+  startTime    String          // "10:00"
+  count        Int?            // Anzahl Termine (optional)
+  until        DateTime?       // Enddatum (optional)
+  createdAt    DateTime        @default(now())
+  appointments Appointment[]
+}
+
+// Einzeltermin
+model Appointment {
+  id              String            @id @default(cuid())
+  patientId       String?           // null = Blocker ohne Patient
+  patient         Patient?          @relation(fields: [patientId], references: [id])
+  therapistId     String
+  therapist       User              @relation("TherapistAppointments", fields: [therapistId], references: [id])
+  typeId          String
+  type            AppointmentType   @relation(fields: [typeId], references: [id])
+  recurrenceId    String?
+  recurrence      RecurringRule?    @relation(fields: [recurrenceId], references: [id])
+
+  startAt         DateTime
+  endAt           DateTime
+  status          AppointmentStatus @default(PENDING)
+  isBlocker       Boolean           @default(false)  // Blocker ohne Patient
+  blockerNote     String?           // z.B. "Supervision", "Verwaltung"
+
+  // Notizen
+  patientNote     String?   // Wunsch/Grund vom Patienten
+  therapistNote   String?   // Interne Notiz (nicht sichtbar für Patient)
+
+  // Stornierung
+  cancelledAt     DateTime?
+  cancelledBy     String?   // userId
+  cancelReason    String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  notifications   Notification[]
+  waitlistEntries WaitlistEntry[]
+
+  @@index([therapistId])
+  @@index([patientId])
+  @@index([startAt])
+  @@index([status])
+}
+
+// Verfügbarkeitsslots (wann ist der Therapeut buchbar)
+model AvailabilitySlot {
+  id          String    @id @default(cuid())
+  therapistId String
+  therapist   User      @relation("TherapistAvailability", fields: [therapistId], references: [id])
+  dayOfWeek   Int       // 0=Mo … 6=So
+  startTime   String    // "09:00"
+  endTime     String    // "17:00"
+  validFrom   DateTime?
+  validUntil  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([therapistId])
+}
+
+// Abwesenheiten / Urlaub
+model Absence {
+  id          String        @id @default(cuid())
+  therapistId String
+  therapist   User          @relation("TherapistAbsences", fields: [therapistId], references: [id])
+  startAt     DateTime
+  endAt       DateTime
+  reason      AbsenceReason @default(OTHER)
+  note        String?
+  createdAt   DateTime      @default(now())
+
+  @@index([therapistId])
+  @@index([startAt])
+}
+
+// Warteliste
+model WaitlistEntry {
+  id            String        @id @default(cuid())
+  patientId     String
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  therapistId   String
+  therapist     User          @relation("TherapistWaitlist", fields: [therapistId], references: [id])
+  typeId        String?
+  preferredDays Json          @default("[]")   // [0,2,4] = Mo,Mi,Fr
+  preferredTime String?       // "morning" / "afternoon" / "any"
+  status        WaitlistStatus @default(WAITING)
+  offeredApptId String?
+  offeredAt     DateTime?
+  offeredAppt   Appointment?  @relation(fields: [offeredApptId], references: [id])
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  @@index([therapistId])
+  @@index([patientId])
+}
+
+// Benachrichtigungen (E-Mail, SMS, In-App)
+model Notification {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation("UserNotifications", fields: [userId], references: [id])
+  appointmentId String?
+  appointment   Appointment?       @relation(fields: [appointmentId], references: [id])
+  channel       NotificationChannel
+  status        NotificationStatus @default(PENDING)
+  subject       String?
+  body          String
+  sentAt        DateTime?
+  readAt        DateTime?
+  scheduledFor  DateTime?          // für Erinnerungen im Voraus
+  createdAt     DateTime           @default(now())
+
+  @@index([userId])
+  @@index([appointmentId])
+  @@index([scheduledFor])
+  @@index([status])
+}
+
+// Notification-Einstellungen pro User
+model NotificationSetting {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id])
+  emailEnabled    Boolean @default(true)
+  smsEnabled      Boolean @default(false)
+  inAppEnabled    Boolean @default(true)
+  reminderHours   Int[]   @default([24, 1])   // Erinnerung X Stunden vorher
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

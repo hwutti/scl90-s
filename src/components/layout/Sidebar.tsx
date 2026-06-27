@@ -1,10 +1,11 @@
 'use client'
+import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   Users, Settings, LogOut, Activity, Info,
-  ChevronRight, User, Shield
+  ChevronRight, User, Shield, CalendarDays, Clock as Clock8, Bell, BarChart3
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BrandingConfig } from '@/lib/branding'
@@ -29,6 +30,32 @@ const BOTTOM_ITEMS: NavItem[] = [
   { href: '/profile',   label: 'Mein Profil',   icon: User,  roles: ['ADMIN','THERAPIST','PATIENT'] },
   { href: '/impressum', label: 'Über / Impressum', icon: Info, roles: ['ADMIN','THERAPIST','PATIENT'] },
 ]
+
+
+function NotificationBell({ userId }: { userId: string }) {
+  const [unread, setUnread] = React.useState(0)
+
+  React.useEffect(() => {
+    fetch('/api/notifications').then(r => r.json()).then(d => setUnread(d.unread ?? 0))
+    const interval = setInterval(() => {
+      fetch('/api/notifications').then(r => r.json()).then(d => setUnread(d.unread ?? 0))
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [userId])
+
+  return (
+    <Link href="/notifications" className="nav-link relative">
+      <Bell className="w-4 h-4 shrink-0" />
+      <span>Benachrichtigungen</span>
+      {unread > 0 && (
+        <span className="ml-auto text-xs font-bold text-white rounded-full w-5 h-5 flex items-center justify-center"
+          style={{ backgroundColor: 'var(--color-primary)' }}>
+          {unread > 9 ? '9+' : unread}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 interface Props {
   branding: BrandingConfig
@@ -131,6 +158,8 @@ export function Sidebar({ branding }: Props) {
             </p>
           </div>
         </div>
+        <NotificationBell userId={(session?.user as any)?.id ?? ''} />
+
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="nav-link w-full text-slate-500 hover:text-red-600 hover:bg-red-50"

@@ -149,6 +149,55 @@ async function main() {
   })
   console.log('✓ PraxisConfig angelegt')
 
+
+  // ─── Standard-Termintypen ──────────────────────────────────────────────────
+  const appointmentTypes = [
+    { name: 'Erstgespräch',        color: '#7c3aed', durationMin: 60,  description: 'Erstkontakt und Anamnese' },
+    { name: 'Einzeltherapie',      color: '#166534', durationMin: 50,  description: 'Reguläre Therapiestunde' },
+    { name: 'Krisenintervention',  color: '#dc2626', durationMin: 60,  description: 'Akute Krisenunterstützung' },
+    { name: 'Gruppentherapie',     color: '#0369a1', durationMin: 90,  description: 'Gruppentherapeutische Sitzung' },
+    { name: 'Supervision',         color: '#92400e', durationMin: 60,  description: 'Fachliche Supervision', isBlocker: true },
+    { name: 'Abschlussgespräch',   color: '#475569', durationMin: 50,  description: 'Therapieabschluss' },
+  ]
+
+  for (const t of appointmentTypes) {
+    await prisma.appointmentType.upsert({
+      where: { id: t.name },
+      create: { id: t.name, ...t },
+      update: {},
+    }).catch(async () => {
+      const exists = await prisma.appointmentType.findFirst({ where: { name: t.name } })
+      if (!exists) await prisma.appointmentType.create({ data: t })
+    })
+  }
+  console.log('✓ Termintypen angelegt')
+
+  // ─── Demo-Verfügbarkeit (Di–Fr 9–17 Uhr) ──────────────────────────────────
+  for (const day of [1, 2, 3, 4]) {
+    const exists = await prisma.availabilitySlot.findFirst({
+      where: { therapistId: therapist.id, dayOfWeek: day }
+    })
+    if (!exists) {
+      await prisma.availabilitySlot.create({
+        data: { therapistId: therapist.id, dayOfWeek: day, startTime: '09:00', endTime: '17:00' }
+      })
+    }
+  }
+  console.log('✓ Verfügbarkeit angelegt')
+
+  // ─── NotificationSettings ──────────────────────────────────────────────────
+  await prisma.notificationSetting.upsert({
+    where: { userId: therapist.id },
+    update: {},
+    create: { userId: therapist.id, emailEnabled: true, smsEnabled: false, inAppEnabled: true, reminderHours: [24, 1] }
+  })
+  await prisma.notificationSetting.upsert({
+    where: { userId: patientUser.id },
+    update: {},
+    create: { userId: patientUser.id, emailEnabled: true, smsEnabled: false, inAppEnabled: true, reminderHours: [24] }
+  })
+  console.log('✓ Notification-Einstellungen angelegt')
+
   console.log('\n✓ Seed abgeschlossen')
   console.log('  Admin:      admin@scl90s.local     / Admin1234!')
   console.log('  Therapeut:  therapeut@scl90s.local / Therapeut1234!')
