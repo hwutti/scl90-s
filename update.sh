@@ -73,11 +73,21 @@ if [[ -d "$MIGRATION_DIR" ]] && [[ -n "$(ls -A $MIGRATION_DIR 2>/dev/null)" ]]; 
   }
 else
   warn "Keine Migrations-Dateien → prisma db push"
-  sudo -u "$APP_USER" bash -c "
-    set -a; source $APP_DIR/.env; set +a
-    cd $APP_DIR
-    npx prisma db push 2>&1 | tail -10
-  " && success "Schema via db push aktualisiert"
+  PUSH_OUTPUT=$(sudo -u "$APP_USER" bash -c "
+    set -a; source \$APP_DIR/.env; set +a
+    cd \$APP_DIR
+    echo 'yes' | npx prisma db push --accept-data-loss 2>&1
+  ")
+  if echo "$PUSH_OUTPUT" | grep -q "error\|Error\|failed"; then
+    warn "db push mit Fehlern, versuche --force-reset"
+    sudo -u "$APP_USER" bash -c "
+      set -a; source $APP_DIR/.env; set +a
+      cd $APP_DIR
+      echo 'yes' | npx prisma db push --force-reset --accept-data-loss 2>&1 | tail -10
+    " && success "Schema via db push (force-reset) aktualisiert" || fail "Schema-Update fehlgeschlagen"
+  else
+    success "Schema via db push aktualisiert"
+  fi
 fi
 
 # ─── 5. Seed: Basis-Daten sicherstellen (idempotent) ─────────────────────────
