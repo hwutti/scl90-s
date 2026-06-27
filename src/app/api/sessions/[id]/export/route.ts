@@ -48,7 +48,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     data: { userId: (session.user as any).id, sessionId: params.id, action: 'SESSION_EXPORTED' },
   }).catch(() => {})
 
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
