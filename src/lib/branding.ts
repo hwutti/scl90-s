@@ -1,0 +1,47 @@
+import { prisma } from './prisma'
+
+export interface BrandingConfig {
+  praxisName: string
+  slogan: string | null
+  logoBase64: string | null
+  logoMimeType: string | null
+  colorPrimary: string
+  colorPrimaryLight: string
+  colorAccent: string
+  imprintHtml: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  address: string | null
+}
+
+export const DEFAULT_BRANDING: BrandingConfig = {
+  praxisName: 'Psychotherapeutische Praxis',
+  slogan: 'Klinische Diagnostik & Dokumentation',
+  logoBase64: null,
+  logoMimeType: null,
+  colorPrimary: '#166534',
+  colorPrimaryLight: '#dcfce7',
+  colorAccent: '#14532d',
+  imprintHtml: null,
+  contactEmail: null,
+  contactPhone: null,
+  address: null,
+}
+
+export async function getBranding(): Promise<BrandingConfig> {
+  try {
+    const config = await prisma.praxisConfig.findUnique({ where: { key: 'default' } })
+    if (!config) return DEFAULT_BRANDING
+    return config as BrandingConfig
+  } catch {
+    return DEFAULT_BRANDING
+  }
+}
+
+export function brandingToCssVars(b: BrandingConfig): string {
+  return `
+    --color-primary: ${b.colorPrimary};
+    --color-primary-light: ${b.colorPrimaryLight};
+    --color-accent: ${b.colorAccent};
+  `.trim()
+}

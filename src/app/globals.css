@@ -2,24 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Branding CSS-Variablen (werden vom Layout überschrieben) ─── */
+:root {
+  --color-primary:       #166534;
+  --color-primary-light: #dcfce7;
+  --color-accent:        #14532d;
+  --sidebar-width:       260px;
+}
+
 @layer base {
-  :root {
-    --bg: 248 250 252;
-    --card: 255 255 255;
-  }
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply bg-slate-100 text-slate-800 antialiased;
     font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   }
 }
 
 @layer components {
+  /* ── Buttons ── */
   .btn {
     @apply inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium
            transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-sm;
+    background-color: var(--color-primary);
+    @apply btn text-white hover:opacity-90 active:scale-95 shadow-sm;
   }
   .btn-secondary {
     @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 active:scale-95 shadow-sm;
@@ -27,20 +33,45 @@
   .btn-danger {
     @apply btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:scale-95;
   }
+
+  /* ── Karten ── */
   .card {
     @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
   }
+
+  /* ── Formular ── */
   .input {
     @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm
-           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
-           focus:border-indigo-500 transition-all;
+           placeholder:text-slate-400 focus:outline-none focus:ring-2
+           focus:border-transparent transition-all;
+    --tw-ring-color: var(--color-primary);
+  }
+  .input:focus {
+    box-shadow: 0 0 0 2px var(--color-primary);
+    border-color: var(--color-primary);
   }
   .label {
     @apply block text-sm font-medium text-slate-700 mb-1.5;
   }
-  .badge-green  { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800; }
-  .badge-yellow { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800; }
-  .badge-red    { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800; }
-  .badge-gray   { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700; }
-  .badge-blue   { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800; }
+
+  /* ── Badges ── */
+  .badge-green  { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800; }
+  .badge-yellow { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800; }
+  .badge-red    { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800; }
+  .badge-gray   { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-600; }
+  .badge-blue   { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800; }
+
+  /* ── Sidebar Nav-Link ── */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-slate-600 hover:bg-slate-100 transition-all duration-150 cursor-pointer;
+  }
+  .nav-link.active {
+    color: var(--color-primary);
+    background-color: var(--color-primary-light);
+    @apply font-semibold;
+  }
+  .nav-link.active svg {
+    color: var(--color-primary);
+  }
 }

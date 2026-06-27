@@ -361,3 +361,30 @@ model AuditLog {
   @@index([assessmentId])
   @@index([createdAt])
 }
+
+// ─── Praxis-Branding (Admin konfigurierbar) ───────────────────────────────────
+
+model PraxisConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique  // z.B. "default" – erweiterbar für Multi-Tenant
+
+  // Branding
+  praxisName      String   @default("Meine Praxis")
+  slogan          String?  // z.B. "Psychotherapeutische Praxis"
+  logoBase64      String?  // Base64-encoded Logo (PNG/SVG)
+  logoMimeType    String?  // "image/png" oder "image/svg+xml"
+
+  // Farben (Hex)
+  colorPrimary    String   @default("#166534")   // Dunkelgrün
+  colorPrimaryLight String @default("#dcfce7")   // Hellgrün für Hover/Bg
+  colorAccent     String   @default("#14532d")   // Dunkleres Grün für Hover
+
+  // Footer / Impressum
+  imprintHtml     String?  // HTML für Impressum/Über
+  contactEmail    String?
+  contactPhone    String?
+  address         String?
+
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+}

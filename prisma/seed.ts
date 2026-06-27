@@ -132,6 +132,23 @@ async function main() {
     console.log('✓ Demo-Assessment angelegt')
   }
 
+
+  // ─── PraxisConfig (Default-Branding) ──────────────────────────────────────
+  await prisma.praxisConfig.upsert({
+    where: { key: 'default' },
+    update: {},
+    create: {
+      key: 'default',
+      praxisName: 'Psychotherapeutische Praxis',
+      slogan: 'Klinische Diagnostik & Dokumentation',
+      colorPrimary: '#166534',
+      colorPrimaryLight: '#dcfce7',
+      colorAccent: '#14532d',
+      imprintHtml: '<p>Bitte Impressum im Admin-Bereich konfigurieren.</p>',
+    },
+  })
+  console.log('✓ PraxisConfig angelegt')
+
   console.log('\n✓ Seed abgeschlossen')
   console.log('  Admin:      admin@scl90s.local     / Admin1234!')
   console.log('  Therapeut:  therapeut@scl90s.local / Therapeut1234!')
