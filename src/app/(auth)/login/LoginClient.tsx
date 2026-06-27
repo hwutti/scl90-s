@@ -1,12 +1,10 @@
 'use client'
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Lock, Mail, Hash, Activity } from 'lucide-react'
 import type { BrandingConfig } from '@/lib/branding'
 
 export function LoginClient({ branding }: { branding: BrandingConfig }) {
-  const router = useRouter()
   const [mode, setMode] = useState<'credentials' | 'pin'>('credentials')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +28,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
     })
     setLoading(false)
     if (res?.ok) window.location.href = '/dashboard'
-    else setError('Ungültige Anmeldedaten. Bitte erneut versuchen.')
+    else setError(res?.error === 'CredentialsSignin' ? 'E-Mail/Passwort ungültig.' : 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.')
   }
 
   return (
