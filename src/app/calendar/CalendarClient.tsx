@@ -337,18 +337,10 @@ export function CalendarClient({ currentUserId, role, types, therapists, patient
                       onClick={() => router.push(`/appointments/new?date=${dateStr}&therapistId=${selectedTherapist!=='ALL'?selectedTherapist:currentUserId}`)}
                       onDragOver={e => { e.preventDefault(); setDragOver(dateStr) }}
                       onDragLeave={() => setDragOver(null)}
-                      onDrop={e => { e.preventDefault()
-                        const orig = new Date(dragAppt!.startAt)
-                        const newStart = new Date(d.getFullYear(),d.getMonth(),d.getDate(),orig.getHours(),orig.getMinutes())
-                        setDragAppt(null); setDragOver(null)
-                        fetch(`/api/appointments/${dragAppt!.id}`, {
-                          method:'PATCH', headers:{'Content-Type':'application/json'},
-                          body: JSON.stringify({ startAt: newStart.toISOString() })
-                        }).then(() => load())
-                      }}>
+                      onDrop={e => { e.preventDefault(); handleDrop(dateStr) }}>
                       {dayAppts.map(a => (
                         <div key={a.id} onClick={e=>e.stopPropagation()}>
-                          <ApptBlock a={a} />
+                          <ApptBlock a={a} onDragStart={() => setDragAppt(a)} onDragEnd={() => {setDragAppt(null);setDragOver(null)}} onClick={() => router.push(`/appointments/${a.id}/edit`)} />
                         </div>
                       ))}
                     </div>
