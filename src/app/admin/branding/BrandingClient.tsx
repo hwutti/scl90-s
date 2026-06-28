@@ -52,6 +52,10 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Datei zu groß. Bitte max. 5 MB.')
+      return
+    }
     const reader = new FileReader()
     reader.onload = ev => {
       const result = ev.target?.result as string
@@ -64,15 +68,21 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
 
   async function save() {
     setSaving(true)
-    await fetch('/api/admin/branding', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-    router.refresh()
+    try {
+      const res = await fetch('/api/admin/branding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+      router.refresh()
+    } catch (e) {
+      alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const logoSrc = form.logoBase64
