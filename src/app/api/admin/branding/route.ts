@@ -1,8 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const config = {
-  api: { bodyParser: { sizeLimit: '10mb' } },
-}
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
