@@ -3,7 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon } from 'lucide-react'
+import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/providers'
 import type { BrandingConfig } from '@/lib/branding'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
     ]
   },
   { href: '/my', label: 'Meine Tests', icon: Activity, roles: ['PATIENT'] },
+  { href: '/finance', label: 'Finanzen', icon: Euro, roles: ['ADMIN','THERAPIST'] },
   { href: '/my/appointments', label: 'Meine Termine', icon: CalendarDays, roles: ['PATIENT'] },
   { href: '/admin/users', label: 'Administration', icon: Shield, roles: ['ADMIN'],
     sub: [
