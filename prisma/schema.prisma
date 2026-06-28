@@ -1222,7 +1222,7 @@ model InvoiceTemplate {
 
 // ─── Transaktionstyp ─────────────────────────────────────────────────────────
 
-model TransactionType {
+model TxType {
   id          String      @id @default(cuid())
   name        String
   direction   String      // "income" | "expense" | "both"
