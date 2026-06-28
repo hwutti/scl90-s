@@ -70,11 +70,11 @@ export async function createSessionFromAppointment(params: {
     // 1. Termin laden und prüfen
     const appt = await tx.appointment.findUnique({
       where: { id: params.appointmentId },
-      include: { patient: true, type: true },
+      include: { patient: true, type: true, therapySession: true },
     })
     if (!appt) throw new Error('Termin nicht gefunden')
     if (!appt.patientId) throw new Error('Termin hat keinen Patienten')
-    if (appt.session) throw new Error('Aus diesem Termin wurde bereits eine Session erstellt')
+    if (appt.therapySession) throw new Error('Aus diesem Termin wurde bereits eine Session erstellt')
 
     // 2. Laufende Sessionsnummer ermitteln
     const count = await tx.therapySession.count({
