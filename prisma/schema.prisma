@@ -1332,7 +1332,7 @@ model VideoCall {
   id                String          @id @default(cuid())
   patientId         String?
   patient           Patient?        @relation("PatientVideoCalls", fields: [patientId], references: [id])
-  appointmentId     String?
+  appointmentId     String?         @unique
   appointment       Appointment?    @relation("AppointmentVideoCall", fields: [appointmentId], references: [id])
   sessionId         String?
   createdByUserId   String
