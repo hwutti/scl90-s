@@ -81,7 +81,7 @@ export function DashboardHomeClient({ role, userName }: { role: string; userName
             {greeting()}, {userName.split(' ')[0]}
           </h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
-            {new Intl.DateTimeFormat('de-AT', { weekday: 'long', dateStyle: 'full' }).format(new Date())}
+            {new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}
           </p>
         </div>
         <button onClick={load} className="btn-secondary" disabled={loading}>
