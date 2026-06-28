@@ -5,9 +5,13 @@ import { prisma } from '@/lib/prisma'
 import { DEFAULT_BRANDING } from '@/lib/branding'
 
 export async function GET() {
-  const config = await prisma.praxisConfig.findUnique({ where: { key: 'default' } })
-  if (!config) return NextResponse.json(DEFAULT_BRANDING)
-  return NextResponse.json(config)
+  try {
+    const config = await prisma.praxisConfig.findUnique({ where: { key: 'default' } })
+    if (!config) return NextResponse.json(DEFAULT_BRANDING)
+    return NextResponse.json(config)
+  } catch (e) {
+    return NextResponse.json(DEFAULT_BRANDING)
+  }
 }
 
 export async function PATCH(req: NextRequest) {
@@ -16,50 +20,48 @@ export async function PATCH(req: NextRequest) {
   if ((session.user as any).role !== 'ADMIN')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await req.json()
-  const {
-    praxisName, slogan, logoBase64, logoMimeType,
-    colorPrimary, colorPrimaryLight, colorAccent, colorSidebarText,
-    imprintHtml, contactEmail, contactPhone, address, bundesland,
-  } = body
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
   const d = DEFAULT_BRANDING
-  const config = await prisma.praxisConfig.upsert({
-    where: { key: 'default' },
-    create: {
-      key: 'default',
-      praxisName:        praxisName        ?? d.praxisName,
-      slogan:            slogan            ?? d.slogan ?? '',
-      logoBase64:        logoBase64        ?? null,
-      logoMimeType:      logoMimeType      ?? null,
-      colorPrimary:      colorPrimary      ?? d.colorPrimary,
-      colorPrimaryLight: colorPrimaryLight ?? d.colorPrimaryLight,
-      colorAccent:       colorAccent       ?? d.colorAccent,
-      colorSidebarText:  colorSidebarText  ?? d.colorSidebarText,
-      imprintHtml:       imprintHtml       ?? '',
-      contactEmail:      contactEmail      ?? '',
-      contactPhone:      contactPhone      ?? '',
-      address:           address           ?? '',
-      bundesland:        bundesland        ?? 'Kärnten',
-      updatedBy: (session.user as any).id,
-    },
-    update: {
-      ...(praxisName        !== undefined && { praxisName }),
-      ...(slogan            !== undefined && { slogan }),
-      ...(logoBase64        !== undefined && { logoBase64 }),
-      ...(logoMimeType      !== undefined && { logoMimeType }),
-      ...(colorPrimary      !== undefined && { colorPrimary }),
-      ...(colorPrimaryLight !== undefined && { colorPrimaryLight }),
-      ...(colorAccent       !== undefined && { colorAccent }),
-      ...(colorSidebarText  !== undefined && { colorSidebarText }),
-      ...(imprintHtml       !== undefined && { imprintHtml }),
-      ...(contactEmail      !== undefined && { contactEmail }),
-      ...(contactPhone      !== undefined && { contactPhone }),
-      ...(address           !== undefined && { address }),
-      ...(bundesland        !== undefined && { bundesland }),
-      updatedBy: (session.user as any).id,
-    },
-  })
+  const userId = (session.user as any).id
+
+  const baseData = {
+    praxisName:        body.praxisName        ?? d.praxisName,
+    slogan:            body.slogan            ?? d.slogan ?? '',
+    logoBase64:        body.logoBase64        ?? null,
+    logoMimeType:      body.logoMimeType      ?? null,
+    colorPrimary:      body.colorPrimary      ?? d.colorPrimary,
+    colorPrimaryLight: body.colorPrimaryLight ?? d.colorPrimaryLight,
+    colorAccent:       body.colorAccent       ?? d.colorAccent,
+    imprintHtml:       body.imprintHtml       ?? '',
+    contactEmail:      body.contactEmail      ?? '',
+    contactPhone:      body.contactPhone      ?? '',
+    address:           body.address           ?? '',
+    bundesland:        body.bundesland        ?? 'Kärnten',
+    updatedBy:         userId,
+  }
+
+  // Try with colorSidebarText first, fall back without if column missing
+  let config: any
+  try {
+    config = await prisma.praxisConfig.upsert({
+      where: { key: 'default' },
+      create: { key: 'default', ...baseData, colorSidebarText: body.colorSidebarText ?? d.colorSidebarText },
+      update: { ...baseData, colorSidebarText: body.colorSidebarText ?? d.colorSidebarText },
+    })
+  } catch (e: any) {
+    console.error('[branding] colorSidebarText not in DB yet, saving without:', e?.message)
+    config = await (prisma.praxisConfig as any).upsert({
+      where: { key: 'default' },
+      create: { key: 'default', ...baseData },
+      update: { ...baseData },
+    })
+  }
 
   return NextResponse.json(config)
 }
