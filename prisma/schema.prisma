@@ -273,6 +273,11 @@ model Patient {
   insuranceProvider String? // Versicherungsträger
   referralSource  String?   // Zuweiser / Zuweisung durch
 
+  // Rechnungsempfänger (KDS-SCR-06A)
+  billRecipientName    String?   // anderer Rechnungsempfänger Name
+  billRecipientAddress String?   // Adresszeile 1
+  billRecipientCity    String?   // PLZ + Stadt
+
   // Beziehungen zu Users
   createdByUserId String
   createdBy       User      @relation("CreatedByUser", fields: [createdByUserId], references: [id])
@@ -769,6 +774,7 @@ model PatientDocument {
   id          String           @id @default(cuid())
   patientId   String
   patient     Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sessionId   String?          // optional: verknüpft mit TherapySession
   uploadedBy  String           // userId
   category    DocumentCategory @default(OTHER)
   name        String           // Dateiname / Bezeichnung
@@ -776,10 +782,13 @@ model PatientDocument {
   size        Int              // Bytes
   data        Bytes            // binary file data
   note        String?          // optionale Bemerkung
+  visibility  String           @default("therapist") // "therapist" | "all"
   uploadedAt  DateTime         @default(now())
+  deletedAt   DateTime?        // soft-delete
 
   @@index([patientId])
   @@index([category])
+  @@index([sessionId])
 }
 
 // ─── Therapieplan & Ziele ────────────────────────────────────────────────────
@@ -1621,5 +1630,56 @@ model TransactionReceipt {
   deletedAt     DateTime?
 
   @@index([transactionId])
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 3: Offene Punkte aus Gap-Report (12 Items)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── BackupJob ───────────────────────────────────────────────────────────────
+
+model BackupJob {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  jobType       String   @default("manual")   // "manual" | "automatic"
+  status        String   @default("pending")  // "pending" | "running" | "done" | "failed"
+  targetPath    String?
+  sourceFileId  String?
+  encrypted     Boolean  @default(false)
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+  errorMessage  String?
+  createdBy     String?
+
+  @@index([status])
+  @@index([startedAt])
+}
+
+// ─── UserVisualSettings ──────────────────────────────────────────────────────
+
+model UserVisualSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  theme           String   @default("light")
+  fontSize        String   @default("medium")
+  accentColor     String   @default("#4f46e5")
+  fontFamily      String   @default("original")
+  helpToolEnabled Boolean  @default(true)
+  classicMode     Boolean  @default(false)
+  backgroundImageId String?
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── UsageTelemetryConsent ───────────────────────────────────────────────────
+
+model UsageTelemetryConsent {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  enabled     Boolean  @default(false)
+  consentedAt DateTime?
+  revokedAt   DateTime?
+  version     String   @default("1.0")
+  source      String   @default("settings")
 }
 

@@ -6,7 +6,7 @@ import {
   User, FileText, ClipboardList, MessageSquare, ChevronLeft, Plus,
   AlertCircle, Camera, Calendar, Activity, X, Trash2, Edit3, Check,
   Upload, Download, Eye, Search, ChevronDown, Target, CheckCircle,
-  Clock, XCircle, Flag, Stethoscope
+  Clock, XCircle, Flag, Stethoscope, Save, Info
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { searchICD10 } from '@/lib/icd10/codes'
@@ -66,6 +66,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<Tab>('stammdaten')
 
   // Photo
@@ -76,6 +77,66 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     }).catch(()=>{})
   }, [patient.id])
 
+  // ── Stammdaten Bearbeitung ──
+  const [editStamm, setEditStamm] = useState(false)
+  const [stammForm, setStammForm] = useState({
+    firstName: patient.firstName, lastName: patient.lastName,
+    dob: patient.dob, gender: patient.gender,
+    phone: patient.phone ?? '', email: patient.email ?? '',
+    insuranceProvider: patient.insuranceProvider ?? '',
+    referralSource: patient.referralSource ?? '',
+    active: patient.active,
+    billRecipientName: (patient as any).billRecipientName ?? '',
+    billRecipientAddress: (patient as any).billRecipientAddress ?? '',
+    billRecipientCity: (patient as any).billRecipientCity ?? '',
+  })
+  const [savingStamm, setSavingStamm] = useState(false)
+
+  async function saveStamm() {
+    setSavingStamm(true)
+    await fetch(`/api/patients/${patient.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stammForm),
+    })
+    setSavingStamm(false)
+    setEditStamm(false)
+  }
+
+  // ── Timeline / Verlauf ──
+  const [timeline, setTimeline] = useState<any[]>([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineSearch, setTimelineSearch] = useState('')
+
+  const loadTimeline = useCallback(() => {
+    setTimelineLoading(true)
+    fetch(`/api/patients/${patient.id}/timeline`).then(r=>r.json()).then(d=>{
+      setTimeline(Array.isArray(d) ? d : [])
+      setTimelineLoading(false)
+    }).catch(()=>setTimelineLoading(false))
+  }, [patient.id])
+  useEffect(() => { if (tab==='verlauf') loadTimeline() }, [tab, loadTimeline])
+
+  // ── Faktenbox Daten ──
+  const [faktenbookData, setFaktenbookData] = useState<any>(null)
+  useEffect(() => {
+    if (tab !== 'stammdaten') return
+    Promise.all([
+      fetch(`/api/patients/${patient.id}/sessions`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/api/patients/${patient.id}/diagnoses`).then(r=>r.json()).catch(()=>[]),
+    ]).then(([sessions, diagnoses]) => {
+      const s = Array.isArray(sessions) ? sessions : []
+      setFaktenbookData({
+        sessionCount: s.length,
+        firstSession: s.length ? s[s.length-1]?.sessionDate : null,
+        lastSession:  s.length ? s[0]?.sessionDate : null,
+        unbilled:     s.filter((x:any) => x.billingStatus === 'UNBILLED').length,
+        unpaid:       s.filter((x:any) => x.billingStatus === 'BILLED_UNPAID').length,
+        excluded:     s.filter((x:any) => x.billingStatus === 'EXCLUDED').length,
+        diagnoses:    Array.isArray(diagnoses) ? diagnoses.map((d:any) => d.icdCode) : [],
+      })
+    })
+  }, [patient.id, tab])
+
   // Documents
   const [docs, setDocs] = useState<any[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
@@ -83,12 +144,34 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   const [docForm, setDocForm] = useState({ name: '', category: 'OTHER', note: '' })
   const [showDocUpload, setShowDocUpload] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<any>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const loadDocs = useCallback(() => {
     setDocsLoading(true)
     fetch(`/api/patients/${patient.id}/documents`).then(r=>r.json()).then(d=>{setDocs(d);setDocsLoading(false)}).catch(()=>setDocsLoading(false))
   }, [patient.id])
   useEffect(() => { if (tab==='dokumente') loadDocs() }, [tab, loadDocs])
+
+  // Drag-and-Drop für Dokumente
+  async function handleFileDrop(file: File) {
+    if (!file) return
+    setUploadingDoc(true)
+    const reader = new FileReader()
+    reader.onload = async ev => {
+      const result = ev.target?.result as string
+      const [, base64] = result.split(',')
+      await fetch(`/api/patients/${patient.id}/documents`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name, category: 'OTHER', note: '',
+          base64, mimeType: file.type, size: file.size,
+        }),
+      })
+      setUploadingDoc(false)
+      loadDocs()
+    }
+    reader.readAsDataURL(file)
+  }
 
   // Goals
   const [goals, setGoals] = useState<any[]>([])
@@ -373,28 +456,150 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
 
         {/* ── STAMMDATEN ── */}
         {tab === 'stammdaten' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="card" style={{ padding: 16 }}>
-              <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Persönliche Daten</h3>
-              {[['Vorname',patient.firstName],['Nachname',patient.lastName],['Geburtsdatum',fmtDate(patient.dob)],['Alter',age+' Jahre'],['Geschlecht',GENDER_LABEL[patient.gender]??patient.gender],['Telefon',patient.phone??'—'],['E-Mail',patient.email??'—']].map(([l,v]) => (
-                <div key={l} className="field-row"><span className="field-label">{l}</span><span className="field-value">{v}</span></div>
-              ))}
-            </div>
-            <div className="card" style={{ padding: 16 }}>
-              <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Administrative Daten</h3>
-              {[['Versicherungsträger',patient.insuranceProvider??'—'],['Zuweisung',patient.referralSource??'—'],['Behandler',patient.therapists?.[0]?.user?.name??'—'],['Patient seit',fmtDate(patient.createdAt)],['Status',patient.active?'Aktiv':'Inaktiv']].map(([l,v]) => (
-                <div key={l} className="field-row">
-                  <span className="field-label">{l}</span>
-                  <span className="field-value">{l==='Status'?<span className={patient.active?'badge badge-green':'badge badge-gray'}>{v}</span>:v}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
+              {/* Persönliche Daten */}
+              <div className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Persönliche Daten</h3>
+                  {!editStamm
+                    ? <button onClick={() => setEditStamm(true)} className="btn-ghost" style={{ padding: '3px 8px', fontSize: 12 }}><Edit3 style={{ width: 13, height: 13 }} /> Bearbeiten</button>
+                    : <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setEditStamm(false)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: 12 }}>Abbrechen</button>
+                        <button onClick={saveStamm} disabled={savingStamm} className="btn-primary" style={{ padding: '3px 8px', fontSize: 12 }}>
+                          {savingStamm ? '...' : <><Save style={{ width: 12, height: 12 }} /> Speichern</>}
+                        </button>
+                      </div>
+                  }
                 </div>
-              ))}
-              {patient.patientUser?.pin && (
-                <div className="field-row">
-                  <span className="field-label">PIN-Login</span>
-                  <span style={{ fontFamily: 'monospace', background: 'var(--surface-panel)', padding: '2px 8px', borderRadius: 5, fontSize: 13, fontWeight: 600, color: 'var(--color-primary)' }}>{patient.patientUser.pin}</span>
-                </div>
-              )}
+                {!editStamm ? (
+                  <>
+                    {[
+                      ['Vorname', patient.firstName],
+                      ['Nachname', patient.lastName],
+                      ['Geburtsdatum', fmtDate(patient.dob)],
+                      ['Alter', age + ' Jahre'],
+                      ['Geschlecht', GENDER_LABEL[patient.gender] ?? patient.gender],
+                      ['Telefon', patient.phone ?? '—'],
+                      ['E-Mail', patient.email ?? '—'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="field-row"><span className="field-label">{l}</span><span className="field-value">{v}</span></div>
+                    ))}
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="form-grid-2">
+                      <div><label className="label">Vorname *</label>
+                        <input className="input" value={stammForm.firstName} onChange={e => setStammForm(f => ({ ...f, firstName: e.target.value }))} /></div>
+                      <div><label className="label">Nachname *</label>
+                        <input className="input" value={stammForm.lastName} onChange={e => setStammForm(f => ({ ...f, lastName: e.target.value }))} /></div>
+                      <div><label className="label">Geburtsdatum</label>
+                        <input type="date" className="input" value={stammForm.dob} onChange={e => setStammForm(f => ({ ...f, dob: e.target.value }))} /></div>
+                      <div><label className="label">Geschlecht</label>
+                        <select className="input" value={stammForm.gender} onChange={e => setStammForm(f => ({ ...f, gender: e.target.value }))}>
+                          <option value="MALE">Männlich</option>
+                          <option value="FEMALE">Weiblich</option>
+                          <option value="DIVERSE">Divers</option>
+                        </select></div>
+                      <div><label className="label">Telefon</label>
+                        <input className="input" value={stammForm.phone} onChange={e => setStammForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                      <div><label className="label">E-Mail</label>
+                        <input className="input" type="email" value={stammForm.email} onChange={e => setStammForm(f => ({ ...f, email: e.target.value }))} /></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Administrative Daten */}
+              <div className="card" style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Administrative Daten</h3>
+                {!editStamm ? (
+                  <>
+                    {[
+                      ['Versicherungsträger', patient.insuranceProvider ?? '—'],
+                      ['Zuweisung', patient.referralSource ?? '—'],
+                      ['Behandler', patient.therapists?.[0]?.therapist?.name ?? '—'],
+                      ['Patient seit', fmtDate(patient.createdAt)],
+                      ['Status', patient.active ? 'Aktiv' : 'Inaktiv'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="field-row">
+                        <span className="field-label">{l}</span>
+                        <span className="field-value">{l === 'Status' ? <span className={patient.active ? 'badge badge-green' : 'badge badge-gray'}>{v}</span> : v}</span>
+                      </div>
+                    ))}
+                    {patient.patientUser?.pin && (
+                      <div className="field-row">
+                        <span className="field-label">PIN-Login</span>
+                        <span style={{ fontFamily: 'monospace', background: 'var(--surface-panel)', padding: '2px 8px', borderRadius: 5, fontSize: 13, fontWeight: 600, color: 'var(--color-primary)' }}>{patient.patientUser.pin}</span>
+                      </div>
+                    )}
+                    {/* Rechnungsempfänger */}
+                    {(patient as any).billRecipientName && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Rechnungsempfänger</div>
+                        <div className="field-row"><span className="field-label">Name</span><span className="field-value">{(patient as any).billRecipientName}</span></div>
+                        {(patient as any).billRecipientAddress && <div className="field-row"><span className="field-label">Adresse</span><span className="field-value">{(patient as any).billRecipientAddress}</span></div>}
+                        {(patient as any).billRecipientCity && <div className="field-row"><span className="field-label">PLZ/Stadt</span><span className="field-value">{(patient as any).billRecipientCity}</span></div>}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div><label className="label">Versicherungsträger</label>
+                      <input className="input" value={stammForm.insuranceProvider} onChange={e => setStammForm(f => ({ ...f, insuranceProvider: e.target.value }))} /></div>
+                    <div><label className="label">Zuweisung</label>
+                      <input className="input" value={stammForm.referralSource} onChange={e => setStammForm(f => ({ ...f, referralSource: e.target.value }))} /></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface-panel)', borderRadius: 7 }}>
+                      <input type="checkbox" id="activeChk" checked={stammForm.active} onChange={e => setStammForm(f => ({ ...f, active: e.target.checked }))} />
+                      <label htmlFor="activeChk" style={{ fontSize: 13, cursor: 'pointer', color: 'var(--text-primary)' }}>Profil aktiv</label>
+                    </div>
+                    <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Anderer Rechnungsempfänger</div>
+                    <div><label className="label">Name</label>
+                      <input className="input" placeholder="Wenn Rechnungen an andere Person gehen soll" value={stammForm.billRecipientName} onChange={e => setStammForm(f => ({ ...f, billRecipientName: e.target.value }))} /></div>
+                    <div><label className="label">Adressezeile</label>
+                      <input className="input" value={stammForm.billRecipientAddress} onChange={e => setStammForm(f => ({ ...f, billRecipientAddress: e.target.value }))} /></div>
+                    <div><label className="label">PLZ / Stadt</label>
+                      <input className="input" value={stammForm.billRecipientCity} onChange={e => setStammForm(f => ({ ...f, billRecipientCity: e.target.value }))} /></div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Faktenbox */}
+            {faktenbookData && (
+              <div className="card" style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Faktenbox</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div className="stat-card" style={{ padding: '10px 12px' }}>
+                    <div className="stat-value" style={{ color: 'var(--color-primary)', fontSize: 20 }}>{faktenbookData.sessionCount}</div>
+                    <div className="stat-label">Sitzungen gesamt</div>
+                  </div>
+                  <div className="stat-card" style={{ padding: '10px 12px' }}>
+                    <div className="stat-value" style={{ color: 'var(--amber)', fontSize: 20 }}>{faktenbookData.unbilled}</div>
+                    <div className="stat-label">Unverrechnete Sessions</div>
+                  </div>
+                  <div className="stat-card" style={{ padding: '10px 12px' }}>
+                    <div className="stat-value" style={{ color: 'var(--red)', fontSize: 20 }}>{faktenbookData.unpaid}</div>
+                    <div className="stat-label">Unbezahlte Sessions</div>
+                  </div>
+                  <div className="stat-card" style={{ padding: '10px 12px' }}>
+                    <div className="stat-value" style={{ color: 'var(--text-muted)', fontSize: 20 }}>{faktenbookData.excluded}</div>
+                    <div className="stat-label">Exkludierte Sessions</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {faktenbookData.firstSession && <span>Erste Session: <strong>{fmtDate(faktenbookData.firstSession)}</strong></span>}
+                  {faktenbookData.lastSession  && <span>· Letzte Session: <strong>{fmtDate(faktenbookData.lastSession)}</strong></span>}
+                  {faktenbookData.diagnoses.length > 0 && (
+                    <span>· ICD-10: {faktenbookData.diagnoses.map((c: string) => (
+                      <span key={c} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)', marginLeft: 4 }}>{c}</span>
+                    ))}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -528,25 +733,61 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
         {tab === 'dokumente' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Dokumente</h2>
-              <button onClick={() => setShowDocUpload(true)} className="btn-primary"><Upload style={{ width: 13, height: 13 }} /> Dokument hochladen</button>
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Meine Dokumente</h2>
+              <button onClick={() => setShowDocUpload(true)} className="btn-primary"><Upload style={{ width: 13, height: 13 }} /> Datei hinzufügen</button>
             </div>
+
+            {/* Drag-and-Drop Zone */}
+            <div
+              ref={dropRef}
+              onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={e => {
+                e.preventDefault(); setIsDragOver(false)
+                const file = e.dataTransfer.files[0]
+                if (file) handleFileDrop(file)
+              }}
+              style={{
+                border: `2px dashed ${isDragOver ? 'var(--color-primary)' : 'var(--border)'}`,
+                borderRadius: 10, padding: '20px 24px', marginBottom: 14,
+                background: isDragOver ? 'var(--color-primary-light)' : 'var(--surface-panel)',
+                transition: 'all 0.15s', textAlign: 'center',
+              }}
+            >
+              {uploadingDoc ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                  <div className="spinner" style={{ width: 16, height: 16 }} /> Datei wird hochgeladen...
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: isDragOver ? 'var(--color-primary)' : 'var(--text-muted)' }}>
+                  Dateien und Ordner in den Dokumente-Bereich ziehen (Drag and Drop) — oder{' '}
+                  <button onClick={() => setShowDocUpload(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontWeight: 600, padding: 0, fontSize: 13 }}>
+                    Datei hinzufügen
+                  </button>
+                </p>
+              )}
+            </div>
+
             {docsLoading ? <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div> :
-            docs.length === 0 ? (
+            docs.filter(d => !d.deletedAt).length === 0 ? (
               <div className="card" style={{ padding: 24 }}>
-                <div className="empty-state"><FileText className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Noch keine Dokumente vorhanden.</p></div>
+                <div className="empty-state">
+                  <FileText className="empty-state-icon" style={{ width: 36, height: 36 }} />
+                  <p className="empty-state-text">Anzahl an gespeicherten Dokumenten: Keine Dokumente gespeichert</p>
+                </div>
               </div>
             ) : (
               <div className="card" style={{ overflow: 'hidden' }}>
                 <table className="data-table">
-                  <thead><tr><th>Name</th><th>Kategorie</th><th>Größe</th><th>Datum</th><th></th></tr></thead>
+                  <thead><tr><th>Name</th><th>Typ</th><th>Größe</th><th>Kategorie</th><th>Hochgeladen</th><th></th></tr></thead>
                   <tbody>
-                    {docs.map(d => (
+                    {docs.filter(d => !d.deletedAt).map(d => (
                       <tr key={d.id}>
                         <td className="primary">{d.name}</td>
-                        <td><span className="badge badge-indigo">{DOC_CATEGORY_LABEL[d.category]??d.category}</span></td>
+                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.mimeType?.split('/')[1]?.toUpperCase() ?? '—'}</td>
                         <td>{fmtBytes(d.size)}</td>
-                        <td>{fmtDate(d.uploadedAt)}</td>
+                        <td><span className="badge badge-indigo" style={{ fontSize: 10 }}>{DOC_CATEGORY_LABEL[d.category] ?? d.category}</span></td>
+                        <td style={{ fontSize: 12 }}>{fmtDate(d.uploadedAt)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button onClick={() => viewDoc(d.id)} className="btn-secondary" style={{ padding: '4px 8px' }}>
@@ -580,29 +821,114 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
 
         {/* ── VERLAUF ── */}
         {tab === 'verlauf' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Verlaufsnotizen</h2>
-              <button onClick={() => setNewNote(true)} className="btn-primary"><Plus style={{ width: 13, height: 13 }} /> Neue Notiz</button>
-            </div>
-            {!notes?.length ? (
-              <div className="card" style={{ padding: 24 }}>
-                <div className="empty-state"><MessageSquare className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Noch keine Verlaufsnotizen.</p></div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            {/* Linke Spalte: Timeline */}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Profilverlauf</h2>
+                <div style={{ position: 'relative' }}>
+                  <Search style={{ position: 'absolute', left: 9, top: 8, width: 14, height: 14, stroke: 'var(--text-muted)' }} />
+                  <input className="input" style={{ paddingLeft: 30, width: 200 }} placeholder="Suchen..."
+                    value={timelineSearch} onChange={e => setTimelineSearch(e.target.value)} />
+                </div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {notes.map((n: any) => (
-                  <div key={n.id} style={{ padding: 16, background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span className="badge badge-indigo">{n.noteType}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(n.date)}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>{n.author?.name}</span>
+
+              {timelineLoading ? (
+                <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div>
+              ) : (() => {
+                const EVENT_ICONS: Record<string, string> = {
+                  profile_created: '👤', session_created: '📋', session_excluded_from_finances: '🚫',
+                  session_included_in_finances: '✅', transaction_created: '💶', transaction_cancelled: '↩',
+                  diagnosis_added: '🩺', document_uploaded: '📄', appointment_created: '📅',
+                }
+                const EVENT_LABELS: Record<string, string> = {
+                  profile_created: 'Profil', session_created: 'Session', transaction_created: 'Transaktion',
+                  transaction_cancelled: 'Transaktion', diagnosis_added: 'Diagnose', document_uploaded: 'Dokument',
+                  appointment_created: 'Termin', session_excluded_from_finances: 'Session',
+                  session_included_in_finances: 'Session',
+                }
+                const EVENT_CLASSES: Record<string, string> = {
+                  session_created: 'badge-indigo', transaction_created: 'badge-green',
+                  transaction_cancelled: 'badge-red', diagnosis_added: 'badge-amber',
+                  document_uploaded: 'badge-blue', profile_created: 'badge-gray',
+                  appointment_created: 'badge-indigo',
+                }
+                // Zusammenführen: Timeline-Events + SessionNotes
+                const noteEvents = (notes ?? []).map((n: any) => ({
+                  id: 'note-' + n.id, eventType: 'note', title: 'Verlaufsnotiz',
+                  summary: n.content?.slice(0, 80) + (n.content?.length > 80 ? '...' : ''),
+                  eventDate: n.date,
+                }))
+                const allEvents = [...timeline, ...noteEvents]
+                  .sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime())
+                  .filter(e => !timelineSearch || [e.title, e.summary, e.eventType].some(
+                    v => v?.toLowerCase().includes(timelineSearch.toLowerCase())
+                  ))
+
+                if (allEvents.length === 0) return (
+                  <div className="card" style={{ padding: 24 }}>
+                    <div className="empty-state">
+                      <MessageSquare className="empty-state-icon" style={{ width: 36, height: 36 }} />
+                      <p className="empty-state-text">{timelineSearch ? 'Keine Ergebnisse für "' + timelineSearch + '"' : 'Noch keine Ereignisse vorhanden.'}</p>
                     </div>
-                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{n.content}</p>
                   </div>
-                ))}
+                )
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {allEvents.map((e, idx) => (
+                      <div key={e.id} style={{ display: 'flex', gap: 12, paddingBottom: 14 }}>
+                        {/* Timeline-Linie */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                            {EVENT_ICONS[e.eventType] ?? '•'}
+                          </div>
+                          {idx < allEvents.length - 1 && <div style={{ width: 2, flex: 1, background: 'var(--border)', marginTop: 4 }} />}
+                        </div>
+                        {/* Inhalt */}
+                        <div style={{ flex: 1, paddingTop: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{e.title}</span>
+                            <span className={`badge ${EVENT_CLASSES[e.eventType] ?? 'badge-gray'}`} style={{ fontSize: 10 }}>
+                              {EVENT_LABELS[e.eventType] ?? e.eventType}
+                            </span>
+                          </div>
+                          {e.summary && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{e.summary}</p>}
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>{fmtDate(e.eventDate)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Rechte Spalte: Notizen */}
+            <div style={{ width: 240, flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Notizen</h3>
+                <button onClick={() => setNewNote(true)} className="btn-secondary" style={{ fontSize: 11, padding: '3px 8px' }}>
+                  <Plus style={{ width: 11, height: 11 }} />
+                </button>
               </div>
-            )}
+              {!notes?.length ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Noch keine Notizen.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {notes.slice(0, 5).map((n: any) => (
+                    <div key={n.id} style={{ padding: '8px 10px', background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{fmtDate(n.date)}</div>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                        {n.content?.slice(0, 100)}{n.content?.length > 100 ? '...' : ''}
+                      </p>
+                    </div>
+                  ))}
+                  {notes.length > 5 && (
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>+ {notes.length - 5} weitere</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -719,14 +1045,35 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                     ))}
                   </div>
                 )}
-                {selectedCode && (
-                  <div style={{ marginTop: 6, padding: '8px 12px', background: 'var(--color-primary-light)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>{selectedCode.code}</span>
-                    <div>
-                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{selectedCode.label}</span>
-                      {selectedCode.definition && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{selectedCode.definition}</p>}
+              {selectedCode && (
+                  <div style={{ marginTop: 6, padding: '10px 12px', background: 'var(--color-primary-light)', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)', fontSize: 14 }}>{selectedCode.code}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{selectedCode.label}</span>
+                      <button onClick={() => { setSelectedCode(null); setDiagSearch('') }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X style={{ width: 13, height: 13 }} /></button>
                     </div>
-                    <button onClick={() => { setSelectedCode(null); setDiagSearch('') }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X style={{ width: 13, height: 13 }} /></button>
+                    {selectedCode.definition && (
+                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 6px', lineHeight: 1.5 }}>{selectedCode.definition}</p>
+                    )}
+                    {/* ICD-Inspector: inkludiert/exkludiert */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                      {selectedCode.includes && selectedCode.includes.length > 0 && (
+                        <div style={{ padding: '6px 10px', background: 'var(--green-bg)', borderRadius: 6 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Inkludiert</div>
+                          {selectedCode.includes.map((inc: string, i: number) => (
+                            <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{inc}</div>
+                          ))}
+                        </div>
+                      )}
+                      {selectedCode.excludes && selectedCode.excludes.length > 0 && (
+                        <div style={{ padding: '6px 10px', background: 'var(--red-bg,#fef2f2)', borderRadius: 6 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Exkludiert</div>
+                          {selectedCode.excludes.map((exc: string, i: number) => (
+                            <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{exc}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -739,6 +1086,16 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                 <div><label className="label">Sicherheit</label>
                   <select className="input" value={diagForm.certainty} onChange={e => setDiagForm(f=>({...f,certainty:e.target.value}))}>
                     <option value="gesichert">gesichert</option><option value="Verdacht">Verdacht</option><option value="Ausschluss">Ausschluss</option>
+                  </select>
+                </div>
+                <div><label className="label">Quelle</label>
+                  <input className="input" placeholder="z.B. Eigene Erhebung, Zuweisung ..." value={(diagForm as any).source ?? ''} onChange={e => setDiagForm(f=>({...f,source:e.target.value}))} />
+                </div>
+                <div><label className="label">Status</label>
+                  <select className="input" value={(diagForm as any).statusValue ?? 'aktiv'} onChange={e => setDiagForm(f=>({...f,statusValue:e.target.value}))}>
+                    <option value="aktiv">Aktiv</option>
+                    <option value="remission">In Remission</option>
+                    <option value="abgeschlossen">Abgeschlossen</option>
                   </select>
                 </div>
               </div>

@@ -37,10 +37,13 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   const [selectedTab, setSelectedTab] = useState<'sessions'|'transactions'>('sessions')
   const [showNewSession, setShowNewSession] = useState(false)
   const [showCreateTx, setShowCreateTx] = useState(false)
+  const [wizardStep, setWizardStep] = useState(1)  // 1–4
   const [selectedSessions, setSelectedSessions] = useState<string[]>([])
   const [showInvoice, setShowInvoice] = useState<any>(null)
   const [payingTxId, setPayingTxId] = useState<string|null>(null)
   const [undoCountdown, setUndoCountdown] = useState<Record<string,number>>({})
+  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
 
   const [newSession, setNewSession] = useState({
     sessionDate: new Date().toISOString().slice(0,10),
@@ -53,6 +56,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   })
   const [txForm, setTxForm] = useState({
     payerName: '', vatRate: 0, markAsPaid: false,
+    generateInvoiceDoc: true, anonymizeInvoice: false,
     paymentMethod: 'UNBAR_BANK_TRANSFER', notes: '', paymentInfo: '',
   })
   const [savingSession, setSavingSession] = useState(false)
@@ -414,69 +418,147 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
         </div>
       )}
 
-      {/* Transaktion erstellen */}
-      {showCreateTx && (
-        <div className="modal-overlay" onClick={() => setShowCreateTx(false)}>
-          <div className="modal" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 style={{margin:0,fontSize:15}}>Transaktion erstellen</h2>
-              <button onClick={()=>setShowCreateTx(false)} className="btn-ghost" style={{padding:4}}><X style={{width:16,height:16}}/></button>
-            </div>
-            <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
-              {/* Summary */}
-              <div style={{padding:'10px 14px',background:'var(--color-primary-light)',borderRadius:8}}>
-                <p style={{fontSize:13,fontWeight:600,color:'var(--color-primary)',margin:'0 0 4px'}}>
-                  {selectedSessions.length} Sitzung(en) ausgewählt
-                </p>
-                <p style={{fontSize:13,color:'var(--text-primary)',margin:0}}>
-                  Gesamtbetrag: <strong>
-                    {fmtEUR(sessions.filter(s=>selectedSessions.includes(s.id))
-                      .reduce((sum:number,s:any)=>sum+parseFloat(s.calculatedPriceNet??0),0))}
-                  </strong>
-                </p>
-              </div>
-              <div><label className="label">Zahler (Name) *</label>
-                <input className="input" placeholder="Vor- und Nachname des Zahlers"
-                  value={txForm.payerName} onChange={e=>setTxForm(f=>({...f,payerName:e.target.value}))} />
-              </div>
-              <div className="form-grid-2">
-                <div><label className="label">MwSt. %</label>
-                  <select className="input" value={txForm.vatRate} onChange={e=>setTxForm(f=>({...f,vatRate:+e.target.value}))}>
-                    <option value={0}>0% (keine MwSt.)</option>
-                    <option value={20}>20%</option>
-                    <option value={10}>10%</option>
-                  </select>
+      {/* ══ 4-SCHRITT TRANSAKTIONS-WIZARD ══ */}
+      {showCreateTx && (() => {
+        const selSessions = sessions.filter((s:any) => selectedSessions.includes(s.id))
+        const totalNet = selSessions.reduce((s: number, x: any) => s + parseFloat(x.calculatedPriceNet ?? 0), 0)
+        const alreadyBilled = selSessions.filter((s: any) => s.billingStatus !== 'UNBILLED')
+        const firstSession = selSessions.length ? selSessions[selSessions.length - 1] : null
+        const lastSession  = selSessions.length ? selSessions[0] : null
+
+        return (
+          <div className="modal-overlay" onClick={() => { setShowCreateTx(false); setWizardStep(1) }}>
+            <div className="modal" style={{ maxWidth: 700, width: '95vw' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+                  <h2 style={{ margin: 0, fontSize: 15, flex: 1 }}>Transaktion erstellen</h2>
+                  <button onClick={() => { setShowCreateTx(false); setWizardStep(1) }} className="btn-ghost" style={{ padding: 4 }}><X style={{ width: 16, height: 16 }} /></button>
                 </div>
-                <div><label className="label">Zahlungsmethode</label>
-                  <select className="input" value={txForm.paymentMethod} onChange={e=>setTxForm(f=>({...f,paymentMethod:e.target.value}))}>
-                    {Object.entries(PAYMENT_METHODS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-                  </select>
+                <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+                  {['Auswahl prüfen', 'Rechnung', 'Zahlung', 'Vorlage bestätigen'].map((label, i) => (
+                    <div key={i} style={{ flex: 1, textAlign: 'center', padding: '4px 6px', borderRadius: 8, fontSize: 11, fontWeight: wizardStep === i+1 ? 700 : 400,
+                      background: wizardStep > i ? 'var(--color-primary)' : wizardStep === i+1 ? 'var(--color-primary-light)' : 'var(--surface-panel)',
+                      color: wizardStep > i ? '#fff' : wizardStep === i+1 ? 'var(--color-primary)' : 'var(--text-muted)' }}>
+                      {i+1}. {label}
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:'var(--surface-panel)',borderRadius:8}}>
-                <input type="checkbox" id="markPaid" checked={txForm.markAsPaid}
-                  onChange={e=>setTxForm(f=>({...f,markAsPaid:e.target.checked}))} />
-                <label htmlFor="markPaid" style={{fontSize:13,cursor:'pointer',color:'var(--text-primary)'}}>
-                  Sofort als bezahlt markieren
-                </label>
+
+              <div className="modal-body" style={{ minHeight: 200 }}>
+                {wizardStep === 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 14px', background: 'var(--color-primary-light)', borderRadius: 8, fontSize: 13 }}>
+                      <div><div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>Ausgewählte Sessions</div><strong style={{ fontSize: 16, color: 'var(--color-primary)' }}>{selSessions.length}</strong></div>
+                      <div><div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>Erste Session</div><strong>{firstSession ? fmtDate(firstSession.sessionDate) : '—'}</strong></div>
+                      <div><div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>Letzte Session</div><strong>{lastSession ? fmtDate(lastSession.sessionDate) : '—'}</strong></div>
+                      <div><div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>Gesamtbetrag</div><strong style={{ fontSize: 18, color: 'var(--color-primary)' }}>{fmtEUR(totalNet)}</strong></div>
+                      <div><div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>Gesamtdauer</div><strong>{selSessions.reduce((s: number, x: any) => s + (x.durationMinutes ?? 0), 0)} min</strong></div>
+                    </div>
+                    {alreadyBilled.length > 0 && (
+                      <div style={{ padding: '10px 12px', background: 'var(--amber-bg)', borderRadius: 8, fontSize: 12, color: 'var(--amber)', display: 'flex', gap: 8 }}>
+                        <AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
+                        Achtung: {alreadyBilled.length} ausgewählte Session(s) wurde bereits verrechnet.
+                      </div>
+                    )}
+                    <table className="data-table" style={{ fontSize: 12 }}>
+                      <thead><tr><th>Session</th><th>Datum</th><th style={{ textAlign: 'right' }}>Betrag</th></tr></thead>
+                      <tbody>
+                        {selSessions.map((s: any) => (
+                          <tr key={s.id}><td>{s.name}</td><td>{fmtDate(s.sessionDate)}</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtEUR(s.calculatedPriceNet)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {[
+                      { label: 'Rechnungen generieren', desc: 'Eine PDF-Rechnung wird erstellt und gespeichert.', val: true },
+                      { label: 'Nur Transaktion erstellen', desc: 'Keine Rechnung, nur Buchungseintrag.', val: false },
+                    ].map(opt => (
+                      <label key={opt.label} style={{ display: 'flex', gap: 12, padding: '12px 14px', background: 'var(--surface-panel)', borderRadius: 8, cursor: 'pointer', border: txForm.generateInvoiceDoc === opt.val ? '1.5px solid var(--color-primary)' : '1px solid var(--border)' }}>
+                        <input type="radio" checked={txForm.generateInvoiceDoc === opt.val} onChange={() => setTxForm(f => ({ ...f, generateInvoiceDoc: opt.val }))} />
+                        <div><div style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{opt.desc}</div></div>
+                      </label>
+                    ))}
+                    {txForm.generateInvoiceDoc && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-panel)', borderRadius: 8, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={txForm.anonymizeInvoice} onChange={e => setTxForm(f => ({ ...f, anonymizeInvoice: e.target.checked }))} />
+                        <span style={{ fontSize: 13 }}>Rechnung anonymisieren (Code-Name statt Klarnamen)</span>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div><label className="label">Zahler / Klient*in (Name) *</label>
+                      <input className="input" placeholder="Vor- und Nachname" value={txForm.payerName} onChange={e => setTxForm(f => ({ ...f, payerName: e.target.value }))} />
+                    </div>
+                    <div><label className="label">MwSt. %</label>
+                      <select className="input" value={txForm.vatRate} onChange={e => setTxForm(f => ({ ...f, vatRate: +e.target.value }))}>
+                        <option value={0}>0% (keine MwSt.)</option><option value={10}>10%</option><option value={20}>20%</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[
+                        { label: 'Wird später bezahlt', paid: false, method: 'UNBAR_BANK_TRANSFER' },
+                        { label: 'Jetzt bar', paid: true, method: 'CASH' },
+                        { label: 'Jetzt Karte/Bankomat', paid: true, method: 'CARD_BANKOMAT' },
+                      ].map(opt => (
+                        <label key={opt.label} style={{ display: 'flex', gap: 10, padding: '10px 14px', background: 'var(--surface-panel)', borderRadius: 8, cursor: 'pointer', border: txForm.markAsPaid === opt.paid && txForm.paymentMethod === opt.method ? '1.5px solid var(--color-primary)' : '1px solid var(--border)' }}>
+                          <input type="radio" checked={txForm.markAsPaid === opt.paid && txForm.paymentMethod === opt.method}
+                            onChange={() => setTxForm(f => ({ ...f, markAsPaid: opt.paid, paymentMethod: opt.method }))} />
+                          <span style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div><label className="label">Notiz</label>
+                      <input className="input" value={txForm.notes} onChange={e => setTxForm(f => ({ ...f, notes: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 4 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ padding: '12px 14px', background: 'var(--color-primary-light)', borderRadius: 8, fontSize: 13, lineHeight: 1.8 }}>
+                      <strong>Zusammenfassung:</strong><br />
+                      • {selSessions.length} Session(s) · Gesamt: {fmtEUR(totalNet)}<br />
+                      • {txForm.generateInvoiceDoc ? 'Mit Rechnung' : 'Ohne Rechnung'}{txForm.anonymizeInvoice ? ' (anonymisiert)' : ''}<br />
+                      • {txForm.markAsPaid ? 'Sofort als bezahlt markieren (' + PAYMENT_METHODS[txForm.paymentMethod] + ')' : 'Wird später bezahlt'}<br />
+                      • Zahler: {txForm.payerName || <span style={{ color: 'var(--red)' }}>⚠ Fehlt!</span>}
+                    </div>
+                    <div><label className="label">Rechnungsvorlage</label>
+                      <select className="input" value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
+                        <option value="">Standardvorlage (Profil-Kopie)</option>
+                        {invoiceTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+                    {!txForm.payerName && (
+                      <div style={{ padding: '10px 12px', background: 'var(--red-bg,#fef2f2)', borderRadius: 8, fontSize: 13, color: 'var(--red)' }}>
+                        ⚠️ Transaktion kann nicht erstellt werden: Zahler-Name fehlt (Schritt 3 ausfüllen).
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div><label className="label">Zahlungsinformationen (für Rechnung)</label>
-                <textarea className="input" rows={2} placeholder="IBAN: AT... · BIC: ..."
-                  value={txForm.paymentInfo} onChange={e=>setTxForm(f=>({...f,paymentInfo:e.target.value}))} style={{resize:'vertical'}}/>
+
+              <div className="modal-footer" style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowCreateTx(false); setWizardStep(1) }} className="btn-secondary">Abbrechen</button>
+                {wizardStep > 1 && <button onClick={() => setWizardStep(s => s - 1)} className="btn-secondary">← Zurück</button>}
+                {wizardStep < 4
+                  ? <button onClick={() => setWizardStep(s => s + 1)} className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>Weiter →</button>
+                  : <button onClick={createTransaction} disabled={savingTx || !txForm.payerName} className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                      {savingTx ? 'Erstelle...' : '✓ Transaktion erstellen'}
+                    </button>
+                }
               </div>
-              <div><label className="label">Notiz</label>
-                <input className="input" value={txForm.notes} onChange={e=>setTxForm(f=>({...f,notes:e.target.value}))} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button onClick={()=>setShowCreateTx(false)} className="btn-secondary" style={{flex:1}}>Abbrechen</button>
-              <button onClick={createTransaction} disabled={savingTx||!txForm.payerName} className="btn-primary" style={{flex:1,justifyContent:'center'}}>
-                {savingTx?'Erstelle...':'Transaktion erstellen'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Sitzungsdetail Modal – vollständiger 4-Tab-View */}
       {detailSession && (
