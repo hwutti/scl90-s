@@ -48,6 +48,9 @@ export async function createTransactionFromSessions(params: {
   notes?: string
   createdByUserId: string
   serviceLabel?: string
+  generateInvoiceDoc?: boolean
+  anonymizeInvoice?: boolean
+  invoiceTemplateId?: string | null
 }): Promise<{ transactionId: string; referenceNumber: string }> {
 
   return await prisma.$transaction(async (tx) => {
@@ -163,6 +166,27 @@ export async function createTransactionFromSessions(params: {
     for (const id of params.sessionIds) {
       await recalcSessionBillingStatus(id)
     }
+
+    // InvoiceDocument anlegen wenn gewünscht
+    if (params.generateInvoiceDoc !== false) {
+      try {
+        const template = params.invoiceTemplateId
+          ? await prisma.invoiceTemplate.findUnique({ where: { id: params.invoiceTemplateId } })
+          : await prisma.invoiceTemplate.findFirst({ where: { isDefault: true } })
+
+        await prisma.invoiceDocument.create({
+          data: {
+            transactionId: result.transactionId,
+            templateId: template?.id ?? null,
+            invoiceNumber: result.referenceNumber,
+            isAnonymized: params.anonymizeInvoice ?? false,
+            status: 'GENERATED',
+            generatedAt: new Date(),
+          },
+        })
+      } catch (_) { /* Invoice-Generierung ist nicht kritisch */ }
+    }
+
     return result
   })
 }

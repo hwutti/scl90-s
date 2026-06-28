@@ -123,9 +123,24 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
     accentColor: '#4f46e5', fontFamily: 'original',
     helpTool: true, classicMode: false,
   })
-
-  // ── Weiteres ──
   const [telemetry, setTelemetry] = useState(false)
+
+  // Visuelle Einstellungen + Telemetrie beim Laden aus DB holen
+  useEffect(() => {
+    fetch('/api/settings/visual').then(r => r.json()).then(d => {
+      if (d && !d.error) setVisual({
+        theme: d.theme ?? 'light',
+        fontSize: d.fontSize ?? 'medium',
+        accentColor: d.accentColor ?? '#4f46e5',
+        fontFamily: d.fontFamily ?? 'original',
+        helpTool: d.helpToolEnabled ?? true,
+        classicMode: d.classicMode ?? false,
+      })
+    }).catch(() => {})
+    fetch('/api/settings/telemetry').then(r => r.json()).then(d => {
+      if (d && !d.error) setTelemetry(d.enabled ?? false)
+    }).catch(() => {})
+  }, [])
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleteScope, setDeleteScope] = useState<'all'|'finance'|null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -556,7 +571,17 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
             <div>
               <button onClick={async () => {
-                await fetch('/api/settings/visual', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ accentColor: visual.accentColor }) })
+                await fetch('/api/settings/visual', {
+                  method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    theme: visual.theme,
+                    fontSize: visual.fontSize,
+                    accentColor: visual.accentColor,
+                    fontFamily: visual.fontFamily,
+                    helpToolEnabled: visual.helpTool,
+                    classicMode: visual.classicMode,
+                  }),
+                })
                 window.location.reload()
               }} className="btn-primary" style={{ fontSize: 12 }}>
                 <Save style={{ width: 12, height: 12 }} /> Visuelle Einstellungen speichern
@@ -570,7 +595,14 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Nutzungserhebung */}
             <div>
-              <Toggle label="Nutzungserhebung" value={telemetry} onChange={setTelemetry}
+              <Toggle label="Nutzungserhebung" value={telemetry}
+              onChange={async v => {
+                setTelemetry(v)
+                await fetch('/api/settings/telemetry', {
+                  method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ enabled: v }),
+                })
+              }}
                 description="Wenn aktiviert, werden keine Daten an Dritte weitergegeben oder jegliche Daten von Klient*innen erhoben." />
               {!telemetry && (
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 0' }}>

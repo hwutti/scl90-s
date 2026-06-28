@@ -76,7 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json()
   const { firstName, lastName, dob, gender, svnr, phone, email,
-          insuranceProvider, referralSource, active } = body
+          insuranceProvider, referralSource, active,
+          billRecipientName, billRecipientAddress, billRecipientCity } = body
 
   const patient = await prisma.patient.update({
     where: { id: params.id },
@@ -91,6 +92,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(insuranceProvider !== undefined && { insuranceProvider }),
       ...(referralSource    !== undefined && { referralSource }),
       ...(active    !== undefined && { active }),
+      ...(billRecipientName    !== undefined && { billRecipientName }),
+      ...(billRecipientAddress !== undefined && { billRecipientAddress }),
+      ...(billRecipientCity    !== undefined && { billRecipientCity }),
     },
   })
 

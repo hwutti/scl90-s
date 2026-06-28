@@ -120,11 +120,10 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   async function createTransaction() {
     if (!selectedSessions.length) return
     setSavingTx(true)
-    // Get patient name for payer
-    const patientSession = sessions.find(s => s.patient)
-    const payeeName = 'Psychotherapeutische Praxis' // from branding ideally
+    const patientSession = sessions.find((s: any) => s.patient)
+    const payeeName = 'Psychotherapeutische Praxis'
     await fetch('/api/transactions/from-sessions', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionIds: selectedSessions,
         patientId,
@@ -134,9 +133,16 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
         markAsPaid: txForm.markAsPaid,
         paymentMethod: txForm.paymentMethod,
         notes: txForm.notes,
+        generateInvoiceDoc: txForm.generateInvoiceDoc,
+        anonymizeInvoice: txForm.anonymizeInvoice,
+        invoiceTemplateId: selectedTemplate || null,
       }),
     })
-    setSavingTx(false); setShowCreateTx(false); setSelectedSessions([]); load()
+    setSavingTx(false)
+    setShowCreateTx(false)
+    setWizardStep(1)
+    setSelectedSessions([])
+    load()
   }
 
   async function markPaid(txId: string) {
