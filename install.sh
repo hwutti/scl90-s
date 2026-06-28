@@ -2,647 +2,433 @@
 # =============================================================================
 # KDS – Klinisches Dokumentationssystem – Automatisches Installationsskript
 # Ubuntu 22.04 / 24.04 LTS
-# Installiert: Node.js 22, PostgreSQL 16, Nginx, Certbot (SSL),
-#              pgAdmin 4, systemd-Service, automatische DB-Backups
 # =============================================================================
 set -euo pipefail
 
-# ─── Farben für Terminal-Output ───────────────────────────────────────────────
+LOG_FILE="/var/log/kds-install.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
 
 info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+error()   { echo -e "${RED}[ERROR]${NC} $*"; echo "[ERROR] $*" >> "$LOG_FILE"; exit 1; }
 step()    { echo -e "\n${BOLD}═══ $* ═══${NC}"; }
 
-# ─── Root-Check ───────────────────────────────────────────────────────────────
 [[ $EUID -ne 0 ]] && error "Bitte als root ausführen: sudo bash install.sh"
 
-# ─── Ubuntu-Version prüfen ────────────────────────────────────────────────────
 UBUNTU_VERSION=$(lsb_release -rs 2>/dev/null || echo "0")
 if [[ "$UBUNTU_VERSION" != "22.04" && "$UBUNTU_VERSION" != "24.04" ]]; then
-  warn "Getestet auf Ubuntu 22.04/24.04. Aktuelle Version: $UBUNTU_VERSION – fortfahren auf eigene Gefahr."
+  warn "Getestet auf Ubuntu 22.04/24.04. Aktuelle Version: $UBUNTU_VERSION"
   read -rp "Trotzdem fortfahren? [j/N] " CONTINUE </dev/tty
   [[ "${CONTINUE,,}" != "j" ]] && exit 0
 fi
 
 # =============================================================================
-# KONFIGURATION – hier anpassen
-# =============================================================================
 APP_NAME="kds"
 APP_USER="kds"
 APP_DIR="/opt/kds"
 APP_PORT="3000"
-
-# Domain (ohne https://) – leer lassen für IP-only ohne SSL
 DOMAIN=""
-
-# PostgreSQL
 DB_NAME="kds_db"
 DB_USER="kds_user"
-DB_PASS=""   # wird zufällig generiert wenn leer
-
-# pgAdmin
-PGADMIN_EMAIL=""    # wird abgefragt wenn leer
-PGADMIN_PASS=""     # wird zufällig generiert wenn leer
-PGADMIN_PORT="5050"
-
-# Backup-Verzeichnis
+DB_PASS=""
 BACKUP_DIR="/var/backups/kds"
 BACKUP_KEEP_DAYS="30"
-
-# NextAuth Secret (wird generiert)
 NEXTAUTH_SECRET=""
 # =============================================================================
 
 echo ""
 echo -e "${BOLD}"
-echo "  ╔══════════════════════════════════════════════════════╗"
-echo "  ║     KDS – Klinisches Dokumentationssystem – Installationsskript           ║"
-echo "  ║     Ubuntu $UBUNTU_VERSION – $(date '+%d.%m.%Y %H:%M')                    ║"
-echo "  ╚══════════════════════════════════════════════════════╝"
+echo "  ╔══════════════════════════════════════════════════╗"
+echo "  ║   KDS – Klinisches Dokumentationssystem         ║"
+echo "  ║   Installation – $(date '+%d.%m.%Y %H:%M')               ║"
+echo "  ╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# ─── Interaktive Konfiguration ────────────────────────────────────────────────
 step "Konfiguration"
 
+# ── Idempotenz: bestehende .env einlesen ──────────────────────────────────────
+if [[ -f "$APP_DIR/.env" ]]; then
+  info "Bestehende .env gefunden – Werte werden wiederverwendet"
+  DB_PASS_EXISTING=$(grep "^DATABASE_URL=" "$APP_DIR/.env" 2>/dev/null | sed 's/.*:\(.*\)@.*/\1/' || echo "")
+  NEXTAUTH_SECRET_EXISTING=$(grep "^NEXTAUTH_SECRET=" "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "")
+  [[ -n "$DB_PASS_EXISTING" ]] && DB_PASS="$DB_PASS_EXISTING"
+  [[ -n "$NEXTAUTH_SECRET_EXISTING" ]] && NEXTAUTH_SECRET="$NEXTAUTH_SECRET_EXISTING"
+fi
+
 if [[ -z "$DOMAIN" ]]; then
-  read -rp "Domain (z.B. scl90.meinserver.at) oder leer für IP-only: " DOMAIN </dev/tty
+  read -rp "Domain (z.B. kds.meinserver.at) oder leer für IP-only: " DOMAIN </dev/tty
 fi
 
 if [[ -z "$DB_PASS" ]]; then
   DB_PASS=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 24)
-  info "Datenbankpasswort generiert"
-fi
-
-if [[ -z "$PGADMIN_EMAIL" ]]; then
-  read -rp "pgAdmin Admin-E-Mail: " PGADMIN_EMAIL </dev/tty
-fi
-if [[ -z "$PGADMIN_PASS" ]]; then
-  PGADMIN_PASS=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 20)
-  info "pgAdmin-Passwort generiert"
+  info "Neues Datenbankpasswort generiert"
 fi
 
 if [[ -z "$NEXTAUTH_SECRET" ]]; then
-  NEXTAUTH_SECRET=$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9' | head -c 48)
+  NEXTAUTH_SECRET=$(openssl rand -base64 48)
 fi
 
-# ─── Systemaktualisierung ─────────────────────────────────────────────────────
-step "System aktualisieren"
+# =============================================================================
+step "System-Pakete installieren"
 apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
-apt-get install -y -qq \
-  curl wget gnupg2 ca-certificates lsb-release \
+apt-get install -y -qq curl wget gnupg2 lsb-release ca-certificates \
   software-properties-common apt-transport-https \
-  build-essential git unzip ufw fail2ban \
-  python3-pip libpq-dev
-success "System aktualisiert"
+  nginx postgresql postgresql-contrib \
+  python3 python3-pip openssl git unzip
 
-# ─── Node.js 20 (via NodeSource) ──────────────────────────────────────────────
-step "Node.js 20 installieren"
-if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 22 ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - 2>/dev/null
+# =============================================================================
+step "Node.js 22 installieren"
+if ! node --version 2>/dev/null | grep -q "^v22"; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y -qq nodejs
 fi
-node -v && npm -v
-success "Node.js $(node -v) installiert"
+node --version
+npm install -g pnpm@9
+pnpm --version
 
-# pnpm (schneller als npm, empfohlen für Next.js)
-npm install -g pnpm@9 --quiet
-success "pnpm $(pnpm -v) installiert"
-
-# ─── PostgreSQL 16 ────────────────────────────────────────────────────────────
-step "PostgreSQL 16 installieren"
-if ! command -v psql &>/dev/null; then
-  # Offizielles PostgreSQL-Repository
-  install -d /usr/share/postgresql-common/pgdg
-  curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-    -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
-  sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
-    https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-    > /etc/apt/sources.list.d/pgdg.list'
-  apt-get update -qq
-  apt-get install -y -qq postgresql-16 postgresql-client-16
-fi
+# =============================================================================
+step "PostgreSQL konfigurieren"
 
 systemctl enable postgresql
 systemctl start postgresql
-success "PostgreSQL $(psql --version) installiert"
+sleep 2
 
-# ─── Datenbank & User anlegen ─────────────────────────────────────────────────
-step "Datenbank einrichten"
-sudo -u postgres psql -c "
-  DO \$\$
-  BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DB_USER') THEN
-      CREATE ROLE $DB_USER WITH LOGIN PASSWORD '$DB_PASS';
-    END IF;
-  END
-  \$\$;
-" 2>/dev/null || true
-
-sudo -u postgres psql -c "
-  SELECT 'CREATE DATABASE $DB_NAME OWNER $DB_USER ENCODING ''UTF8'''
-  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')
-" | sudo -u postgres psql 2>/dev/null || true
-
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
-sudo -u postgres psql -c "ALTER USER $DB_USER CREATEDB;" 2>/dev/null || true
-sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO $DB_USER;" 2>/dev/null || true
-
-# pg_hba.conf – scram-sha-256 für lokale Verbindungen
-PG_HBA="/etc/postgresql/16/main/pg_hba.conf"
-if [[ -f "$PG_HBA" ]]; then
-  # Sicherstellen dass md5/scram für den App-User funktioniert
-  if ! grep -q "^host.*$DB_NAME.*$DB_USER" "$PG_HBA"; then
-    echo "host    $DB_NAME    $DB_USER    127.0.0.1/32    scram-sha-256" >> "$PG_HBA"
-    systemctl reload postgresql
-  fi
-fi
-success "Datenbank '$DB_NAME' und User '$DB_USER' angelegt"
-
-# ─── pgAdmin 4 ────────────────────────────────────────────────────────────────
-step "pgAdmin 4 installieren"
-if ! command -v pgadmin4 &>/dev/null && ! dpkg -l pgadmin4 &>/dev/null 2>&1; then
-  curl -fsSL https://www.pgadmin.org/static/packages_pgadmin_org.pub \
-    | gpg --dearmor -o /usr/share/keyrings/packages-pgadmin-org.gpg
-  echo "deb [signed-by=/usr/share/keyrings/packages-pgadmin-org.gpg] \
-    https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_release -cs) pgadmin4 main" \
-    > /etc/apt/sources.list.d/pgadmin4.list
-  apt-get update -qq
-  apt-get install -y -qq pgadmin4-web
-
-  # pgAdmin Setup (non-interaktiv via expect oder Python)
-  python3 /usr/pgadmin4/bin/setup-web.py \
-    --email "$PGADMIN_EMAIL" \
-    --password "$PGADMIN_PASS" \
-    --yes 2>/dev/null || \
-  printf '%s\n%s\n%s\n' "$PGADMIN_EMAIL" "$PGADMIN_PASS" "$PGADMIN_PASS" \
-    | python3 /usr/pgadmin4/bin/setup-web.py 2>/dev/null || true
-fi
-success "pgAdmin 4 installiert"
-
-# ─── Apache stoppen (wird von pgAdmin als Abhängigkeit installiert) ────────────
-# pgAdmin bringt Apache mit, der Port 80 belegt – wir nutzen Nginx statt Apache
-if systemctl is-active apache2 &>/dev/null || systemctl is-enabled apache2 &>/dev/null 2>&1; then
-  info "Apache2 wird gestoppt und deaktiviert (Port 80 wird für Nginx benötigt)"
-  systemctl stop apache2 2>/dev/null || true
-  systemctl disable apache2 2>/dev/null || true
-  success "Apache2 deaktiviert"
-fi
-
-# ─── Nginx ────────────────────────────────────────────────────────────────────
-step "Nginx installieren"
-apt-get install -y -qq nginx
-systemctl enable nginx
-systemctl start nginx
-success "Nginx installiert"
-
-# ─── App-User & Verzeichnis ───────────────────────────────────────────────────
-step "App-User anlegen"
-if ! id "$APP_USER" &>/dev/null; then
-  useradd --system --shell /bin/bash --create-home --home-dir "$APP_DIR" "$APP_USER"
-fi
-mkdir -p "$APP_DIR"
-chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
-success "User '$APP_USER' und Verzeichnis '$APP_DIR' angelegt"
-
-# ─── App-Code von GitHub klonen ───────────────────────────────────────────────
-step "App-Code von GitHub klonen"
-GITHUB_REPO="https://github.com/hwutti/scl90-s.git"
-
-if [[ -f "$APP_DIR/package.json" ]]; then
-  info "package.json gefunden – Update via git reset + pull"
-  sudo -u "$APP_USER" bash -c "
-    cd '$APP_DIR'
-    git fetch origin main 2>&1 | tail -3
-    git reset --hard origin/main 2>&1 | tail -3
-    git pull origin main 2>&1 | tail -3
-  "
+# User anlegen oder Passwort aktualisieren
+if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1; then
+  info "DB-User $DB_USER existiert – Passwort aktualisieren"
+  sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASS';" \
+    || error "Konnte Passwort für $DB_USER nicht setzen"
 else
-  info "Klone Repository: $GITHUB_REPO"
-  # Verzeichnis vollständig leeren (außer .env)
-  if [[ -f "$APP_DIR/.env" ]]; then
-    cp "$APP_DIR/.env" /tmp/kds_env_backup
-  fi
-  rm -rf "$APP_DIR"
-  mkdir -p "$APP_DIR"
-  chown "$APP_USER":"$APP_USER" "$APP_DIR"
-  if [[ -f /tmp/kds_env_backup ]]; then
-    cp /tmp/kds_env_backup "$APP_DIR/.env"
-    chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
-    chmod 600 "$APP_DIR/.env"
-    rm /tmp/kds_env_backup
-  fi
-
-  sudo -u "$APP_USER" bash -c "
-    git clone '$GITHUB_REPO' '$APP_DIR' 2>&1 | tail -5
-  " || error "Git Clone fehlgeschlagen. Netzwerk prüfen."
+  info "DB-User $DB_USER anlegen"
+  sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS' CREATEDB;" \
+    || error "Konnte $DB_USER nicht anlegen"
 fi
-success "App-Code bereit"
 
-# ─── Node.js Abhängigkeiten installieren ──────────────────────────────────────
-step "npm-Pakete installieren (pnpm install)"
-sudo -u "$APP_USER" bash -c "
-  cd '$APP_DIR'
-  pnpm install --frozen-lockfile 2>&1 | tail -8 || pnpm install 2>&1 | tail -8
-"
-success "npm-Pakete installiert"
+# Datenbank anlegen wenn nicht vorhanden
+if sudo -u postgres psql -lqt | cut -d\| -f1 | grep -qw "$DB_NAME"; then
+  info "Datenbank $DB_NAME existiert bereits"
+else
+  info "Datenbank $DB_NAME anlegen"
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" \
+    || error "Konnte $DB_NAME nicht anlegen"
+fi
 
-# ─── Chromium für Puppeteer (PDF-Export) ──────────────────────────────────────
-step "Chromium für PDF-Export installieren"
-apt-get install -y -qq chromium-browser 2>/dev/null ||   apt-get install -y -qq chromium 2>/dev/null ||   warn "Chromium nicht installiert – PDF Export nutzt HTML-Fallback"
-success "Chromium installiert"
+# Rechte setzen
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
+sudo -u postgres psql -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;"
+sudo -u postgres psql -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DB_USER;"
 
-# Prisma Schema kommt aus Git-Repository
+# Verbindung aktiv prüfen
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
+info "Teste Datenbankverbindung..."
+if ! PGPASSWORD="$DB_PASS" psql -U "$DB_USER" -h localhost -d "$DB_NAME" -c "SELECT 1;" > /dev/null 2>&1; then
+  error "Datenbankverbindung fehlgeschlagen! Bitte PostgreSQL-Konfiguration prüfen."
+fi
+success "Datenbankverbindung erfolgreich"
 
+# =============================================================================
+step "Anwendungsverzeichnis vorbereiten"
 
-# ─── Umgebungsvariablen (.env) ────────────────────────────────────────────────
+if [[ ! -d "$APP_DIR" ]]; then
+  git clone https://github.com/hwutti/scl90-s.git "$APP_DIR"
+else
+  info "Verzeichnis $APP_DIR existiert – git pull"
+  cd "$APP_DIR" && git pull
+fi
+
+# System-User
+if ! id "$APP_USER" &>/dev/null; then
+  useradd --system --home "$APP_DIR" --shell /bin/bash "$APP_USER"
+fi
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+
+# =============================================================================
 step ".env Datei erstellen"
-# .env OHNE Anführungszeichen schreiben (systemd EnvironmentFile-kompatibel)
-ENCRYPTION_KEY_VAL=$(openssl rand -hex 32)
-NEXTAUTH_URL_VAL="${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
+
+APP_URL="${DOMAIN:+https://$DOMAIN}"
+APP_URL="${APP_URL:-http://localhost:$APP_PORT}"
 
 cat > "$APP_DIR/.env" << ENV_EOF
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
+NEXTAUTH_URL=${APP_URL}
 NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-NEXTAUTH_URL=${NEXTAUTH_URL_VAL}
 NODE_ENV=production
-APP_PORT=${APP_PORT}
-ENCRYPTION_KEY=${ENCRYPTION_KEY_VAL}
+JITSI_BASE_URL=https://meet.jit.si
 ENV_EOF
 
 chmod 600 "$APP_DIR/.env"
-chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
-success ".env Datei erstellt (chmod 600)"
+chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
+success ".env erstellt"
 
-# ─── Prisma Migrations ────────────────────────────────────────────────────────
-step "Datenbank-Schema anwenden"
-# DATABASE_URL explizit setzen damit Prisma die DB findet
-DB_URL_EXPORT="export DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
+# =============================================================================
+step "Node-Abhängigkeiten installieren"
+cd "$APP_DIR"
+
+# pnpm-lock.yaml prüfen
+if [[ ! -f "pnpm-lock.yaml" ]]; then
+  warn "pnpm-lock.yaml fehlt – führe pnpm install aus (ohne --frozen-lockfile)"
+  sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --no-frozen-lockfile" \
+    || error "pnpm install fehlgeschlagen"
+else
+  info "pnpm-lock.yaml vorhanden – nutze --frozen-lockfile"
+  sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --frozen-lockfile" \
+    || error "pnpm install --frozen-lockfile fehlgeschlagen"
+fi
+success "Abhängigkeiten installiert"
+
+# =============================================================================
+step "Prisma Schema anwenden"
+cd "$APP_DIR"
+
+info "Prisma validate..."
 sudo -u "$APP_USER" bash -c "
-  ${DB_URL_EXPORT}
-  cd '$APP_DIR'
-  npx prisma generate 2>&1 | tail -3
-  npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss 2>&1 | tail -5
-"
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  export DATABASE_URL='postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}'
+  npx prisma validate
+" || error "Prisma validate fehlgeschlagen"
+success "Prisma Schema valide"
+
+info "Prisma generate..."
+sudo -u "$APP_USER" bash -c "
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  npx prisma generate
+" || error "Prisma generate fehlgeschlagen"
+success "Prisma Client generiert"
+
+info "Prisma db push..."
+sudo -u "$APP_USER" bash -c "
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  export DATABASE_URL='postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}'
+  npx prisma db push --accept-data-loss
+" || error "Prisma db push fehlgeschlagen"
 success "Datenbank-Schema angewendet"
 
-# ─── Next.js Build ────────────────────────────────────────────────────────────
-step "Next.js Build erstellen"
+# Prüfen ob zentrale Tabellen existieren
+info "Prüfe ob zentrale Tabellen existieren..."
+for TABLE in User Patient TherapySession Transaction; do
+  if PGPASSWORD="$DB_PASS" psql -U "$DB_USER" -h localhost -d "$DB_NAME" \
+      -c "\dt" 2>/dev/null | grep -qi "\"$TABLE\""; then
+    success "Tabelle $TABLE vorhanden"
+  else
+    warn "Tabelle $TABLE nicht gefunden – Schema möglicherweise unvollständig"
+  fi
+done
+
+# =============================================================================
+step "Seed: Basisdaten anlegen"
+
+info "Prüfe ob User-Tabelle existiert..."
+if ! PGPASSWORD="$DB_PASS" psql -U "$DB_USER" -h localhost -d "$DB_NAME" \
+    -c "SELECT COUNT(*) FROM \"User\";" > /dev/null 2>&1; then
+  error "User-Tabelle nicht vorhanden – Prisma db push war nicht erfolgreich!"
+fi
+
+info "Seed ausführen..."
 sudo -u "$APP_USER" bash -c "
-  ${DB_URL_EXPORT}
-  cd '$APP_DIR'
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  export DATABASE_URL='postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}'
+  npx tsx prisma/seed.ts
+" || error "Seed fehlgeschlagen – Installation abgebrochen"
+success "Seed erfolgreich"
+
+# =============================================================================
+step "Next.js Build"
+info "Starte Build (kann 2-5 Minuten dauern)..."
+sudo -u "$APP_USER" bash -c "
+  set -a; source $APP_DIR/.env; set +a
+  cd $APP_DIR
+  export DATABASE_URL='postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}'
   pnpm build
-"
-success "Next.js Build abgeschlossen"
+" || error "Build fehlgeschlagen"
+success "Build erfolgreich"
 
-# ─── Datenbank-Seed (Demo-User) ───────────────────────────────────────────────
-step "Datenbank-Seed ausführen (Admin, Demo-Therapeut, Demo-Patient)"
-sudo -u "$APP_USER" bash -c "
-  ${DB_URL_EXPORT}
-  cd '$APP_DIR'
-  npx tsx prisma/seed.ts 2>&1 | tail -10
-" && success "Seed abgeschlossen" || warn "Seed fehlgeschlagen (DB evtl. schon befüllt – OK)"
-
-# ─── systemd Service ──────────────────────────────────────────────────────────
+# =============================================================================
 step "systemd Service einrichten"
-cat > "/etc/systemd/system/${APP_NAME}.service" << SYSTEMD_EOF
+
+cat > /etc/systemd/system/kds.service << SERVICE_EOF
 [Unit]
-Description=KDS – Klinisches Dokumentationssystem (Next.js)
-Documentation=https://nextjs.org/
+Description=KDS – Klinisches Dokumentationssystem
 After=network.target postgresql.service
 Requires=postgresql.service
 
 [Service]
 Type=simple
-User=${APP_USER}
-WorkingDirectory=${APP_DIR}
-EnvironmentFile=${APP_DIR}/.env
-ExecStart=/usr/bin/pnpm start
-Restart=on-failure
-RestartSec=10
+User=$APP_USER
+WorkingDirectory=$APP_DIR
+EnvironmentFile=$APP_DIR/.env
+ExecStart=$(which node) $APP_DIR/.next/standalone/server.js
+Restart=always
+RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=${APP_NAME}
-
-# Sicherheits-Hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=${APP_DIR}
-PrivateTmp=true
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_BIND_SERVICE
+SyslogIdentifier=kds
 
 [Install]
 WantedBy=multi-user.target
-SYSTEMD_EOF
+SERVICE_EOF
 
 systemctl daemon-reload
-systemctl enable "${APP_NAME}"
-systemctl start "${APP_NAME}"
-success "systemd Service '${APP_NAME}' aktiviert und gestartet"
+systemctl enable kds
+systemctl restart kds
 
-# ─── Nginx Konfiguration ──────────────────────────────────────────────────────
+# Healthcheck mit Retry
+info "Warte auf Service-Start..."
+HEALTHY=false
+for i in $(seq 1 30); do
+  sleep 2
+  if curl -sf "http://127.0.0.1:$APP_PORT" > /dev/null 2>&1; then
+    HEALTHY=true
+    break
+  fi
+  echo -n "."
+done
+echo ""
+
+if [[ "$HEALTHY" != "true" ]]; then
+  warn "Service antwortet nicht auf Port $APP_PORT – Journal:"
+  journalctl -u kds -n 30 --no-pager
+  error "Healthcheck fehlgeschlagen. Bitte Log prüfen: journalctl -u kds -f"
+fi
+success "Service läuft und antwortet auf Port $APP_PORT"
+
+# =============================================================================
 step "Nginx konfigurieren"
 
-# Standard-Site deaktivieren
-rm -f /etc/nginx/sites-enabled/default
-
-NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
-
-if [[ -n "$DOMAIN" ]]; then
-  # Mit Domain – zunächst HTTP (SSL kommt nach Certbot)
-  cat > "$NGINX_CONF" << NGINX_EOF
-# KDS – Klinisches Dokumentationssystem – Nginx Konfiguration
-# Domain: ${DOMAIN}
-
-# Rate Limiting (Schutz vor Brute-Force)
-limit_req_zone \$binary_remote_addr zone=scl90_api:10m rate=20r/m;
-limit_req_zone \$binary_remote_addr zone=scl90_login:10m rate=5r/m;
-
+NGINX_CONF="/etc/nginx/sites-available/kds"
+cat > "$NGINX_CONF" << NGINX_EOF
 server {
     listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
+    server_name ${DOMAIN:-_};
 
-    # Security Headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;" always;
-
-    # Logging
-    access_log /var/log/nginx/${APP_NAME}_access.log;
-    error_log  /var/log/nginx/${APP_NAME}_error.log;
-
-    # Gzip
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml;
-    gzip_comp_level 6;
-
-    # Statische Next.js Assets (direkt von Nginx ohne Node)
     location /_next/static/ {
-        alias ${APP_DIR}/.next/static/;
-        expires 365d;
+        alias $APP_DIR/.next/static/;
+        expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
-    # API Routes – Rate Limiting
-    location /api/ {
-        limit_req zone=scl90_api burst=30 nodelay;
-        proxy_pass http://127.0.0.1:${APP_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-    }
-
-    # Login – strengeres Rate Limiting
-    location /api/auth/ {
-        limit_req zone=scl90_login burst=5 nodelay;
-        proxy_pass http://127.0.0.1:${APP_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    # pgAdmin
-    location /pgadmin/ {
-        proxy_pass http://127.0.0.1:${PGADMIN_PORT}/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        # Nur aus lokalem Netz erreichbar – nach Bedarf anpassen
-        # allow 10.0.0.0/8;
-        # deny all;
-    }
-
-    # Alles andere → Next.js
     location / {
-        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
-        proxy_read_timeout 60s;
-        proxy_connect_timeout 60s;
-    }
-
-    # Gesundheitscheck
-    location /health {
-        access_log off;
-        return 200 "OK\n";
-        add_header Content-Type text/plain;
+        client_max_body_size 50M;
     }
 }
 NGINX_EOF
 
-else
-  # Ohne Domain – IP-only
-  cat > "$NGINX_CONF" << NGINX_EOF
-server {
-    listen 80 default_server;
-    server_name _;
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/kds
+rm -f /etc/nginx/sites-enabled/default
 
-    access_log /var/log/nginx/${APP_NAME}_access.log;
-    error_log  /var/log/nginx/${APP_NAME}_error.log;
+nginx -t || error "Nginx Konfiguration ungültig"
+systemctl enable nginx
+systemctl reload nginx
+success "Nginx konfiguriert und neu geladen"
 
-    location /_next/static/ {
-        alias ${APP_DIR}/.next/static/;
-        expires 365d;
-    }
-
-    location /pgadmin/ {
-        proxy_pass http://127.0.0.1:${PGADMIN_PORT}/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:${APP_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-NGINX_EOF
-fi
-
-ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/${APP_NAME}"
-nginx -t && systemctl reload nginx
-success "Nginx konfiguriert"
-
-# ─── SSL mit Certbot (nur wenn Domain vorhanden) ──────────────────────────────
-if [[ -n "$DOMAIN" ]]; then
-  step "SSL-Zertifikat (Let's Encrypt) einrichten"
-  apt-get install -y -qq certbot python3-certbot-nginx
-
-  # Email für Certbot abfragen
-  read -rp "E-Mail für Let's Encrypt Benachrichtigungen: " CERT_EMAIL </dev/tty
-
-  certbot --nginx \
-    -d "$DOMAIN" \
-    -d "www.$DOMAIN" \
-    --non-interactive \
-    --agree-tos \
-    --email "$CERT_EMAIL" \
-    --redirect \
-    2>&1 | tail -10 || warn "SSL konnte nicht eingerichtet werden – DNS ggf. noch nicht propagiert"
-
-  # Auto-Renewal (Certbot richtet das meist schon ein)
-  systemctl enable certbot.timer 2>/dev/null || true
-  success "SSL-Zertifikat eingerichtet (auto-renewal aktiv)"
-fi
-
-# ─── Automatische DB-Backups ──────────────────────────────────────────────────
-step "Automatische Datenbank-Backups einrichten"
+# =============================================================================
+step "Backup einrichten"
 mkdir -p "$BACKUP_DIR"
 chown postgres:postgres "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
 
-cat > "/usr/local/bin/kds-backup.sh" << BACKUP_EOF
+cat > /etc/cron.d/kds-backup << CRON_EOF
+0 2 * * * postgres pg_dump $DB_NAME | gzip > $BACKUP_DIR/kds_\$(date +\%Y\%m\%d_\%H\%M).sql.gz && find $BACKUP_DIR -name "*.sql.gz" -mtime +$BACKUP_KEEP_DAYS -delete
+CRON_EOF
+
+# =============================================================================
+step "Update-Skript erstellen"
+
+cat > "$APP_DIR/update.sh" << 'UPDATE_EOF'
 #!/usr/bin/env bash
-# SCL-90-S – PostgreSQL Backup
 set -euo pipefail
+APP_DIR="/opt/kds"
+APP_USER="kds"
 
-BACKUP_DIR="${BACKUP_DIR}"
-DB_NAME="${DB_NAME}"
-KEEP_DAYS="${BACKUP_KEEP_DAYS}"
-TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="\${BACKUP_DIR}/\${DB_NAME}_\${TIMESTAMP}.sql.gz"
+RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
+step()    { echo -e "\n${BOLD}▶ $*${NC}"; }
+success() { echo -e "${GREEN}✓ $*${NC}"; }
+error()   { echo -e "${RED}✗ $*${NC}"; exit 1; }
 
-# Dump erstellen
-pg_dump -U postgres "\$DB_NAME" | gzip > "\$BACKUP_FILE"
-chmod 600 "\$BACKUP_FILE"
+cd "$APP_DIR"
 
-# Alte Backups löschen
-find "\$BACKUP_DIR" -name "*.sql.gz" -mtime +\$KEEP_DAYS -delete
+step "Git Pull"
+git pull origin main
+COMMIT=$(git log -1 --format="%h %s")
 
-echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Backup erstellt: \$BACKUP_FILE"
-echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Backup-Größe: \$(du -sh \$BACKUP_FILE | cut -f1)"
-BACKUP_EOF
+step "Prisma Client generieren"
+sudo -u "$APP_USER" bash -c "set -a; source $APP_DIR/.env; set +a; cd $APP_DIR && npx prisma generate" \
+  || error "Prisma generate fehlgeschlagen"
+success "Prisma Client generiert"
 
-chmod +x "/usr/local/bin/kds-backup.sh"
+step "Datenbank-Schema migrieren"
+sudo -u "$APP_USER" bash -c "set -a; source $APP_DIR/.env; set +a; cd $APP_DIR && npx prisma db push --accept-data-loss" \
+  2>&1 | grep -v "^$" || error "Prisma db push fehlgeschlagen"
+success "Schema aktualisiert"
 
-# Cron-Job: täglich um 02:30 Uhr als postgres-User
-(crontab -u postgres -l 2>/dev/null || echo "") | \
-  grep -v "kds-backup" | \
-  { cat; echo "30 2 * * * /usr/local/bin/kds-backup.sh >> /var/log/kds-backup.log 2>&1"; } | \
-  crontab -u postgres -
+step "Seed: Basisdaten prüfen"
+sudo -u "$APP_USER" bash -c "set -a; source $APP_DIR/.env; set +a; cd $APP_DIR && npx tsx prisma/seed.ts" \
+  && success "Alle Basisdaten vorhanden – Seed übersprungen" \
+  || error "Seed fehlgeschlagen"
 
-success "Tägliches DB-Backup um 02:30 Uhr eingerichtet (${BACKUP_KEEP_DAYS} Tage aufbewahrung)"
+step "Next.js Build"
+sudo -u "$APP_USER" bash -c "set -a; source $APP_DIR/.env; set +a; cd $APP_DIR && pnpm build" \
+  || error "Build fehlgeschlagen"
+success "Build erfolgreich"
 
-# ─── Firewall (UFW) ───────────────────────────────────────────────────────────
-step "Firewall konfigurieren"
-ufw --force reset
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow ssh
-ufw allow 80/tcp     # HTTP
-ufw allow 443/tcp    # HTTPS
-# Port 3000 und 5432 bleiben intern (kein direkter Zugang von außen)
-ufw --force enable
-success "Firewall aktiv: SSH, HTTP(S) erlaubt – PostgreSQL & Node.js nur intern"
+step "Service neu starten"
+systemctl restart kds
+sleep 5
 
-# ─── Fail2ban ─────────────────────────────────────────────────────────────────
-step "Fail2ban einrichten"
-cat > "/etc/fail2ban/jail.d/${APP_NAME}.conf" << F2B_EOF
-[nginx-http-auth]
-enabled  = true
-port     = http,https
-logpath  = /var/log/nginx/${APP_NAME}_error.log
-maxretry = 5
-bantime  = 3600
-
-[nginx-limit-req]
-enabled  = true
-port     = http,https
-logpath  = /var/log/nginx/${APP_NAME}_error.log
-maxretry = 10
-bantime  = 600
-F2B_EOF
-
-systemctl enable fail2ban
-systemctl restart fail2ban
-success "Fail2ban eingerichtet"
-
-# ─── Sofort-Backup nach Installation ─────────────────────────────────────────
-step "Initiales Backup erstellen"
-sudo -u postgres /usr/local/bin/kds-backup.sh || warn "Initiales Backup fehlgeschlagen (DB möglicherweise noch leer)"
-
-# ─── Credentials-Datei speichern ─────────────────────────────────────────────
-CREDS_FILE="/root/kds_credentials.txt"
-cat > "$CREDS_FILE" << CREDS_EOF
-# ============================================================
-# SCL-90-S – Zugangsdaten (sicher aufbewahren!)
-# Erstellt: $(date '+%d.%m.%Y %H:%M:%S')
-# ============================================================
-
-App-URL:         ${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://SERVER-IP}
-pgAdmin-URL:     ${DOMAIN:+https://${DOMAIN}/pgadmin}${DOMAIN:-http://SERVER-IP/pgadmin}
-pgAdmin-Login:   ${PGADMIN_EMAIL}
-pgAdmin-Pass:    ${PGADMIN_PASS}
-
-Datenbank:       ${DB_NAME}
-DB-User:         ${DB_USER}
-DB-Passwort:     ${DB_PASS}
-
-App-Verzeichnis: ${APP_DIR}
-systemd-Service: ${APP_NAME}
-Backup-Ordner:   ${BACKUP_DIR}
-
-Nützliche Befehle:
-  Service-Status:   systemctl status ${APP_NAME}
-  Logs anzeigen:    journalctl -u ${APP_NAME} -f
-  Nginx-Logs:       tail -f /var/log/nginx/${APP_NAME}_error.log
-  Manuelles Backup: sudo -u postgres /usr/local/bin/kds-backup.sh
-  DB-Konsole:       sudo -u postgres psql ${DB_NAME}
-  App neu starten:  systemctl restart ${APP_NAME}
-  App deployen:     cd ${APP_DIR} && git pull && pnpm install && pnpm build && systemctl restart ${APP_NAME}
-CREDS_EOF
-
-chmod 600 "$CREDS_FILE"
-
-# ─── Abschluss ────────────────────────────────────────────────────────────────
+step "Healthcheck"
+for i in $(seq 1 15); do
+  sleep 2
+  if curl -sf "http://127.0.0.1:3000" > /dev/null 2>&1; then
+    echo ""
+    echo "═══════════════════════════════════════════"
+    success "Update abgeschlossen ✓"
+    echo "  $COMMIT"
+    echo "═══════════════════════════════════════════"
+    systemctl status kds --no-pager -l | head -10
+    exit 0
+  fi
+  echo -n "."
+done
 echo ""
-echo -e "${GREEN}${BOLD}"
-echo "  ╔══════════════════════════════════════════════════════╗"
-echo "  ║     ✓  Installation abgeschlossen!                  ║"
-echo "  ╚══════════════════════════════════════════════════════╝"
+error "Healthcheck fehlgeschlagen nach Update. Journal: journalctl -u kds -n 50"
+UPDATE_EOF
+
+chmod +x "$APP_DIR/update.sh"
+
+# =============================================================================
+ADMIN_PASS="Admin1234!"
+echo ""
+echo -e "${BOLD}${GREEN}"
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║        KDS Installation erfolgreich! ✓              ║"
+echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo ""
-echo -e "  ${BOLD}App-URL:${NC}        ${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
-echo -e "  ${BOLD}pgAdmin:${NC}        ${DOMAIN:+https://${DOMAIN}/pgadmin}${DOMAIN:-http://$(hostname -I | awk '{print $1}')/pgadmin}"
-echo -e "  ${BOLD}pgAdmin Login:${NC}  ${PGADMIN_EMAIL} / ${PGADMIN_PASS}"
-echo -e "  ${BOLD}DB-Passwort:${NC}    ${DB_PASS}"
+echo "  URL:              ${APP_URL}"
+echo "  Admin-Login:      admin@scl90s.local"
+echo "  Admin-Passwort:   ${ADMIN_PASS}"
 echo ""
-echo -e "  ${YELLOW}Zugangsdaten gespeichert in: ${CREDS_FILE}${NC}"
+echo "  Datenbank:        ${DB_NAME}"
+echo "  DB-User:          ${DB_USER}"
+echo "  DB-Passwort:      ${DB_PASS}"
 echo ""
-echo -e "  ${BOLD}Nächste Schritte:${NC}"
-echo "  1. Browser öffnen: ${DOMAIN:+https://${DOMAIN}}${DOMAIN:-http://$(hostname -I | awk '{print $1}')}"
-echo "  2. Login: admin@kds.local / Admin1234!  (Passwort sofort ändern!)"
-if [[ -n "$DOMAIN" ]]; then
-  echo "  3. DNS: A-Record ${DOMAIN} → $(hostname -I | awk '{print $1}')"
-fi
+echo "  Log:              $LOG_FILE"
+echo "  Update:           sudo bash $APP_DIR/update.sh"
+echo "  Service:          sudo systemctl status kds"
+echo "  Journal:          sudo journalctl -u kds -f"
 echo ""
-echo -e "  Logs: ${BLUE}journalctl -u ${APP_NAME} -f${NC}"
-echo ""
+echo -e "${YELLOW}WICHTIG: Passwörter notieren und sicher aufbewahren!${NC}"

@@ -54,7 +54,7 @@ async function main() {
     where: { pin: '123456' },
     update: {},
     create: {
-      name: 'Herbert Wutti',
+      name: 'Demo Patient',
       role: 'PATIENT',
       pin: '123456',
     },
@@ -67,8 +67,8 @@ async function main() {
 
   const patient = existingPatient ?? await prisma.patient.create({
     data: {
-      firstName: 'Herbert',
-      lastName: 'Wutti',
+      firstName: 'Demo',
+      lastName: 'Patient',
       dob: '1975-11-04',
       gender: Gender.MALE,
       createdByUserId: therapist.id,

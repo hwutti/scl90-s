@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Validate
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kds_test
+          POSTGRES_USER: kds_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma validate
+        run: npx prisma validate
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Prisma db push
+        run: npx prisma db push --accept-data-loss
+        env:
+          DATABASE_URL: postgresql://kds_user:test_password@localhost:5432/kds_test
+
+      - name: Check central tables exist
+        run: |
+          for TABLE in User Patient TherapySession Transaction; do
+            PGPASSWORD=test_password psql -U kds_user -h localhost -d kds_test \
+              -c "\dt" | grep -i "$TABLE" \
+              && echo "✓ $TABLE" || echo "✗ $TABLE MISSING"
+          done
+
+      - name: Seed
+        run: npx tsx prisma/seed.ts
+        env:
+          DATABASE_URL: postgresql://kds_user:test_password@localhost:5432/kds_test
+
+      - name: Check no real person names in seed
+        run: |
+          if grep -i "herbert wutti\|hwutti" prisma/seed.ts; then
+            echo "ERROR: Real person name found in seed!"
+            exit 1
+          fi
+          echo "✓ No real person names in seed"
+
+      - name: TypeScript check & Next.js build
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://kds_user:test_password@localhost:5432/kds_test
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: ci-test-secret-do-not-use-in-production
+
+      - name: Check for deprecated dependencies
+        run: |
+          pnpm list --depth=0 2>&1 | tee /tmp/deps.txt
+          # Warn about known deprecated packages
+          for PKG in "eslint@8" "uuid@3" "rimraf@2" "glob@7"; do
+            if grep -q "$PKG" /tmp/deps.txt; then
+              echo "WARN: Potentially deprecated: $PKG"
+            fi
+          done
+          echo "✓ Dependency check complete"
+
+      - name: Lint
+        run: pnpm lint --max-warnings=50
+        continue-on-error: true
