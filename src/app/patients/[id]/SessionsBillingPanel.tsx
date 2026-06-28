@@ -1,7 +1,7 @@
 
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, 
+import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, Edit3, Euro, 
          FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban } from 'lucide-react'
 
 const BILLING_STATUS_LABEL: Record<string,string> = {
@@ -56,6 +56,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   })
   const [savingSession, setSavingSession] = useState(false)
   const [sessionError, setSessionError] = useState<string|null>(null)
+  const [detailSession, setDetailSession] = useState<any>(null)
   const [savingTx, setSavingTx] = useState(false)
 
   const load = useCallback(async () => {
@@ -233,7 +234,8 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                 </tr></thead>
                 <tbody>
                   {sessions.map((s: any) => (
-                    <tr key={s.id}>
+                    <tr key={s.id} style={{cursor:'pointer'}}
+                      onClick={() => setDetailSession(s)}>
                       <td onClick={e => e.stopPropagation()}>
                         {s.billingStatus === 'UNBILLED' && (
                           <input type="checkbox" checked={selectedSessions.includes(s.id)}
@@ -470,6 +472,47 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
               <button onClick={createTransaction} disabled={savingTx||!txForm.payerName} className="btn-primary" style={{flex:1,justifyContent:'center'}}>
                 {savingTx?'Erstelle...':'Transaktion erstellen'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sitzungsdetail Modal */}
+      {detailSession && (
+        <div className="modal-overlay" onClick={() => setDetailSession(null)}>
+          <div className="modal" style={{maxWidth:600}} onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{margin:0,fontSize:15}}>{detailSession.name}</h2>
+              <button onClick={()=>setDetailSession(null)} className="btn-ghost" style={{padding:4}}><X style={{width:16,height:16}}/></button>
+            </div>
+            <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:10}}>
+              {[
+                ['Datum', fmtDate(detailSession.sessionDate)],
+                ['Dauer', detailSession.durationMinutes ? detailSession.durationMinutes + ' Min.' : '—'],
+                ['Abrechnungsmodus', detailSession.billingMode === 'time' ? 'Zeit' : 'Einheiten'],
+                ['Betrag', fmtEUR(detailSession.calculatedPriceNet)],
+                ['Dienstleistung', detailSession.serviceLabel || '—'],
+                ['Status', BILLING_STATUS_LABEL[detailSession.billingStatus] ?? detailSession.billingStatus],
+              ].map(([label, value]) => (
+                <div key={label} className="field-row">
+                  <span className="field-label">{label}</span>
+                  <span className="field-value">{value}</span>
+                </div>
+              ))}
+              {detailSession.billingStatus === 'UNBILLED' && (
+                <div style={{paddingTop:8,borderTop:'0.5px solid var(--border)'}}>
+                  <button onClick={() => {
+                    setSelectedSessions([detailSession.id])
+                    setDetailSession(null)
+                    setShowCreateTx(true)
+                  }} className="btn-primary" style={{width:'100%',justifyContent:'center'}}>
+                    <Euro style={{width:13,height:13}}/> Transaktion für diese Sitzung erstellen
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button onClick={()=>setDetailSession(null)} className="btn-secondary" style={{flex:1}}>Schließen</button>
             </div>
           </div>
         </div>
