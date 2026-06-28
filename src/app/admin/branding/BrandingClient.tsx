@@ -109,7 +109,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Building2 className="w-4 h-4" style={{ color: form.colorPrimary }} />
-              <h2 className="font-semibold text-slate-700">Praxis-Informationen</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Praxis-Informationen</h2>
             </div>
             <div className="space-y-3">
               <div>
@@ -160,12 +160,12 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Upload className="w-4 h-4" style={{ color: form.colorPrimary }} />
-              <h2 className="font-semibold text-slate-700">Logo</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Logo</h2>
             </div>
             <div className="flex items-center gap-4">
               {logoSrc ? (
                 <div className="relative">
-                  <img src={logoSrc} alt="Logo" className="w-20 h-20 rounded-2xl object-contain border border-slate-200 p-2" />
+                  <img src={logoSrc} alt="Logo" style={{ width: 80, height: 80, borderRadius: 16, objectFit: "contain", border: "0.5px solid var(--border)", padding: 8 }} />
                   <button
                     onClick={() => setForm(f => ({ ...f, logoBase64: null, logoMimeType: null }))}
                     className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
@@ -174,7 +174,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                   </button>
                 </div>
               ) : (
-                <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
+                <div style={{ width: 80, height: 80, borderRadius: 16, border: "2px dashed var(--border-strong)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Upload className="w-6 h-6 text-slate-300" />
                 </div>
               )}
@@ -184,7 +184,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                 <button onClick={() => fileRef.current?.click()} className="btn-secondary">
                   <Upload className="w-4 h-4" /> Logo hochladen
                 </button>
-                <p className="text-xs text-slate-400 mt-1.5">PNG, SVG, JPG · max. 500 KB empfohlen</p>
+                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>PNG, SVG, JPG · max. 500 KB empfohlen</p>
               </div>
             </div>
           </div>
@@ -193,18 +193,18 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Palette className="w-4 h-4" style={{ color: form.colorPrimary }} />
-              <h2 className="font-semibold text-slate-700">Farben</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Farben</h2>
             </div>
 
             {/* Presets */}
             <div className="mb-4">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Farbpaletten</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Farbpaletten</p>
               <div className="flex flex-wrap gap-2">
                 {PRESET_COLORS.map(p => (
                   <button
                     key={p.name}
                     onClick={() => applyPreset(p)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-600 transition-all"
+                    className="btn-secondary" style={{ fontSize: 12 }}
                     title={p.name}
                   >
                     <span className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: p.primary }} />
@@ -228,7 +228,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                       type="color"
                       value={(form as any)[key]}
                       onChange={e => set(key, e.target.value)}
-                      className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5"
+                      style={{ width: 40, height: 40, borderRadius: 8, border: "0.5px solid var(--border-strong)", cursor: "pointer", padding: 2 }}
                     />
                     <input
                       className="input font-mono text-xs"
@@ -237,7 +237,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                       maxLength={7}
                     />
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">{desc}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{desc}</p>
                 </div>
               ))}
             </div>
@@ -247,7 +247,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4" style={{ color: form.colorPrimary }} />
-              <h2 className="font-semibold text-slate-700">Impressum / Über diese App</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Impressum / Über diese App</h2>
             </div>
             <label className="label">Inhalt (HTML erlaubt)</label>
             <textarea
@@ -257,18 +257,18 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
               onChange={e => set('imprintHtml', e.target.value)}
               placeholder="<p>Betreiber: Dr. Max Mustermann ...</p>"
             />
-            <p className="text-xs text-slate-400 mt-1">Wird auf der Seite /impressum angezeigt</p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Wird auf der Seite /impressum angezeigt</p>
           </div>
         </div>
 
         {/* Rechte Spalte: Live-Vorschau Sidebar */}
         <div className="hidden lg:block">
           <div className="sticky top-6">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Vorschau Sidebar</p>
-            <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-lg bg-white"
+            <p style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Vorschau Sidebar</p>
+            <div style={{ borderRadius: 14, border: "0.5px solid var(--border)", overflow: "hidden", background: "var(--surface-card)" }}
                  style={{ '--color-primary': form.colorPrimary, '--color-primary-light': form.colorPrimaryLight } as any}>
               {/* Mini-Sidebar */}
-              <div className="p-3 border-b border-slate-100">
+              <div style={{ padding: 12, borderBottom: "0.5px solid var(--border)" }}>
                 <div className="flex items-center gap-2">
                   {logoSrc ? (
                     <img src={logoSrc} alt="" className="w-7 h-7 rounded-lg object-contain" />
@@ -279,8 +279,8 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                     </div>
                   )}
                   <div>
-                    <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[140px]">{form.praxisName}</p>
-                    {form.slogan && <p className="text-[10px] text-slate-400 truncate max-w-[140px]">{form.slogan}</p>}
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>{form.praxisName}</p>
+                    {form.slogan && <p style={{ fontSize: 10, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>{form.slogan}</p>}
                   </div>
                 </div>
               </div>
@@ -301,21 +301,21 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                   </div>
                 ))}
               </div>
-              <div className="p-2 border-t border-slate-100">
+              <div style={{ padding: 8, borderTop: "0.5px solid var(--border)" }}>
                 <div className="flex items-center gap-2 px-2 py-2">
                   <div className="w-6 h-6 rounded-md flex items-center justify-center text-white text-[10px] font-bold"
                        style={{ backgroundColor: form.colorPrimary }}>MM</div>
                   <div>
-                    <p className="text-xs font-semibold text-slate-700">Dr. M. Muster</p>
-                    <p className="text-[10px] text-slate-400">Therapeut/in</p>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>Dr. M. Muster</p>
+                    <p style={{ fontSize: 10, color: "var(--text-muted)" }}>Therapeut/in</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Farbvorschau Button */}
-            <div className="mt-4 p-3 rounded-xl border border-slate-200 bg-white">
-              <p className="text-xs font-medium text-slate-400 mb-2">Button-Vorschau</p>
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: "0.5px solid var(--border)", background: "var(--surface-card)" }}>
+              <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>Button-Vorschau</p>
               <button
                 className="w-full py-2 rounded-xl text-white text-sm font-medium transition-opacity hover:opacity-90"
                 style={{ backgroundColor: form.colorPrimary }}
