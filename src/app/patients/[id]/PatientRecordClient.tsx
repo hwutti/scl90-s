@@ -13,7 +13,7 @@ import { searchICD10 } from '@/lib/icd10/codes'
 import { SessionsBillingPanel } from './SessionsBillingPanel'
 import { PatientStatsPanel } from './PatientStatsPanel'
 
-type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'timeline'
+type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'statistik'
 
 const GENDER_LABEL: Record<string,string> = { MALE: 'maennlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 
