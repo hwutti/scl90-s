@@ -12,8 +12,8 @@ export default async function NormTablesPage() {
 
   const tables = await prisma.normTable.findMany({ orderBy: { createdAt: 'desc' } })
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <NormTablesClient tables={tables.map(t => ({ ...t, createdAt: t.createdAt.toISOString() }))} />
-    </PageShell>
+    </div>
   )
 }

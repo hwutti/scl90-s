@@ -47,7 +47,7 @@ function Avatar({ firstName, lastName, clinical }: { firstName: string; lastName
       'w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 transition-colors',
       clinical === true  ? 'bg-red-100 text-red-700'
       : clinical === false ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-indigo-100 text-indigo-700'
+      : 'bg-[var(--color-primary-light)] text-[var(--color-primary)]'
     )}>
       {initials}
     </div>
@@ -108,26 +108,26 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Patientenliste</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{total} {total === 1 ? 'Patient' : 'Patienten'} in Ihrer Praxis</p>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      {/* Topbar */}
+      <div className="topbar">
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Patienten</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{total} {total === 1 ? 'Patient' : 'Patienten'} in Ihrer Praxis</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-primary shrink-0">
-          <UserPlus className="w-4 h-4" /> Neuer Patient
+        <button onClick={() => setCreating(true)} className="btn-primary">
+          <UserPlus style={{ width: 14, height: 14 }} /> Neuer Patient
         </button>
       </div>
+      <div style={{ padding: 20, flex: 1 }}>
 
       {/* ── KPI-Zeile ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Gesamt',          value: total,    icon: Users,         color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Gesamt',          value: total,    icon: Users,         color: 'text-[var(--color-primary)]', bg: 'bg-[var(--color-primary-light)]' },
           { label: 'Klinisch auffällig', value: clinical, icon: AlertCircle, color: 'text-red-600',    bg: 'bg-red-50' },
           { label: 'Test ausstehend', value: pending,  icon: Clock,         color: 'text-amber-600',  bg: 'bg-amber-50' },
-          { label: 'Noch kein Test',  value: noTest,   icon: Activity,      color: 'text-slate-500',  bg: 'bg-slate-100' },
+          { label: 'Noch kein Test',  value: noTest,   icon: Activity,      color: 'text-[var(--text-muted)]',  bg: 'bg-[var(--surface-panel)]' },
         ].map(k => (
           <div key={k.label} className="card p-4 flex items-center gap-3">
             <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', k.bg)}>
@@ -135,7 +135,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
             </div>
             <div>
               <p className={cn('text-xl font-bold', k.color)}>{k.value}</p>
-              <p className="text-xs text-slate-400 leading-tight">{k.label}</p>
+              <p className="text-xs text-[var(--text-muted)] leading-tight">{k.label}</p>
             </div>
           </div>
         ))}
@@ -143,7 +143,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
 
       {/* ── Suche ── */}
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
         <input
           className="input pl-10"
           placeholder="Patient nach Name suchen…"
@@ -151,7 +151,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
           onChange={e => setSearch(e.target.value)}
         />
         {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-slate-600">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -173,11 +173,11 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
       ) : (
         <div className="card overflow-hidden">
           {/* Tabellen-Header */}
-          <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Patient</span>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Letzter Test</span>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">GSI</span>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</span>
+          <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-slate-50">
+            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Patient</span>
+            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Letzter Test</span>
+            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">GSI</span>
+            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Status</span>
             <span />
           </div>
 
@@ -194,20 +194,20 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                 <div
                   key={p.id}
                   className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 sm:gap-4 items-center
-                             px-5 py-4 hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                             px-5 py-4 hover:bg-[var(--surface-panel)]/80 cursor-pointer transition-colors group"
                   onClick={() => router.push(`/patients/${p.id}`)}
                 >
                   {/* Patient */}
                   <div className="flex items-center gap-3">
                     <Avatar firstName={p.firstName} lastName={p.lastName} clinical={clinical} />
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 truncate">
+                      <p className="font-semibold text-[var(--text-primary)] truncate">
                         {p.lastName}, {p.firstName}
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         {age} J. · {GENDER_SHORT[p.gender]}
                         {p.patientUser && (
-                          <span className="ml-2 text-indigo-400 font-mono">PIN {p.patientUser.pin}</span>
+                          <span className="ml-2 text-[var(--color-primary)] font-mono">PIN {p.patientUser.pin}</span>
                         )}
                       </p>
                     </div>
@@ -218,7 +218,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                     {last ? (
                       <p className="text-sm text-slate-500">{formatDate(last.createdAt)}</p>
                     ) : (
-                      <p className="text-xs text-slate-300 italic">kein Test</p>
+                      <p className="text-xs text-[var(--text-muted)] italic">kein Test</p>
                     )}
                   </div>
 
@@ -255,20 +255,21 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                   </div>
 
                   {/* Pfeil */}
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors hidden sm:block" />
+                  <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-muted)] transition-colors hidden sm:block" />
                 </div>
               )
             })}
           </div>
 
           {filtered.length < patients.length && (
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
+            <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--surface-panel)] text-xs text-slate-400">
               {filtered.length} von {patients.length} Patienten angezeigt
             </div>
           )}
         </div>
       )}
 
+      </div>
       {/* ── Modal: Neuer Patient ── */}
       {creating && !newPin && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -276,7 +277,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-lg font-bold text-slate-800">Neuen Patienten anlegen</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Pflichtfelder sind mit * markiert</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">Pflichtfelder sind mit * markiert</p>
               </div>
               <button onClick={() => setCreating(false)} className="btn-secondary p-2">
                 <X className="w-4 h-4" />
@@ -317,8 +318,8 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
               </div>
 
               {/* Divider */}
-              <div className="border-t border-slate-100 pt-3">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Kontakt (optional)</p>
+              <div className="border-t border-[var(--border)] pt-3">
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Kontakt (optional)</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">Telefon</label>
@@ -348,13 +349,13 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
               </div>
 
               {/* PIN-Login */}
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-[var(--color-primary-light)] border border-indigo-100">
                 <input type="checkbox" id="createLogin" checked={form.createLogin}
                   onChange={e => setForm(f => ({...f, createLogin: e.target.checked}))}
                   className="w-4 h-4 mt-0.5 rounded text-indigo-600" />
                 <label htmlFor="createLogin" className="cursor-pointer">
                   <p className="text-sm font-medium text-indigo-800">PIN-Login erstellen</p>
-                  <p className="text-xs text-indigo-600 mt-0.5">Patient kann den Fragebogen selbst mit PIN ausfüllen</p>
+                  <p className="text-xs text-[var(--color-primary)] mt-0.5">Patient kann den Fragebogen selbst mit PIN ausfüllen</p>
                 </label>
               </div>
             </div>
@@ -380,24 +381,24 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
             <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
-            <h2 className="text-lg font-bold text-slate-800 mb-1">Patient angelegt</h2>
-            <p className="text-sm text-slate-400 mb-5">PIN für den Patienten-Login — bitte sicher aufbewahren:</p>
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">Patient angelegt</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-5">PIN für den Patienten-Login — bitte sicher aufbewahren:</p>
 
             <div className="relative mb-5">
-              <div className="text-4xl font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-100
+              <div className="text-4xl font-mono font-bold text-[var(--color-primary)] bg-[var(--color-primary-light)] border border-[var(--border)]
                               rounded-2xl py-5 tracking-[0.3em] select-all">
                 {newPin}
               </div>
               <button
                 onClick={copyPin}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-indigo-100 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[var(--color-primary-light)] transition-colors"
                 title="Kopieren"
               >
                 {pinCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-indigo-400" />}
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-[var(--text-muted)] mb-5">
               Mit dieser PIN kann der Patient unter <span className="font-mono text-slate-600">{typeof window !== 'undefined' ? window.location.origin : ''}</span> einloggen und Fragebögen ausfüllen.
             </p>
 

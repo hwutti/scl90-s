@@ -73,11 +73,11 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2">
+          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2">
             <ArrowLeft className="w-4 h-4" /> Zurück
           </button>
           <h1 className="text-2xl font-bold text-slate-800">Auswertung SCL-90-S</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">
             {patientName} · {patientGender || '—'} · Alter: {age ?? '—'} · {formatDate(startedAt)}
             {occasion && ` · ${occasion}`}
           </p>
@@ -99,7 +99,7 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
             {g.isClinicalCase ? 'Klinisch auffällig (Schritt 1: Falldefinition erfüllt)' : 'Kein klinischer Befund (Falldefinition nicht erfüllt)'}
           </p>
           {g.clinicalReason !== '—' && <p className="text-sm mt-0.5 text-slate-600">{g.clinicalReason}</p>}
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[var(--text-muted)] mt-1">
             Falldefinition: T(GSI) ≥ 63 oder ≥ 2 Skalen mit T ≥ 63.
             Die SCL-90-S ist kein Diagnoseinstrument – klinische Einschätzung erforderlich.
           </p>
@@ -115,13 +115,13 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
           { label: 'PSDI', value: g.psdi?.toFixed(3) ?? '—', sub: g.psdiT ? `T = ${Math.round(g.psdiT)}` : 'Intensität' },
         ].map(kpi => (
           <div key={kpi.label} className="card p-4">
-            <p className="text-xs text-slate-500 font-medium">{kpi.label}</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">{kpi.value}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{kpi.sub}</p>
+            <p className="text-xs text-[var(--text-muted)] font-medium">{kpi.label}</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{kpi.value}</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{kpi.sub}</p>
           </div>
         ))}
       </div>
-      <p className="text-xs text-slate-400 flex items-center gap-1.5">
+      <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
         <Info className="w-3.5 h-3.5" />
         Beantwortet: {g.answeredTotal} / 90 · Missing: {g.missingTotal}
       </p>
@@ -134,7 +134,7 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
             {(['bar','radar'] as ChartMode[]).map(m => (
               <button key={m} onClick={() => setChartMode(m)}
                 className={cn('px-3 py-1 rounded-lg text-xs font-medium transition-colors',
-                  chartMode === m ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  chartMode === m ? 'bg-indigo-600 text-white' : 'bg-[var(--surface-panel)] text-[var(--text-secondary)] hover:bg-slate-200')}>
                 {m === 'bar' ? 'Balken' : 'Radar'}
               </button>
             ))}
@@ -179,14 +179,14 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
       <div className="card overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-700">Skalenauswertung (Schritte 2–4)</h2>
-          <p className="text-xs text-slate-400 mt-0.5">G = Summe / (Items − Missing) · T-Werte nur bei hinterlegter Normtabelle · Fett = T ≥ 60 (auffällig)</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">G = Summe / (Items − Missing) · T-Werte nur bei hinterlegter Normtabelle · Fett = T ≥ 60 (auffällig)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
+            <thead className="bg-[var(--surface-panel)] border-b border-slate-100">
               <tr>
                 {['Skala','Items','Missing','Summe (S)','G','Ampel','P (>0)','T','T-Interpretation'].map(h => (
-                  <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -194,12 +194,12 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
               {scales.map(s => {
                 const elevated = s.tScore !== null && s.tScore >= 60
                 return (
-                  <tr key={s.id} className={cn('hover:bg-slate-50', elevated && !s.isAddOn ? 'bg-amber-50' : '')}>
+                  <tr key={s.id} className={cn('hover:bg-[var(--surface-panel)]', elevated && !s.isAddOn ? 'bg-amber-50' : '')}>
                     <td className="px-3 py-2.5">
-                      <span className={cn('font-semibold', elevated ? 'text-amber-800' : 'text-slate-700')}>{s.id}</span>
-                      <span className="text-slate-500 ml-1.5 text-xs">{s.name}</span>
+                      <span className={cn('font-semibold', elevated ? 'text-amber-800' : 'text-[var(--text-secondary)]')}>{s.id}</span>
+                      <span className="text-[var(--text-muted)] ml-1.5 text-xs">{s.name}</span>
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-400 font-mono">{s.items.join(', ')}</td>
+                    <td className="px-3 py-2 text-xs text-[var(--text-muted)] font-mono">{s.items.join(', ')}</td>
                     <td className="px-3 py-2 text-center font-mono">{s.missing}</td>
                     <td className="px-3 py-2 text-center font-mono font-semibold">{s.sum}</td>
                     <td className="px-3 py-2 text-center font-mono font-bold">{formatG(s.mean)}</td>
@@ -220,7 +220,7 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
       {/* Schritt 4: Auffällige Items */}
       {scales.filter(s => !s.isAddOn && s.flaggedItems.length > 0 && (s.tScore ?? 0) >= 60).length > 0 && (
         <div className="card p-5">
-          <h2 className="font-semibold text-slate-700 mb-3">Schritt 4 – Auffällige Items (Wert ≥ 2 bei Skalen mit T ≥ 60)</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-3">Schritt 4 – Auffällige Items (Wert ≥ 2 bei Skalen mit T ≥ 60)</h2>
           <div className="space-y-3">
             {scales
               .filter(s => !s.isAddOn && s.flaggedItems.length > 0 && (s.tScore ?? 0) >= 60)

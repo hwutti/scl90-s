@@ -47,7 +47,7 @@ export function NormTablesClient({ tables }: { tables: NormTable[] }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Normwert-Tabellen</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Franke (2014) – Hogrefe-Lizenz erforderlich</p>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">Franke (2014) – Hogrefe-Lizenz erforderlich</p>
         </div>
         <button onClick={() => setCreating(true)} className="btn-primary">
           <Plus className="w-4 h-4" /> Normtabelle importieren
@@ -119,10 +119,10 @@ export function NormTablesClient({ tables }: { tables: NormTable[] }) {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
+            <thead className="bg-[var(--surface-panel)] border-b border-slate-100">
               <tr>
                 {['Name','Population','Geschlecht','Alter','N','Quelle','Standard'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>

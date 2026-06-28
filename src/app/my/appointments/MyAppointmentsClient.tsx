@@ -83,7 +83,7 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Meine Termine</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{upcoming.length} bevorstehende Termine</p>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">{upcoming.length} bevorstehende Termine</p>
         </div>
         <button onClick={() => { setBooking(true); setStep('type') }} className="btn-primary">
           <Plus className="w-4 h-4" /> Termin anfragen
@@ -93,7 +93,7 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
       {/* Bevorstehende */}
       {upcoming.length > 0 && (
         <div>
-          <h2 className="font-semibold text-slate-700 mb-3">Bevorstehende Termine</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-3">Bevorstehende Termine</h2>
           <div className="space-y-2">
             {upcoming.map((a: any) => {
               const { date, time } = formatDT(a.startAt)
@@ -106,7 +106,7 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-800">{a.type.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{date} · {time} Uhr · {a.therapist.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{date} · {time} Uhr · {a.therapist.name}</p>
                   </div>
                   <span className={cn('text-xs', s?.class)}>{s?.label}</span>
                 </div>
@@ -129,16 +129,16 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
       {/* Vergangene */}
       {past.length > 0 && (
         <div>
-          <h2 className="font-semibold text-slate-700 mb-3">Vergangene Termine</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-3">Vergangene Termine</h2>
           <div className="space-y-2">
             {past.slice(0,5).map((a: any) => {
               const { date, time } = formatDT(a.startAt)
               return (
                 <div key={a.id} className="card p-3 flex items-center gap-3 opacity-60">
-                  <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                  <Calendar className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
                   <div className="flex-1 text-sm">
                     <span className="font-medium text-slate-700">{a.type.name}</span>
-                    <span className="text-slate-400 ml-2">{date}</span>
+                    <span className="text-[var(--text-muted)] ml-2">{date}</span>
                   </div>
                   <span className="badge-gray text-xs">{STATUS_MAP[a.status]?.label}</span>
                 </div>
@@ -178,7 +178,7 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
                         className={cn('p-3 rounded-xl border-2 text-left transition-all',
                           selectedType?.id === t.id
                             ? 'border-current shadow-sm'
-                            : 'border-slate-200 hover:border-slate-300')}
+                            : 'border-[var(--border-strong)] hover:border-slate-300')}
                         style={selectedType?.id === t.id ? { borderColor: t.color, backgroundColor: t.color + '10' } : {}}>
                         <div className="w-3 h-3 rounded-full mb-1.5" style={{ backgroundColor: t.color }} />
                         <p className="text-sm font-semibold text-slate-800">{t.name}</p>
@@ -201,11 +201,11 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
 
             {step === 'slot' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 text-sm">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-[var(--surface-panel)] text-sm">
                   <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedType?.color }} />
                   <span className="font-medium">{selectedType?.name}</span>
                   <span className="text-slate-400">· {selectedType?.durationMin} Min.</span>
-                  <button onClick={() => setStep('type')} className="ml-auto text-xs text-slate-400 hover:text-slate-600">Ändern</button>
+                  <button onClick={() => setStep('type')} className="ml-auto text-xs text-[var(--text-muted)] hover:text-slate-600">Ändern</button>
                 </div>
 
                 {loadingSlots ? (
@@ -213,15 +213,15 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
                 ) : Object.keys(slotsByDate).length === 0 ? (
                   <div className="py-8 text-center">
                     <AlertCircle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
-                    <p className="text-slate-600 font-medium mb-1">Keine freien Termine in den nächsten 6 Wochen</p>
-                    <p className="text-slate-400 text-sm mb-4">Sie können sich auf die Warteliste setzen lassen.</p>
+                    <p className="text-[var(--text-secondary)] font-medium mb-1">Keine freien Termine in den nächsten 6 Wochen</p>
+                    <p className="text-[var(--text-muted)] text-sm mb-4">Sie können sich auf die Warteliste setzen lassen.</p>
                     <button onClick={() => setWaitlist(true)} className="btn-secondary">Auf Warteliste setzen</button>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {Object.entries(slotsByDate).map(([date, daySlots]) => (
                       <div key={date}>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{date}</p>
+                        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1.5">{date}</p>
                         <div className="flex flex-wrap gap-2">
                           {daySlots.map((s: any, i: number) => (
                             <button key={i}
@@ -229,7 +229,7 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
                               className={cn('px-3 py-1.5 rounded-lg text-sm font-medium border transition-all',
                                 selectedSlot?.startAt === s.startAt
                                   ? 'text-white border-transparent'
-                                  : 'border-slate-200 text-slate-600 hover:border-slate-300')}
+                                  : 'border-[var(--border-strong)] text-[var(--text-secondary)] hover:border-slate-300')}
                               style={selectedSlot?.startAt === s.startAt ? { backgroundColor: selectedType?.color } : {}}>
                               {new Date(s.startAt).toLocaleTimeString('de-AT', { hour:'2-digit', minute:'2-digit' })}
                             </button>
@@ -265,8 +265,8 @@ export function MyAppointmentsClient({ appointments, therapists, types, patientI
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="card w-full max-w-sm p-6 text-center shadow-2xl">
             <Clock className="w-10 h-10 mx-auto mb-3 text-amber-400" />
-            <h2 className="font-bold text-slate-800 mb-2">Auf Warteliste setzen?</h2>
-            <p className="text-sm text-slate-500 mb-5">Sie werden benachrichtigt, sobald ein Termin frei wird.</p>
+            <h2 className="font-bold text-[var(--text-primary)] mb-2">Auf Warteliste setzen?</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-5">Sie werden benachrichtigt, sobald ein Termin frei wird.</p>
             <div className="flex gap-3">
               <button onClick={() => setWaitlist(false)} className="btn-secondary flex-1">Abbrechen</button>
               <button onClick={joinWaitlist} className="btn-primary flex-1 justify-center">Ja, eintragen</button>

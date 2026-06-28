@@ -32,8 +32,8 @@ export default async function PatientsPage() {
   const instruments = await prisma.instrument.findMany({ where: { isActive: true } })
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <PatientsListClient patients={patients as any} instruments={instruments} role={role} />
-    </PageShell>
+    </div>
   )
 }

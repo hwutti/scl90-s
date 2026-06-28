@@ -17,5 +17,5 @@ export default async function AvailabilityPage() {
     prisma.absence.findMany({ where: { therapistId: userId, endAt: { gte: new Date() } }, orderBy: { startAt: 'asc' } }),
   ])
 
-  return <PageShell><AvailabilityClient slots={slots} absences={absences} /></PageShell>
+  return <div className="flex-1 flex flex-col"><AvailabilityClient slots={slots} absences={absences} /></div>
 }

@@ -13,8 +13,8 @@ export default async function BrandingPage() {
   const branding = await getBranding()
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <BrandingClient initial={branding} />
-    </PageShell>
+    </div>
   )
 }

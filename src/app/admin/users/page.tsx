@@ -19,8 +19,8 @@ export default async function UsersPage() {
   const users = usersRaw.map(u => ({ ...u, createdAt: u.createdAt.toISOString() }))
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <UsersClient users={users} currentRole={role} />
-    </PageShell>
+    </div>
   )
 }

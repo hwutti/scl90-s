@@ -16,5 +16,5 @@ export default async function NotificationsPage() {
     take: 50,
   })
 
-  return <PageShell><NotificationsClient notifications={notifications as any} /></PageShell>
+  return <div className="flex-1 flex flex-col"><NotificationsClient notifications={notifications as any} /></div>
 }

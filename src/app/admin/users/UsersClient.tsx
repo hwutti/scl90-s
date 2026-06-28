@@ -95,11 +95,11 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Benutzerverwaltung</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{users.length} Benutzer</p>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">{users.length} Benutzer</p>
         </div>
         <button onClick={() => setCreating(true)} className="btn-primary">
           <Plus className="w-4 h-4" /> Benutzer anlegen
@@ -108,16 +108,16 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-100">
+          <thead className="bg-[var(--surface-panel)] border-b border-slate-100">
             <tr>
               {['Name','Rolle','E-Mail / PIN','Patienten','Status','Angelegt',''].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {users.map(u => (
-              <tr key={u.id} className={cn('hover:bg-slate-50', !u.active && 'opacity-50')}>
+              <tr key={u.id} className={cn('hover:bg-[var(--surface-panel)]', !u.active && 'opacity-50')}>
                 <td className="px-4 py-3 font-medium text-slate-800">{u.name ?? '—'}</td>
                 <td className="px-4 py-3">
                   <span className={ROLE_BADGE[u.role]}>{ROLE_LABEL[u.role]}</span>
@@ -125,7 +125,7 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
                 <td className="px-4 py-3">
                   {u.pin ? (
                     <button onClick={() => copyPin(u.pin!, u.id)}
-                      className="flex items-center gap-1.5 font-mono text-sm bg-slate-100 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+                      className="flex items-center gap-1.5 font-mono text-sm bg-[var(--surface-panel)] px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
                       {copiedId === u.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                       {u.pin}
                     </button>
@@ -139,20 +139,20 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
                     ? <span className="badge-green">Aktiv</span>
                     : <span className="badge-red">Gesperrt</span>}
                 </td>
-                <td className="px-4 py-3 text-slate-400 text-xs">
+                <td className="px-4 py-3 text-[var(--text-muted)] text-xs">
                   {new Date(u.createdAt).toLocaleDateString('de-AT')}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(u)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" title="Bearbeiten">
+                    <button onClick={() => openEdit(u)} className="p-1.5 rounded-lg hover:bg-[var(--surface-panel)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" title="Bearbeiten">
                       <Edit3 className="w-4 h-4" />
                     </button>
                     {u.pin && (
-                      <button onClick={() => regeneratePin(u.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors" title="Neuen PIN generieren">
+                      <button onClick={() => regeneratePin(u.id)} className="p-1.5 rounded-lg hover:bg-[var(--surface-panel)] text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors" title="Neuen PIN generieren">
                         <RefreshCw className="w-4 h-4" />
                       </button>
                     )}
-                    <button onClick={() => toggleActive(u)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" title={u.active ? 'Sperren' : 'Aktivieren'}>
+                    <button onClick={() => toggleActive(u)} className="p-1.5 rounded-lg hover:bg-[var(--surface-panel)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" title={u.active ? 'Sperren' : 'Aktivieren'}>
                       {u.active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                     </button>
                   </div>
@@ -206,7 +206,7 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
                   </div>
                 </>
               ) : (
-                <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700">
+                <div className="bg-[var(--color-primary-light)] rounded-xl p-3 text-xs text-indigo-700">
                   PIN wird automatisch generiert und nach dem Anlegen angezeigt.
                 </div>
               )}
@@ -259,7 +259,7 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
                 </>
               )}
               {editUser.role === 'PATIENT' && (
-                <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between">
+                <div className="bg-[var(--surface-panel)] rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-slate-700">Aktueller PIN</p>
                     <p className="font-mono font-bold text-slate-800">{editUser.pin ?? '—'}</p>
@@ -293,9 +293,9 @@ export function UsersClient({ users: initialUsers, currentRole }: { users: UserR
       {newPin && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="card w-full max-w-sm p-7 text-center shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-800 mb-1">PIN</h2>
-            <p className="text-sm text-slate-400 mb-5">Bitte dem Patienten mitteilen:</p>
-            <div className="text-4xl font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-100
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">PIN</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-5">Bitte dem Patienten mitteilen:</p>
+            <div className="text-4xl font-mono font-bold text-[var(--color-primary)] bg-[var(--color-primary-light)] border border-[var(--border)]
                             rounded-2xl py-5 tracking-[0.3em] mb-5 select-all">
               {newPin}
             </div>

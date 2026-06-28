@@ -11,8 +11,8 @@ export default async function CalendarStatsPage() {
   if (role === 'PATIENT') redirect('/my')
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <CalendarStatsClient />
-    </PageShell>
+    </div>
   )
 }

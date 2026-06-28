@@ -26,13 +26,13 @@ export default async function MyAppointmentsPage() {
   const types = await prisma.appointmentType.findMany({ where: { isActive: true, isBlocker: false } })
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <MyAppointmentsClient
         appointments={appointments as any}
         therapists={patient.therapists.map(t => t.therapist)}
         types={types}
         patientId={patient.id}
       />
-    </PageShell>
+    </div>
   )
 }

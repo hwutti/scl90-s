@@ -8,7 +8,7 @@ const STATUS_LABELS: Record<string, string> = {
   NO_SHOW: 'No-Show', COMPLETED: 'Abgeschlossen',
 }
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#f59e0b', CONFIRMED: '#10b981', CANCELLED: '#94a3b8',
+  PENDING: '#f59e0b', CONFIRMED: '#10b981', CANCELLED: 'var(--text-muted)',
   NO_SHOW: '#ef4444', COMPLETED: '#6366f1',
 }
 
@@ -37,7 +37,7 @@ export function CalendarStatsClient() {
   }, [load])
 
   if (!data && loading) {
-    return <div className="text-slate-400 text-sm p-8 text-center">Lade Statistiken…</div>
+    return <div className="text-[var(--text-muted)] text-sm p-8 text-center">Lade Statistiken…</div>
   }
 
   if (!data) return null
@@ -53,12 +53,12 @@ export function CalendarStatsClient() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Auslastung & Statistiken</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{month} · {total} Termine gesamt</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Auslastung & Statistiken</h1>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">{month} · {total} Termine gesamt</p>
         </div>
         <div className="flex items-center gap-2">
           {lastUpdated && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-[var(--text-muted)]">
               Stand: {lastUpdated.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           )}
@@ -78,21 +78,21 @@ export function CalendarStatsClient() {
         {byStatus.map((b: any) => (
           <div key={b.status} className="card p-4 text-center">
             <p className="text-2xl font-bold" style={{ color: STATUS_COLORS[b.status] }}>{b._count}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{STATUS_LABELS[b.status] ?? b.status}</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{STATUS_LABELS[b.status] ?? b.status}</p>
           </div>
         ))}
       </div>
 
       {/* Auslastung nach Wochentag */}
       <div className="card p-5">
-        <h2 className="font-semibold text-slate-700 mb-4">Termine nach Wochentag</h2>
+        <h2 className="font-semibold text-[var(--text-secondary)] mb-4">Termine nach Wochentag</h2>
         <div className="flex items-end gap-2 h-36">
           {byDay.map((count: number, i: number) => (
             <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs font-semibold text-slate-600">{count}</span>
+              <span className="text-xs font-semibold text-[var(--text-secondary)]">{count}</span>
               <div className="w-full rounded-t-lg transition-all"
                 style={{ height: `${(count / maxDay) * 100}px`, minHeight: count > 0 ? '4px' : '0', backgroundColor: 'var(--color-primary)' }} />
-              <span className="text-xs text-slate-400">{DAYS[i]}</span>
+              <span className="text-xs text-[var(--text-muted)]">{DAYS[i]}</span>
             </div>
           ))}
         </div>
@@ -101,16 +101,16 @@ export function CalendarStatsClient() {
       {/* Termine nach Typ */}
       {byType.length > 0 && (
         <div className="card p-5">
-          <h2 className="font-semibold text-slate-700 mb-4">Termine nach Typ</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-4">Termine nach Typ</h2>
           <div className="space-y-3">
             {byType.sort((a: any, b: any) => b._count - a._count).map((b: any) => (
               <div key={b.typeId} className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: b.type?.color ?? '#94a3b8' }} />
-                <span className="text-sm text-slate-600 w-36 truncate">{b.type?.name ?? 'Unbekannt'}</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2">
-                  <div className="h-2 rounded-full" style={{ width: `${(b._count / maxType) * 100}%`, backgroundColor: b.type?.color ?? '#94a3b8' }} />
+                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: b.type?.color ?? 'var(--text-muted)' }} />
+                <span className="text-sm text-[var(--text-secondary)] w-36 truncate">{b.type?.name ?? 'Unbekannt'}</span>
+                <div className="flex-1 bg-[var(--surface-panel)] rounded-full h-2">
+                  <div className="h-2 rounded-full" style={{ width: `${(b._count / maxType) * 100}%`, backgroundColor: b.type?.color ?? 'var(--text-muted)' }} />
                 </div>
-                <span className="text-sm font-semibold text-slate-700 w-6 text-right">{b._count}</span>
+                <span className="text-sm font-semibold text-[var(--text-secondary)] w-6 text-right">{b._count}</span>
               </div>
             ))}
           </div>

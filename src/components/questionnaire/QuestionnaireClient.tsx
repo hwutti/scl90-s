@@ -107,8 +107,8 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
       {/* Item-Liste links */}
       <div className="hidden lg:flex flex-col w-64 shrink-0">
         <div className="card flex-1 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</span>
+          <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Items</span>
             <span className="badge-blue text-xs">{answered} / 90</span>
           </div>
           <div ref={listRef} className="overflow-y-auto flex-1 p-2">
@@ -121,16 +121,16 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
                   onClick={() => setCurrentIdx(idx)}
                   className={cn(
                     'q-item w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-all mb-0.5',
-                    isActive ? 'q-active bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50',
+                    isActive ? 'q-active bg-[var(--color-primary-light)] border border-indigo-200' : 'hover:bg-[var(--surface-panel)]',
                   )}
                 >
                   <span className={cn(
                     'flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold',
-                    val !== null ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'
+                    val !== null ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-panel)] text-[var(--text-muted)]'
                   )}>
                     {val !== null ? val : idx + 1}
                   </span>
-                  <span className={cn('truncate', isActive ? 'text-indigo-700 font-medium' : 'text-slate-500')}>
+                  <span className={cn('truncate', isActive ? 'text-[var(--color-primary)] font-medium' : 'text-[var(--text-muted)]')}>
                     {item.substring(0, 35)}{item.length > 35 ? '…' : ''}
                   </span>
                 </button>
@@ -145,12 +145,12 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
         {/* Patient Info */}
         <div className="card px-5 py-3 flex items-center gap-4 flex-wrap">
           <div>
-            <span className="text-xs text-slate-400">Patient</span>
-            <p className="text-sm font-semibold text-slate-800">{patientName || '—'}</p>
+            <span className="text-xs text-[var(--text-muted)]">Patient</span>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{patientName || '—'}</p>
           </div>
-          {patientGender && <div><span className="text-xs text-slate-400">Geschlecht</span><p className="text-sm">{patientGender}</p></div>}
-          {occasion && <div><span className="text-xs text-slate-400">Anlass</span><p className="text-sm">{occasion}</p></div>}
-          {saving && <span className="text-xs text-slate-400 ml-auto animate-pulse">Speichert…</span>}
+          {patientGender && <div><span className="text-xs text-[var(--text-muted)]">Geschlecht</span><p className="text-sm">{patientGender}</p></div>}
+          {occasion && <div><span className="text-xs text-[var(--text-muted)]">Anlass</span><p className="text-sm">{occasion}</p></div>}
+          {saving && <span className="text-xs text-[var(--text-muted)] ml-auto animate-pulse">Speichert…</span>}
         </div>
 
         {/* Aktuelle Frage */}
@@ -162,9 +162,9 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
                 {currentItem}
               </span>
               <div>
-                <p className="text-xs text-slate-400">Item {currentItem} von 90</p>
+                <p className="text-xs text-[var(--text-muted)]">Item {currentItem} von 90</p>
                 {scales.length > 0 && (
-                  <p className="text-xs text-indigo-600 font-medium">Skala: {scales.join(', ')}</p>
+                  <p className="text-xs text-[var(--color-primary)] font-medium">Skala: {scales.join(', ')}</p>
                 )}
               </div>
             </div>
@@ -178,8 +178,8 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
 
           {/* Fragentext */}
           <div className="flex-1 flex flex-col justify-center">
-            <p className="text-slate-500 text-sm mb-2">Wie sehr litten Sie in den letzten 7 Tagen unter…</p>
-            <h2 className="text-xl font-semibold text-slate-800 leading-relaxed mb-8">
+            <p className="text-[var(--text-muted)] text-sm mb-2">Wie sehr litten Sie in den letzten 7 Tagen unter…</p>
+            <h2 className="text-xl font-semibold text-[var(--text-primary)] leading-relaxed mb-8">
               {ITEMS[currentIdx]}
             </h2>
 
@@ -226,11 +226,11 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
 
             {/* Fortschritt */}
             <div className="flex-1 min-w-32">
-              <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
                 <span>{answered} beantwortet</span>
                 <span>{pct}%</span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-[var(--surface-panel)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-300"
                   style={{ width: `${pct}%` }}
@@ -253,9 +253,9 @@ export function QuestionnaireClient({ sessionId, patientName, patientDob, patien
         </div>
 
         {/* Keyboard-Hint */}
-        <p className="text-center text-xs text-slate-400">
-          Tastatur: <kbd className="bg-slate-100 px-1.5 py-0.5 rounded">0</kbd>–<kbd className="bg-slate-100 px-1.5 py-0.5 rounded">4</kbd> Wert wählen ·
-          <kbd className="bg-slate-100 px-1.5 py-0.5 rounded ml-1">←</kbd><kbd className="bg-slate-100 px-1.5 py-0.5 rounded">→</kbd> navigieren
+        <p className="text-center text-xs text-[var(--text-muted)]">
+          Tastatur: <kbd className="bg-[var(--surface-panel)] px-1.5 py-0.5 rounded">0</kbd>–<kbd className="bg-[var(--surface-panel)] px-1.5 py-0.5 rounded">4</kbd> Wert wählen ·
+          <kbd className="bg-[var(--surface-panel)] px-1.5 py-0.5 rounded ml-1">←</kbd><kbd className="bg-[var(--surface-panel)] px-1.5 py-0.5 rounded">→</kbd> navigieren
         </p>
       </div>
     </div>

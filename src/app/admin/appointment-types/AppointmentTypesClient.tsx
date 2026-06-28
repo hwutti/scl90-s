@@ -36,17 +36,17 @@ export function AppointmentTypesClient({ initial, role }: { initial: any[]; role
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Termintypen</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Arten von Terminen definieren, Farben und Dauern festlegen</p>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">Arten von Terminen definieren, Farben und Dauern festlegen</p>
         </div>
         <button onClick={() => setCreating(true)} className="btn-primary"><Plus className="w-4 h-4" /> Neuer Typ</button>
       </div>
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-100">
+          <thead className="bg-[var(--surface-panel)] border-b border-slate-100">
             <tr>
               {['Farbe', 'Name', 'Dauer', 'Beschreibung', 'Typ', ''].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
@@ -105,7 +105,7 @@ export function AppointmentTypesClient({ initial, role }: { initial: any[]; role
                 <div>
                   <label className="label">Farbe</label>
                   <div className="flex gap-2">
-                    <input type="color" value={form.color} onChange={e => setForm(f => ({...f, color: e.target.value}))} className="w-10 h-10 rounded-lg border border-slate-200 p-0.5" />
+                    <input type="color" value={form.color} onChange={e => setForm(f => ({...f, color: e.target.value}))} className="w-10 h-10 rounded-lg border border-[var(--border-strong)] p-0.5" />
                     <input className="input font-mono text-sm" value={form.color} onChange={e => setForm(f => ({...f, color: e.target.value}))} maxLength={7} />
                   </div>
                 </div>

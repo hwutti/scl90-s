@@ -28,7 +28,7 @@ export default async function CalendarPage() {
   ])
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <CalendarClient
         currentUserId={userId}
         role={role}
@@ -37,6 +37,6 @@ export default async function CalendarPage() {
         patients={patients}
         bundesland={branding.bundesland ?? 'Kärnten'}
       />
-    </PageShell>
+    </div>
   )
 }

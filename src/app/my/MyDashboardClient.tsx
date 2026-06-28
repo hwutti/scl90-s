@@ -34,7 +34,7 @@ export function MyDashboardClient({ patient, assessments, userName }: any) {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Guten Tag, {userName.split(' ')[0]}!</h1>
         {patient?.therapists?.[0] && (
-          <p className="text-slate-400 text-sm mt-0.5">
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">
             Behandelnde Person: {patient.therapists[0].therapist.name}
           </p>
         )}
@@ -43,7 +43,7 @@ export function MyDashboardClient({ patient, assessments, userName }: any) {
       {/* Offene Tests */}
       {open.length > 0 && (
         <div>
-          <h2 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-500" /> Ausstehende Tests
           </h2>
           <div className="space-y-2">
@@ -51,9 +51,9 @@ export function MyDashboardClient({ patient, assessments, userName }: any) {
               <div
                 key={a.id}
                 onClick={() => router.push(`/assessment/${a.id}`)}
-                className="card p-4 flex items-center gap-4 cursor-pointer hover:bg-indigo-50 border-2 border-indigo-100 transition-colors"
+                className="card p-4 flex items-center gap-4 cursor-pointer hover:bg-[var(--color-primary-light)] border-2 border-[var(--border)] transition-colors"
               >
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-light)] flex items-center justify-center">
                   <ClipboardList className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div className="flex-1">
@@ -82,7 +82,7 @@ export function MyDashboardClient({ patient, assessments, userName }: any) {
       {/* Abgeschlossene Tests */}
       {done.length > 0 && (
         <div>
-          <h2 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <h2 className="font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-slate-500" /> Meine Ergebnisse
           </h2>
           <div className="space-y-2">

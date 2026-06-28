@@ -28,12 +28,12 @@ export default async function MyPage() {
     : []
 
   return (
-    <PageShell>
+    <div className="flex-1 flex flex-col">
       <MyDashboardClient
         patient={patient as any}
         assessments={assessments as any}
         userName={(session.user as any).name ?? ''}
       />
-    </PageShell>
+    </div>
   )
 }

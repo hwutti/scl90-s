@@ -11,5 +11,5 @@ export default async function AppointmentTypesPage() {
   if (!['ADMIN','THERAPIST'].includes((session.user as any).role)) redirect('/calendar')
 
   const types = await prisma.appointmentType.findMany({ orderBy: { name: 'asc' } })
-  return <PageShell><AppointmentTypesClient initial={types} role={(session.user as any).role} /></PageShell>
+  return <div className="flex-1 flex flex-col"><AppointmentTypesClient initial={types} role={(session.user as any).role} /></div>
 }

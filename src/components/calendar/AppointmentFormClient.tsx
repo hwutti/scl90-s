@@ -122,11 +122,11 @@ export function AppointmentFormClient({
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
             {mode === 'create' ? 'Neuer Termin' : 'Termin bearbeiten'}
           </h1>
           {defaultDate && (
-            <p className="text-slate-400 text-sm mt-0.5">
+            <p className="text-[var(--text-muted)] text-sm mt-0.5">
               {new Date(defaultDate + 'T00:00').toLocaleDateString('de-AT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
             </p>
           )}
@@ -139,38 +139,38 @@ export function AppointmentFormClient({
           {/* Termintyp */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <h2 className="font-semibold text-slate-700">Terminart</h2>
+              <Calendar className="w-4 h-4 text-[var(--text-muted)]" />
+              <h2 className="font-semibold text-[var(--text-secondary)]">Terminart</h2>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {types.map(t => (
                 <button key={t.id} onClick={() => setForm(f => ({...f, typeId: t.id}))}
                   className={cn('p-3 rounded-xl border-2 text-left transition-all',
-                    form.typeId === t.id ? 'shadow-sm' : 'border-slate-200 hover:border-slate-300')}
+                    form.typeId === t.id ? 'shadow-sm' : 'border-[var(--border-strong)] hover:border-slate-300')}
                   style={form.typeId === t.id ? { borderColor: t.color, backgroundColor: t.color + '15' } : {}}>
                   <div className="w-3 h-3 rounded-full mb-1.5" style={{ backgroundColor: t.color }} />
-                  <p className="text-sm font-semibold text-slate-800 leading-tight">{t.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{t.durationMin} Min.</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight">{t.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{t.durationMin} Min.</p>
                 </button>
               ))}
             </div>
             <label className="flex items-center gap-2 mt-3 cursor-pointer">
               <input type="checkbox" checked={form.isBlocker}
                 onChange={e => setForm(f => ({...f, isBlocker: e.target.checked}))} className="w-4 h-4 rounded" />
-              <span className="text-sm text-slate-600">Blockiertermin (kein Patient)</span>
+              <span className="text-sm text-[var(--text-secondary)]">Blockiertermin (kein Patient)</span>
             </label>
           </div>
 
           {/* Datum & Zeit */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <h2 className="font-semibold text-slate-700">Datum & Uhrzeit</h2>
+              <Clock className="w-4 h-4 text-[var(--text-muted)]" />
+              <h2 className="font-semibold text-[var(--text-secondary)]">Datum & Uhrzeit</h2>
             </div>
             <input type="datetime-local" className="input" value={form.startAt}
               onChange={e => setForm(f => ({...f, startAt: e.target.value}))} />
             {selectedType && form.startAt && (
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-[var(--text-muted)] mt-2">
                 Ende: {(() => {
                   const end = new Date(new Date(form.startAt).getTime() + selectedType.durationMin * 60000)
                   return end.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })
@@ -183,13 +183,13 @@ export function AppointmentFormClient({
           {mode === 'create' && (
             <div className="card p-5">
               <label className="flex items-center gap-2 cursor-pointer mb-3">
-                <RepeatIcon className="w-4 h-4 text-slate-400" />
-                <span className="font-semibold text-slate-700">Terminserie</span>
+                <RepeatIcon className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="font-semibold text-[var(--text-secondary)]">Terminserie</span>
                 <input type="checkbox" checked={form.recurrence} className="w-4 h-4 rounded ml-auto"
                   onChange={e => setForm(f => ({...f, recurrence: e.target.checked}))} />
               </label>
               {form.recurrence && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
                   <div>
                     <label className="label">Frequenz</label>
                     <select className="input" value={form.recurrenceFreq}
@@ -229,8 +229,8 @@ export function AppointmentFormClient({
           {!form.isBlocker && (
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-4">
-                <User className="w-4 h-4 text-slate-400" />
-                <h2 className="font-semibold text-slate-700">Patient</h2>
+                <User className="w-4 h-4 text-[var(--text-muted)]" />
+                <h2 className="font-semibold text-[var(--text-secondary)]">Patient</h2>
               </div>
               <select className="input" value={form.patientId}
                 onChange={e => setForm(f => ({...f, patientId: e.target.value}))}>
@@ -246,8 +246,8 @@ export function AppointmentFormClient({
           {form.isBlocker && (
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Ban className="w-4 h-4 text-slate-400" />
-                <h2 className="font-semibold text-slate-700">Grund</h2>
+                <Ban className="w-4 h-4 text-[var(--text-muted)]" />
+                <h2 className="font-semibold text-[var(--text-secondary)]">Grund</h2>
               </div>
               <input className="input" placeholder="z.B. Supervision, Fortbildung, Verwaltung"
                 value={form.blockerNote}
@@ -259,8 +259,8 @@ export function AppointmentFormClient({
           {role === 'ADMIN' && therapists.length > 1 && (
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-3">
-                <User className="w-4 h-4 text-slate-400" />
-                <h2 className="font-semibold text-slate-700">Therapeut</h2>
+                <User className="w-4 h-4 text-[var(--text-muted)]" />
+                <h2 className="font-semibold text-[var(--text-secondary)]">Therapeut</h2>
               </div>
               <select className="input" value={form.therapistId}
                 onChange={e => setForm(f => ({...f, therapistId: e.target.value}))}>
@@ -272,14 +272,14 @@ export function AppointmentFormClient({
           {/* Status (nur bei edit) */}
           {mode === 'edit' && (
             <div className="card p-5">
-              <h2 className="font-semibold text-slate-700 mb-3">Status</h2>
+              <h2 className="font-semibold text-[var(--text-secondary)] mb-3">Status</h2>
               <div className="grid grid-cols-2 gap-2">
                 {STATUS_OPTIONS.map(s => (
                   <button key={s.value} onClick={() => setForm(f => ({...f, status: s.value}))}
                     className={cn('py-2 px-3 rounded-xl border text-sm font-medium transition-all',
                       form.status === s.value
                         ? 'border-transparent text-white'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300')}
+                        : 'border-[var(--border-strong)] text-[var(--text-secondary)] hover:border-slate-300')}
                     style={form.status === s.value ? { backgroundColor: 'var(--color-primary)' } : {}}>
                     {s.label}
                   </button>
@@ -291,8 +291,8 @@ export function AppointmentFormClient({
           {/* Notizen */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <FileText className="w-4 h-4 text-slate-400" />
-              <h2 className="font-semibold text-slate-700">Interne Notiz</h2>
+              <FileText className="w-4 h-4 text-[var(--text-muted)]" />
+              <h2 className="font-semibold text-[var(--text-secondary)]">Interne Notiz</h2>
             </div>
             <textarea className="input" rows={4} value={form.therapistNote}
               onChange={e => setForm(f => ({...f, therapistNote: e.target.value}))}

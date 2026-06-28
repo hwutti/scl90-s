@@ -49,24 +49,24 @@ export function AvailabilityClient({ slots: initialSlots, absences: initialAbsen
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Verfügbarkeit & Abwesenheiten</h1>
-        <p className="text-slate-400 text-sm mt-0.5">Legen Sie Ihre buchbaren Zeiten und Urlaubsperioden fest</p>
+        <p className="text-[var(--text-muted)] text-sm mt-0.5">Legen Sie Ihre buchbaren Zeiten und Urlaubsperioden fest</p>
       </div>
 
       {/* Verfügbarkeitsslots */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-700 flex items-center gap-2"><Clock className="w-4 h-4" /> Reguläre Arbeitszeiten</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] flex items-center gap-2"><Clock className="w-4 h-4" /> Reguläre Arbeitszeiten</h2>
           <button onClick={() => setShowSlot(true)} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> Slot hinzufügen</button>
         </div>
         {slots.length === 0 ? (
-          <p className="text-slate-400 text-sm text-center py-6">Noch keine Verfügbarkeitszeiten definiert</p>
+          <p className="text-[var(--text-muted)] text-sm text-center py-6">Noch keine Verfügbarkeitszeiten definiert</p>
         ) : (
           <div className="space-y-2">
             {slots.map((s: any) => (
-              <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 group">
-                <span className="text-sm font-semibold text-slate-700 w-24">{DAYS[s.dayOfWeek]}</span>
+              <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--surface-panel)] group">
+                <span className="text-sm font-semibold text-[var(--text-secondary)] w-24">{DAYS[s.dayOfWeek]}</span>
                 <span className="text-sm text-slate-500">{s.startTime} – {s.endTime} Uhr</span>
-                <button onClick={() => deleteSlot(s.id)} className="ml-auto text-slate-300 hover:text-red-500 transition-colors">
+                <button onClick={() => deleteSlot(s.id)} className="ml-auto text-[var(--text-muted)] hover:text-red-500 transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -78,11 +78,11 @@ export function AvailabilityClient({ slots: initialSlots, absences: initialAbsen
       {/* Abwesenheiten */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-700 flex items-center gap-2"><Calendar className="w-4 h-4" /> Urlaub & Abwesenheiten</h2>
+          <h2 className="font-semibold text-[var(--text-secondary)] flex items-center gap-2"><Calendar className="w-4 h-4" /> Urlaub & Abwesenheiten</h2>
           <button onClick={() => setShowAbsence(true)} className="btn-secondary text-sm"><Plus className="w-4 h-4" /> Abwesenheit</button>
         </div>
         {absences.length === 0 ? (
-          <p className="text-slate-400 text-sm text-center py-6">Keine Abwesenheiten eingetragen</p>
+          <p className="text-[var(--text-muted)] text-sm text-center py-6">Keine Abwesenheiten eingetragen</p>
         ) : (
           <div className="space-y-2">
             {absences.map((a: any) => (
@@ -92,7 +92,7 @@ export function AvailabilityClient({ slots: initialSlots, absences: initialAbsen
                   {new Date(a.startAt).toLocaleDateString('de-AT')} – {new Date(a.endAt).toLocaleDateString('de-AT')}
                 </span>
                 {a.note && <span className="text-xs text-slate-400">· {a.note}</span>}
-                <button onClick={() => deleteAbsence(a.id)} className="ml-auto text-slate-300 hover:text-red-500 transition-colors">
+                <button onClick={() => deleteAbsence(a.id)} className="ml-auto text-[var(--text-muted)] hover:text-red-500 transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

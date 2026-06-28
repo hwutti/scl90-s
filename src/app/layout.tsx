@@ -29,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <Providers>
           {isLoggedIn ? (
-            <div className="flex min-h-screen" style={{ background: 'var(--surface-0)' }}>
+            <div className="flex min-h-screen" style={{ background: 'var(--surface-page)' }}>
               <Sidebar branding={branding} />
               <main
                 className="flex-1 min-h-screen flex flex-col"
@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </main>
             </div>
           ) : (
-            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-0)' }}>
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-page)' }}>
               {children}
             </div>
           )}

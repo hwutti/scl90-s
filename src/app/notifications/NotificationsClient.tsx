@@ -26,7 +26,7 @@ export function NotificationsClient({ notifications }: { notifications: any[] })
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Benachrichtigungen</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{unreadCount} ungelesen</p>
+          <p className="text-[var(--text-muted)] text-sm mt-0.5">{unreadCount} ungelesen</p>
         </div>
         {unreadCount > 0 && (
           <button onClick={markAllRead} className="btn-secondary text-sm">
@@ -43,12 +43,12 @@ export function NotificationsClient({ notifications }: { notifications: any[] })
       ) : (
         <div className="card overflow-hidden divide-y divide-slate-50">
           {items.map(n => (
-            <div key={n.id} className={cn('flex gap-3 px-5 py-4', !n.readAt && 'bg-indigo-50/40')}>
-              <div className={cn('w-2 h-2 rounded-full mt-2 shrink-0', n.readAt ? 'bg-slate-200' : 'bg-indigo-500')} />
+            <div key={n.id} className={cn('flex gap-3 px-5 py-4', !n.readAt && 'bg-[var(--color-primary-light)]/40')}>
+              <div className={cn('w-2 h-2 rounded-full mt-2 shrink-0', n.readAt ? 'bg-slate-200' : 'bg-[var(--color-primary-light)]0')} />
               <div className="flex-1 min-w-0">
-                {n.subject && <p className="font-medium text-slate-800 text-sm">{n.subject}</p>}
-                <p className="text-sm text-slate-500 mt-0.5">{n.body}</p>
-                <p className="text-xs text-slate-300 mt-1">
+                {n.subject && <p className="font-medium text-[var(--text-primary)] text-sm">{n.subject}</p>}
+                <p className="text-sm text-[var(--text-muted)] mt-0.5">{n.body}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   {new Date(n.createdAt).toLocaleDateString('de-AT', { dateStyle: 'medium' })} · {new Date(n.createdAt).toLocaleTimeString('de-AT', { timeStyle: 'short' })}
                 </p>
               </div>
