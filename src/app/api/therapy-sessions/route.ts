@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       eventType: 'session_created',
       relatedEntityType: 'therapy_session',
       relatedEntityId: ts.id,
-      title: `Session #${sessionNumber} erstellt`,
+      title: `Sitzung #${sessionNumber} erstellt`,
       eventDate: new Date(),
       createdByUserId: userId,
     },

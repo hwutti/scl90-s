@@ -50,7 +50,7 @@ function fmtBytes(b: number) {
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: 'stammdaten',   label: 'Stammdaten',   icon: User },
-  { key: 'sessions',     label: 'Sessions',      icon: ClipboardList },
+  { key: 'sessions',     label: 'Sitzungen',      icon: ClipboardList },
   { key: 'screening',    label: 'Screening',     icon: Activity },
   { key: 'anamnese',     label: 'Anamnese',      icon: FileText },
   { key: 'therapieplan', label: 'Therapieplan',  icon: Target },

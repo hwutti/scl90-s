@@ -58,7 +58,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const ts = await prisma.therapySession.findUnique({ where: { id: params.id }, select: { billingStatus: true } })
   if (ts?.billingStatus !== 'UNBILLED')
-    return NextResponse.json({ error: 'Nur unverrechnete Sessions können gelöscht werden' }, { status: 400 })
+    return NextResponse.json({ error: 'Nur unverrechnete Sitzungen können gelöscht werden' }, { status: 400 })
   await prisma.therapySession.delete({ where: { id: params.id } })
   return NextResponse.json({ ok: true })
 }

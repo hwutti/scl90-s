@@ -171,7 +171,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
         {[
-          { label: 'Sessions gesamt', value: sessions.length, color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+          { label: 'Sitzungen gesamt', value: sessions.length, color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
           { label: 'Nicht verrechnet', value: unbilledSessions.length, color: 'var(--amber)', bg: 'var(--amber-bg)' },
           { label: 'Offener Betrag', value: fmtEUR(totalUnbilled), color: 'var(--red)', bg: 'var(--red-bg)' },
           { label: 'Transaktionen', value: transactions.length, color: 'var(--green)', bg: 'var(--green-bg)' },
@@ -188,7 +188,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
 
       {/* Sub-Tabs */}
       <div style={{ display: 'flex', gap: 0 }}>
-        {[['sessions','Sessions'],['transactions','Transaktionen']].map(([key,label]) => (
+        {[['sessions','Sitzungen'],['transactions','Transaktionen']].map(([key,label]) => (
           <button key={key} onClick={() => setSelectedTab(key as any)}
             style={{ padding: '7px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13,
               fontWeight: selectedTab===key ? 600 : 400,
@@ -211,7 +211,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
               )}
             </div>
             <button onClick={() => setShowNewSession(true)} className="btn-primary">
-              <Plus style={{ width: 13, height: 13 }} /> Neue Session
+              <Plus style={{ width: 13, height: 13 }} /> Neue Sitzung
             </button>
           </div>
 
@@ -220,7 +220,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
             <div className="card" style={{ padding: 24 }}>
               <div className="empty-state">
                 <ClipboardList className="empty-state-icon" style={{width:36,height:36}}/>
-                <p className="empty-state-text">Noch keine Sessions erfasst.</p>
+                <p className="empty-state-text">Noch keine Sitzungen erfasst.</p>
               </div>
             </div>
           ) : (
@@ -228,7 +228,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
               <table className="data-table">
                 <thead><tr>
                   <th style={{width:30}}></th>
-                  <th>Session</th><th>Datum</th><th>Dauer</th>
+                  <th>Sitzung</th><th>Datum</th><th>Dauer</th>
                   <th>Betrag</th><th>Status</th><th></th>
                 </tr></thead>
                 <tbody>
@@ -340,12 +340,12 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
 
       {/* ══ MODALS ══ */}
 
-      {/* Neue Session */}
+      {/* Neue Sitzung */}
       {showNewSession && (
         <div className="modal-overlay" onClick={() => setShowNewSession(false)}>
           <div className="modal" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
             <div className="modal-header">
-              <h2 style={{margin:0,fontSize:15}}>Neue Session erfassen</h2>
+              <h2 style={{margin:0,fontSize:15}}>Neue Sitzung erfassen</h2>
               <button onClick={()=>setShowNewSession(false)} className="btn-ghost" style={{padding:4}}><X style={{width:16,height:16}}/></button>
             </div>
             <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -402,7 +402,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
             <div className="modal-footer">
               <button onClick={()=>setShowNewSession(false)} className="btn-secondary" style={{flex:1}}>Abbrechen</button>
               <button onClick={createSession} disabled={savingSession||!newSession.sessionDate} className="btn-primary" style={{flex:1,justifyContent:'center'}}>
-                {savingSession?'Speichern...':'Session speichern'}
+                {savingSession?'Speichern...':'Sitzung speichern'}
               </button>
             </div>
           </div>
@@ -421,7 +421,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
               {/* Summary */}
               <div style={{padding:'10px 14px',background:'var(--color-primary-light)',borderRadius:8}}>
                 <p style={{fontSize:13,fontWeight:600,color:'var(--color-primary)',margin:'0 0 4px'}}>
-                  {selectedSessions.length} Session(s) ausgewählt
+                  {selectedSessions.length} Sitzung(en) ausgewählt
                 </p>
                 <p style={{fontSize:13,color:'var(--text-primary)',margin:0}}>
                   Gesamtbetrag: <strong>

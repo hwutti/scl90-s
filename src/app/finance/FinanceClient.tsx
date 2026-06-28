@@ -8,7 +8,7 @@ const INCOME_CATS: Record<string,string> = {
 }
 const EXPENSE_CATS: Record<string,string> = {
   MISC_BUSINESS:'Sonstiger betr. Aufwand', GENERAL:'Allg. Ausgabe',
-  SESSION_TRANS:'Sessiontransaktion', CANCELLATION:'Storno',
+  SESSION_TRANS:'Sitzungstransaktion', CANCELLATION:'Storno',
   CONTINUING_ED:'Fortbildung', THERAPY_TRAINING:'Lehrtherapie',
   TRAVEL:'Reisekosten', OFFICE:'Büroartikel', MARKETING:'Werbung',
   LITERATURE:'Literatur', FEES_TAXES:'Gebühren und Abgaben',

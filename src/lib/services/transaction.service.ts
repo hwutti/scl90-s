@@ -188,7 +188,7 @@ export async function markTransactionPaid(params: {
     include: { sessionAllocations: { select: { sessionId: true } } },
   })
 
-  // Session-Status neu berechnen
+  // Sitzungs-Status neu berechnen
   const sessionIds = [...new Set(tx.sessionAllocations.map(a => a.sessionId))]
   for (const id of sessionIds) {
     await recalcSessionBillingStatus(id)

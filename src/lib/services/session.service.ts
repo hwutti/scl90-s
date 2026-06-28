@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { Decimal } from '@prisma/client/runtime/library'
 
-// ─── Session-Preisberechnung ─────────────────────────────────────────────────
+// ─── Sitzungs-Preisberechnung ─────────────────────────────────────────────────
 
 export function calculateSessionPrice(params: {
   billingMode: 'time' | 'unit'
@@ -22,7 +22,7 @@ export function calculateSessionPrice(params: {
   }
 }
 
-// ─── Session-Abrechnungsstatus ableiten ──────────────────────────────────────
+// ─── Sitzungs-Abrechnungsstatus ableiten ──────────────────────────────────────
 // WICHTIG: Status wird nie manuell gesetzt, immer aus Allocations berechnet!
 
 export async function deriveSessionBillingStatus(sessionId: string): Promise<string> {
@@ -49,7 +49,7 @@ export async function deriveSessionBillingStatus(sessionId: string): Promise<str
   return allPaid ? 'PAID' : 'BILLED_UNPAID'
 }
 
-// ─── Session-Status neu berechnen und in DB schreiben ────────────────────────
+// ─── Sitzungs-Status neu berechnen und in DB schreiben ────────────────────────
 
 export async function recalcSessionBillingStatus(sessionId: string): Promise<void> {
   const status = await deriveSessionBillingStatus(sessionId)
@@ -82,7 +82,7 @@ export async function createSessionFromAppointment(params: {
     })
     const sessionNumber = count + 1
 
-    // 3. Session erstellen
+    // 3. Sitzung erstellen
     const durationMinutes = appt.startAt && appt.endAt
       ? Math.round((appt.endAt.getTime() - appt.startAt.getTime()) / 60000)
       : appt.type.durationMin ?? 50
@@ -92,7 +92,7 @@ export async function createSessionFromAppointment(params: {
         patientId: appt.patientId,
         therapistId: params.therapistId,
         appointmentId: params.appointmentId,
-        name: `Session-${String(sessionNumber).padStart(3,'0')} · ${appt.startAt.toLocaleDateString('de-AT')}`,
+        name: `Sitzungs-${String(sessionNumber).padStart(3,'0')} · ${appt.startAt.toLocaleDateString('de-AT')}`,
         sessionNumber,
         source: 'APPOINTMENT',
         sessionDate: appt.startAt,
@@ -117,7 +117,7 @@ export async function createSessionFromAppointment(params: {
         eventType: 'session_created',
         relatedEntityType: 'therapy_session',
         relatedEntityId: session.id,
-        title: `Session #${sessionNumber} erstellt`,
+        title: `Sitzung #${sessionNumber} erstellt`,
         summary: `Aus Kalendertermin am ${appt.startAt.toLocaleDateString('de-AT')}`,
         eventDate: new Date(),
         createdByUserId: params.therapistId,
