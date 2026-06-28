@@ -60,7 +60,6 @@ const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: 'dokumente',    label: 'Dokumente',     icon: FileText },
   { key: 'termine',      label: 'Termine',       icon: Calendar },
   { key: 'verlauf',      label: 'Verlauf',       icon: MessageSquare },
-  { key: 'timeline',     label: 'Verlauf',       icon: Clock },
 ]
 
 export function PatientRecordClient({ patient, notes, instruments, currentUserId, role }: any) {
