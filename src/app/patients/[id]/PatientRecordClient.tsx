@@ -10,8 +10,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { searchICD10 } from '@/lib/icd10/codes'
+import { SessionsBillingPanel } from './SessionsBillingPanel'
 
-type Tab = 'stammdaten' | 'screening' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'termine' | 'verlauf'
+type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'timeline'
 
 const GENDER_LABEL: Record<string,string> = { MALE: 'maennlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 
@@ -49,12 +50,16 @@ function fmtBytes(b: number) {
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: 'stammdaten',   label: 'Stammdaten',   icon: User },
+  { key: 'sessions',     label: 'Sessions',      icon: ClipboardList },
   { key: 'screening',    label: 'Screening',     icon: Activity },
+  { key: 'anamnese',     label: 'Anamnese',      icon: FileText },
   { key: 'therapieplan', label: 'Therapieplan',  icon: Target },
   { key: 'diagnosen',    label: 'Diagnosen',     icon: Stethoscope },
+  { key: 'medikamente',  label: 'Medikamente',   icon: Activity },
   { key: 'dokumente',    label: 'Dokumente',     icon: FileText },
   { key: 'termine',      label: 'Termine',       icon: Calendar },
   { key: 'verlauf',      label: 'Verlauf',       icon: MessageSquare },
+  { key: 'timeline',     label: 'Verlauf',       icon: Clock },
 ]
 
 export function PatientRecordClient({ patient, notes, instruments, currentUserId, role }: any) {
@@ -391,6 +396,11 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
               )}
             </div>
           </div>
+        )}
+
+        {/* ── SESSIONS ── */}
+        {tab === 'sessions' && (
+          <SessionsBillingPanel patientId={patient.id} role={role} />
         )}
 
         {/* ── SCREENING ── */}

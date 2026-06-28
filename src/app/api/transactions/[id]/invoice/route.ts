@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { renderInvoice, getDefaultTemplate } from '@/lib/invoice/template'
+import { getBranding } from '@/lib/branding'
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const body = await req.json()
+
+  const tx = await prisma.transaction.findUnique({
+    where: { id: params.id },
+    include: {
+      lineItems: { orderBy: { sortOrder: 'asc' } },
+      patient: { select: { firstName: true, lastName: true } },
+    },
+  })
+  if (!tx) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const branding = await getBranding()
+  const template = await getDefaultTemplate()
+  const fmtEUR = (n: number | string) => parseFloat(n.toString()).toFixed(2).replace('.', ',')
+  const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
+
+  const invoiceData = {
+    praxis_name: branding.praxisName,
+    praxis_slogan: branding.slogan ?? '',
+    praxis_address: branding.address ?? '',
+    praxis_email: branding.contactEmail ?? '',
+    praxis_phone: branding.contactPhone ?? '',
+    logo_base64: branding.logoBase64 ?? '',
+    logo_mime: branding.logoMimeType ?? '',
+    primary_color: branding.colorPrimary,
+    reference_number: tx.referenceNumber,
+    transaction_date: fmtDate(tx.transactionDate),
+    due_date: fmtDate(new Date(tx.transactionDate.getTime() + 14 * 24 * 3600000)),
+    payer_name: tx.payerName,
+    payer_address: tx.payerAddress ?? '',
+    amount_net: fmtEUR(tx.amountNet),
+    vat_rate: (parseFloat(tx.vatRate.toString()) * 100).toFixed(0),
+    vat_amount: fmtEUR(tx.vatAmount),
+    amount_gross: fmtEUR(tx.amountGross),
+    is_paid: tx.paymentStatus === 'PAID',
+    vat_enabled: parseFloat(tx.vatRate.toString()) > 0,
+    payment_info: body.paymentInfo ?? '',
+    notes: tx.notes ?? '',
+    line_items: tx.lineItems.map(li => ({
+      date: li.lineDate ? fmtDate(li.lineDate) : '',
+      description: li.description,
+      service_label: li.serviceLabel ?? '',
+      quantity: parseFloat(li.quantity.toString()).toString(),
+      unit_price_net: fmtEUR(li.unitPriceNet),
+      amount_net: fmtEUR(li.amountNet),
+    })),
+  }
+
+  const html = renderInvoice(template, invoiceData)
+
+  // Save invoice document
+  const invoiceDoc = await prisma.invoiceDocument.create({
+    data: {
+      transactionId: tx.id,
+      documentType: 'INVOICE_PDF',
+      format: 'html',
+      anonymized: body.anonymized ?? false,
+      data: Buffer.from(html, 'utf8'),
+      mimeType: 'text/html',
+    },
+  })
+
+  return NextResponse.json({ id: invoiceDoc.id, html })
+}
+
+export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const docs = await prisma.invoiceDocument.findMany({
+    where: { transactionId: params.id, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+  })
+  return NextResponse.json(docs)
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { searchParams } = new URL(req.url)
+  const docId = searchParams.get('docId')
+  if (!docId) return NextResponse.json({ error: 'docId required' }, { status: 400 })
+  await prisma.invoiceDocument.update({ where: { id: docId }, data: { deletedAt: new Date() } })
+  return NextResponse.json({ ok: true })
+}
