@@ -59,6 +59,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const html = renderInvoice(template, invoiceData)
 
   // Save invoice document
+  // Wrap with print styles for PDF via browser print
+  const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>@media print { @page { margin: 0; } body { margin: 1cm; } .no-print { display: none; } }</style>
+</head><body>
+<div class="no-print" style="position:fixed;top:10px;right:10px;z-index:999">
+  <button onclick="window.print()" style="padding:8px 16px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">
+    Als PDF speichern / Drucken
+  </button>
+</div>
+${html}</body></html>`
+
   const invoiceDoc = await prisma.invoiceDocument.create({
     data: {
       transactionId: tx.id,
@@ -70,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   })
 
-  return NextResponse.json({ id: invoiceDoc.id, html })
+  return NextResponse.json({ id: invoiceDoc.id, html, printHtml: printHtml ?? html })
 }
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {

@@ -247,9 +247,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                       <td>{fmtMins(s.durationMinutes)}</td>
                       <td style={{fontWeight:600,color:'var(--color-primary)'}}>{fmtEUR(s.calculatedPriceNet)}</td>
                       <td><span className={'badge '+BILLING_STATUS_CLASS[s.billingStatus]}>{BILLING_STATUS_LABEL[s.billingStatus]}</span></td>
-                      <td>
+                      <td style={{display:'flex',gap:4,alignItems:'center'}}>
                         {s.protocols?.some((p:any) => p.type === 'SHORT') &&
                           <span className="badge badge-indigo" style={{fontSize:10}}>Protokoll</span>}
+                        {s._count?.audioRecordings > 0 &&
+                          <span className="badge badge-blue" style={{fontSize:10}}>🎙 Audio</span>}
                       </td>
                     </tr>
                   ))}

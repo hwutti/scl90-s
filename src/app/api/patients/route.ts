@@ -62,9 +62,13 @@ export async function POST(req: NextRequest) {
     patientUserId = patientUser.id
   }
 
+  const patientCount = await prisma.patient.count()
+  const codeName = 'KL-' + String(patientCount + 1).padStart(3, '0')
+
   const patient = await prisma.patient.create({
     data: {
       firstName, lastName, dob,
+      codeName,
       gender: gender as Gender,
       svnr: svnr || null,
       phone: phone || null,

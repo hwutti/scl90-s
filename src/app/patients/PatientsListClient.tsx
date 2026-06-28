@@ -206,6 +206,9 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                       </p>
                       <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         {age} J. · {GENDER_SHORT[p.gender]}
+                        {(p as any).codeName && (
+                          <span className="ml-2 font-mono opacity-60">{(p as any).codeName}</span>
+                        )}
                         {p.patientUser && (
                           <span className="ml-2 text-[var(--color-primary)] font-mono">PIN {p.patientUser.pin}</span>
                         )}

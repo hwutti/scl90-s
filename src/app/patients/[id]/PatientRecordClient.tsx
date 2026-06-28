@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils'
 import { searchICD10 } from '@/lib/icd10/codes'
 import { SessionsBillingPanel } from './SessionsBillingPanel'
+import { PatientStatsPanel } from './PatientStatsPanel'
 
 type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'timeline'
 
@@ -566,6 +567,11 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
           </div>
         )}
 
+        {/* ── STATISTIKEN ── */}
+        {tab === 'statistik' && (
+          <PatientStatsPanel patientId={patient.id} />
+        )}
+
         {/* ── TERMINE ── */}
         {tab === 'termine' && (
           <div className="card" style={{ padding: 24 }}>
@@ -706,7 +712,10 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                         onMouseEnter={e => (e.currentTarget as any).style.background='var(--surface-hover)'}
                         onMouseLeave={e => (e.currentTarget as any).style.background=''}>
                         <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', minWidth: 50 }}>{r.code}</span>
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{r.label}</span>
+                        <div>
+                          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{r.label}</span>
+                          {r.definition && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0', lineHeight: 1.4 }}>{r.definition}</p>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -714,7 +723,10 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                 {selectedCode && (
                   <div style={{ marginTop: 6, padding: '8px 12px', background: 'var(--color-primary-light)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)' }}>{selectedCode.code}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{selectedCode.label}</span>
+                    <div>
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{selectedCode.label}</span>
+                      {selectedCode.definition && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{selectedCode.definition}</p>}
+                    </div>
                     <button onClick={() => { setSelectedCode(null); setDiagSearch('') }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X style={{ width: 13, height: 13 }} /></button>
                   </div>
                 )}

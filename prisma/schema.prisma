@@ -221,6 +221,8 @@ model User {
   googleCalendar        GoogleCalendarConnection? @relation("UserGoogleCalendar")
   videoCalls            VideoCall[]             @relation("UserVideoCalls")
   exportJobs            ExportJob[]             @relation("UserExportJobs")
+  supervisionEntriesAs  SupervisionEntry[]      @relation("SuperviseeEntries")
+  supervisorEntries     SupervisionEntry[]      @relation("SupervisorEntries")
 }
 
 model Account {
@@ -278,6 +280,10 @@ model Patient {
   patientUserId   String?   @unique  // falls Patient selbst einen Login hat (PIN)
   patientUser     User?     @relation("PatientUser", fields: [patientUserId], references: [id])
 
+  // Anonymisierung
+  codeName        String?   // z.B. "KL-001" für anonymisierten Export
+  codeNameAuto    Boolean   @default(true)  // automatisch generiert
+
   // Status
   active          Boolean   @default(true)
   deletedAt       DateTime? // soft delete (Aufbewahrungspflicht 10 Jahre §16a)
@@ -308,6 +314,7 @@ model Patient {
   timelineEvents        ProfileTimelineEvent[]  @relation("PatientTimeline")
   travelLogs            TravelLogEntry[]        @relation("PatientTravelLog")
   videoCalls            VideoCall[]             @relation("PatientVideoCalls")
+  ratings               SessionRating[]         @relation("PatientRatings")
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -993,8 +1000,11 @@ model TherapySession {
   // Relationen
   txAllocations         TxSessionAllocation[]
   attachments           SessionAttachment[]
-  assessmentLinks       SessionAssessmentLink[]  // verknüpfte Screenings
+  assessmentLinks       SessionAssessmentLink[]
   travelLogEntry        TravelLogEntry?
+  audioRecordings       AudioRecording[]        @relation("SessionAudio")
+  supervisionEntries    SupervisionEntry[]      @relation("SessionSupervision")
+  ratings               SessionRating[]         @relation("SessionRatings")
 
   @@index([patientId])
   @@index([therapistId])
@@ -1398,4 +1408,69 @@ model ExportJob {
   completedAt       DateTime?
 
   @@index([createdByUserId])
+}
+
+// ─── Audio-Aufnahmen in Sitzungen ────────────────────────────────────────────
+
+model AudioRecording {
+  id          String         @id @default(cuid())
+  sessionId   String
+  session     TherapySession @relation("SessionAudio", fields: [sessionId], references: [id], onDelete: Cascade)
+  fileName    String
+  mimeType    String         @default("audio/webm")
+  size        Int
+  durationSec Int?
+  data        Bytes
+  encrypted   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  createdBy   String
+
+  @@index([sessionId])
+}
+
+// ─── Supervision ─────────────────────────────────────────────────────────────
+
+model SupervisionEntry {
+  id              String         @id @default(cuid())
+  superviseeId    String         // User (Therapeut in Ausbildung)
+  supervisee      User           @relation("SuperviseeEntries", fields: [superviseeId], references: [id])
+  supervisorId    String?        // User (Supervisor)
+  supervisor      User?          @relation("SupervisorEntries", fields: [supervisorId], references: [id])
+  sessionId       String?        // verknüpfte Sitzung
+  session         TherapySession? @relation("SessionSupervision", fields: [sessionId], references: [id])
+  date            DateTime
+  durationMinutes Int
+  supervisionType String         @default("INDIVIDUAL") // INDIVIDUAL | GROUP | SELF
+  content         String?        // Inhalt / Notizen
+  fachspezifikum  Boolean        @default(false) // zählt für Fachspezifikum
+  approved        Boolean        @default(false)
+  approvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([superviseeId])
+  @@index([date])
+}
+
+// ─── Patientenbewertungen / Verlaufsstatistik ────────────────────────────────
+
+model SessionRating {
+  id                  String         @id @default(cuid())
+  sessionId           String
+  session             TherapySession @relation("SessionRatings", fields: [sessionId], references: [id], onDelete: Cascade)
+  patientId           String
+  patient             Patient        @relation("PatientRatings", fields: [patientId], references: [id])
+  ratingDate          DateTime
+  // Skalen 1-10
+  wellbeing           Int?           // Wohlbefinden
+  anxiety             Int?           // Angst (invertiert)
+  depression          Int?           // Depressivität (invertiert)
+  sessionSatisfaction Int?           // Zufriedenheit mit Sitzung
+  goalProgress        Int?           // Fortschritt Therapieziele
+  customValues        String?        // JSON für eigene Skalen
+  note                String?
+  createdAt           DateTime       @default(now())
+
+  @@index([patientId])
+  @@index([sessionId])
 }
