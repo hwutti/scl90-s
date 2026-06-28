@@ -419,7 +419,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                   {patient.assessments?.map((a: any) => {
                     const gsi = a.result?.scores?.GSI
                     return (
-                      <tr key={a.id} onClick={() => router.push(a.status==='IN_PROGRESS'?'/assessment/'+a.id:'/session/'+a.sessionId+'/results')}>
+                      <tr key={a.id} onClick={() => router.push(a.status==='IN_PROGRESS'?'/assessment/'+a.id:'/assessment/'+a.id+'/results')}>
                         <td className="primary">{a.session?.occasion||'—'}</td>
                         <td><span className={a.status==='SCORED'?'badge badge-green':a.status==='IN_PROGRESS'?'badge badge-blue':'badge badge-gray'}>{a.status}</span></td>
                         <td>{fmtDate(a.createdAt)}</td>
