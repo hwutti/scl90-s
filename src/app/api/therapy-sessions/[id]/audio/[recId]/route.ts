@@ -10,7 +10,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string; re
     where: { id: params.recId, sessionId: params.id },
   })
   if (!rec) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return new NextResponse(rec.data, {
+  return new NextResponse(rec.data as unknown as BodyInit, {
     headers: {
       'Content-Type': rec.mimeType,
       'Content-Disposition': `attachment; filename="${rec.fileName}"`,
