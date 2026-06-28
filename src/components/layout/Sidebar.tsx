@@ -9,6 +9,7 @@ import { useTheme } from '@/app/providers'
 import type { BrandingConfig } from '@/lib/branding'
 
 const NAV_ITEMS = [
+  { href: '/dashboard', label: 'Dashboard', icon: Activity, roles: ['ADMIN','THERAPIST'] },
   { href: '/patients', label: 'Patienten', icon: Users, roles: ['ADMIN','THERAPIST'] },
   { href: '/calendar', label: 'Kalender', icon: CalendarDays, roles: ['ADMIN','THERAPIST'],
     sub: [
