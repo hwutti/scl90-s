@@ -89,7 +89,7 @@ export function ProtocolEditor({ sessionId, type, readOnly = false, role }: Prop
       >
         <FileText style={{ width: 14, height: 14, stroke: color, fill: 'none', flexShrink: 0 }} />
         <span style={{ fontSize: 13, fontWeight: 600, color, flex: 1 }}>{label}</span>
-        {isLong && <Lock style={{ width: 12, height: 12, stroke: color, fill: 'none' }} title="Nur für Therapeut*in sichtbar" />}
+        {isLong && <span title="Nur für Therapeut*in sichtbar" style={{ display: 'flex' }}><Lock style={{ width: 12, height: 12, stroke: color, fill: 'none' }} /></span>}
         {saved && <CheckCircle style={{ width: 13, height: 13, stroke: 'var(--green)', fill: 'none' }} />}
         {collapsed
           ? <ChevronDown style={{ width: 14, height: 14, stroke: color }} />
