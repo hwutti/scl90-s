@@ -125,8 +125,14 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
   })
   const [telemetry, setTelemetry] = useState(false)
 
-  // Visuelle Einstellungen + Telemetrie beim Laden aus DB holen
+  // Visuelle Einstellungen, Telemetrie + Anamnese-Vorlage beim Laden aus DB holen
   useEffect(() => {
+    fetch('/api/settings/anamnesis-template').then(r => r.json()).then(d => {
+      if (Array.isArray(d) && d.length > 0) setAnamnesisTemplate(d)
+    }).catch(() => {})
+    fetch('/api/settings/session-templates').then(r => r.json()).then(d => {
+      if (Array.isArray(d)) setSessionTemplates(d)
+    }).catch(() => {})
     fetch('/api/settings/visual').then(r => r.json()).then(d => {
       if (d && !d.error) setVisual({
         theme: d.theme ?? 'light',
@@ -148,6 +154,12 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
   // Rechnungsvorlagen
   const [showNewTemplate, setShowNewTemplate] = useState(false)
   const [templateForm, setTemplateForm] = useState({ name: '', description: '', htmlContent: '', isDefault: false })
+
+  // SessionTemplates
+  const [sessionTemplates, setSessionTemplates] = useState<any[]>([])
+  const [showSessionTplForm, setShowSessionTplForm] = useState(false)
+  const [sessionTplForm, setSessionTplForm] = useState({ name: '', isDefault: false })
+  const [savingSessionTpl, setSavingSessionTpl] = useState(false)
 
   // txTypes
   const [txTypeForm, setTxTypeForm] = useState({ name: '', direction: 'income' })
@@ -372,10 +384,21 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                     </button>
                   </div>
                 ))}
-                <button onClick={() => setAnamnesisTemplate(t => [...t, { title: '', prefilledText: '' }])}
-                  className="btn-secondary" style={{ fontSize: 12, alignSelf: 'flex-start' }}>
-                  <Plus style={{ width: 12, height: 12 }} /> Feld hinzufügen
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setAnamnesisTemplate(t => [...t, { title: '', prefilledText: '' }])}
+                    className="btn-secondary" style={{ fontSize: 12 }}>
+                    <Plus style={{ width: 12, height: 12 }} /> Feld hinzufügen
+                  </button>
+                  <button onClick={async () => {
+                    await fetch('/api/settings/anamnesis-template', {
+                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ fields: anamnesisTemplate }),
+                    })
+                    setSaved(true); setTimeout(() => setSaved(false), 2500)
+                  }} className="btn-primary" style={{ fontSize: 12 }}>
+                    <Save style={{ width: 12, height: 12 }} /> Vorlage speichern
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -404,6 +427,62 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
             <Toggle label="Zusätzliche Leistungen aktivieren" value={sessionSettings.extraServices}
               onChange={v => setSessionSettings(s => ({ ...s, extraServices: v }))}
               description="Mit dem zusätzlichen Leistungen-Modus ist es möglich, bei Sessions weitere Leistungen (z.B. Diagnose, Testverfahren) hinzuzufügen." />
+
+            <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
+
+            {/* Sessionvorlagen */}
+            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sessionvorlagen</h4>
+            {sessionTemplates.map((t: any) => (
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{t.name}</span>
+                  {t.isDefault && <span className="badge badge-green" style={{ marginLeft: 8, fontSize: 10 }}>Standard</span>}
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                    Kurzprotokoll, Langprotokoll
+                  </span>
+                </div>
+                <button onClick={async () => {
+                  await fetch(`/api/settings/session-templates/${t.id}`, { method: 'DELETE' })
+                  setSessionTemplates(prev => prev.filter(x => x.id !== t.id))
+                }} className="btn-ghost" style={{ padding: '2px 4px', color: 'var(--red)' }}>
+                  <Trash2 style={{ width: 12, height: 12 }} />
+                </button>
+              </div>
+            ))}
+            {!showSessionTplForm ? (
+              <button onClick={() => setShowSessionTplForm(true)} className="btn-secondary" style={{ fontSize: 12, marginTop: 8, alignSelf: 'flex-start' }}>
+                <Plus style={{ width: 12, height: 12 }} /> Sessionvorlage hinzufügen
+              </button>
+            ) : (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
+                <div><label className="label">Name der Vorlage *</label>
+                  <input className="input" placeholder="z.B. Standardsession, Erstgespräch" value={sessionTplForm.name}
+                    onChange={e => setSessionTplForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={sessionTplForm.isDefault}
+                    onChange={e => setSessionTplForm(f => ({ ...f, isDefault: e.target.checked }))} />
+                  Als Standard-Sessionvorlage setzen
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setShowSessionTplForm(false)} className="btn-secondary">Abbrechen</button>
+                  <button onClick={async () => {
+                    if (!sessionTplForm.name) return
+                    setSavingSessionTpl(true)
+                    const res = await fetch('/api/settings/session-templates', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(sessionTplForm),
+                    })
+                    const tpl = await res.json()
+                    setSessionTemplates(prev => [...prev, tpl])
+                    setSavingSessionTpl(false)
+                    setShowSessionTplForm(false)
+                    setSessionTplForm({ name: '', isDefault: false })
+                  }} disabled={savingSessionTpl || !sessionTplForm.name} className="btn-primary" style={{ fontSize: 12 }}>
+                    {savingSessionTpl ? 'Speichern...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 

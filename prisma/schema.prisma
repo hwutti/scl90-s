@@ -278,6 +278,14 @@ model Patient {
   billRecipientAddress String?   // Adresszeile 1
   billRecipientCity    String?   // PLZ + Stadt
 
+  // Abrechnungs-Einstellungen pro Profil (KDS-SCR-06A)
+  defaultBillingMode     String?   @default("time")  // "time" | "unit"
+  defaultUnitDuration    Int?      @default(50)       // Minuten pro Einheit
+  defaultUnitPriceNet    Decimal?  @db.Decimal(10,2)  // Kosten pro Einheit
+  defaultHourlyRateNet   Decimal?  @db.Decimal(10,2)  // Stundensatz
+  defaultInvoiceTemplate String?   // invoiceTemplateId
+  sessionStartNumber     Int       @default(0)        // Startzahl für Sessionzähler
+
   // Beziehungen zu Users
   createdByUserId String
   createdBy       User      @relation("CreatedByUser", fields: [createdByUserId], references: [id])
@@ -544,6 +552,7 @@ model PraxisConfig {
   address         String?
 
   bundesland      String   @default("Kärnten")  // für Schulferien
+  anamnesisTemplate String? // JSON: [{title, prefilledText}]
   updatedAt       DateTime @updatedAt
   updatedBy       String?
 }
@@ -977,6 +986,7 @@ model TherapySession {
   // Identifikation
   name                  String              // auto: "CodeName-001 - 27.06.2026", editierbar
   sessionNumber         Int                 // laufende Nummer pro Patient
+  referenceNumber       String?             // Referenznummer für Sessionkopf (z.B. "S-2026-001")
   codeName              String?             // anonymisierter Name aus Patientenprofil
   source                SessionSource       @default(MANUAL)
 

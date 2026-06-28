@@ -95,6 +95,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(billRecipientName    !== undefined && { billRecipientName }),
       ...(billRecipientAddress !== undefined && { billRecipientAddress }),
       ...(billRecipientCity    !== undefined && { billRecipientCity }),
+      ...(body.defaultBillingMode   !== undefined && { defaultBillingMode: body.defaultBillingMode }),
+      ...(body.defaultUnitDuration  !== undefined && { defaultUnitDuration: parseInt(body.defaultUnitDuration) }),
+      ...(body.defaultUnitPriceNet  !== undefined && { defaultUnitPriceNet: parseFloat(body.defaultUnitPriceNet) }),
+      ...(body.defaultHourlyRateNet !== undefined && { defaultHourlyRateNet: parseFloat(body.defaultHourlyRateNet) }),
+      ...(body.sessionStartNumber   !== undefined && { sessionStartNumber: parseInt(body.sessionStartNumber) }),
     },
   })
 

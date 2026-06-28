@@ -314,6 +314,11 @@ export function SessionDetailPanel({
                 <span className={`badge ${BILLING_STATUS_CLASS[session.billingStatus]}`}>
                   {BILLING_STATUS_LABEL[session.billingStatus]}
                 </span>
+                {session.referenceNumber && (
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', background: 'var(--surface-panel)', padding: '1px 6px', borderRadius: 4 }}>
+                    Ref: {session.referenceNumber}
+                  </span>
+                )}
                 {session.protocols?.some((p: any) => p.type === 'SHORT') && (
                   <span className="badge badge-indigo" style={{ fontSize: 10 }}>📄 Protokoll</span>
                 )}

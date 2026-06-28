@@ -72,6 +72,11 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
     firstName: '', lastName: '', dob: '', gender: 'MALE',
     phone: '', email: '', insuranceProvider: '', referralSource: '',
     createLogin: true,
+    // Abrechnungs-Einstellungen (KDS-SCR-18)
+    defaultBillingMode: 'time',
+    defaultUnitDuration: 50,
+    defaultUnitPriceNet: '',
+    sessionStartNumber: 0,
   })
 
   const filtered = patients.filter(p =>
@@ -348,6 +353,37 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                   <label className="label">Zuweiser</label>
                   <input className="input" placeholder="Dr. Mustermann"
                     value={form.referralSource} onChange={e => setForm(f => ({...f, referralSource: e.target.value}))} />
+                </div>
+              </div>
+
+              {/* Abrechnung */}
+              <div className="border-t border-[var(--border)] pt-3">
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Abrechnung</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Einheitenmodus</label>
+                    <select className="input" value={form.defaultBillingMode}
+                      onChange={e => setForm(f => ({...f, defaultBillingMode: e.target.value}))}>
+                      <option value="time">Zeitmodus (Minuten)</option>
+                      <option value="unit">Einheitenmodus (Einheiten)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Einheitendauer (Min.)</label>
+                    <input type="number" className="input" value={form.defaultUnitDuration}
+                      onChange={e => setForm(f => ({...f, defaultUnitDuration: +e.target.value}))} />
+                  </div>
+                  <div>
+                    <label className="label">Kosten/Einheit (€)</label>
+                    <input type="number" step="0.01" className="input" placeholder="z.B. 80.00"
+                      value={form.defaultUnitPriceNet}
+                      onChange={e => setForm(f => ({...f, defaultUnitPriceNet: e.target.value}))} />
+                  </div>
+                  <div>
+                    <label className="label">Startzahl Sessionzähler</label>
+                    <input type="number" min="0" className="input" value={form.sessionStartNumber}
+                      onChange={e => setForm(f => ({...f, sessionStartNumber: +e.target.value}))} />
+                  </div>
                 </div>
               </div>
 

@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { firstName, lastName, dob, gender, svnr, phone, email,
-          insuranceProvider, referralSource, createLogin } = body
+          insuranceProvider, referralSource, createLogin,
+          defaultBillingMode, defaultUnitDuration, defaultUnitPriceNet,
+          sessionStartNumber } = body
 
   if (!firstName || !lastName || !dob || !gender) {
     return NextResponse.json({ error: 'Pflichtfelder fehlen' }, { status: 400 })
@@ -75,6 +77,10 @@ export async function POST(req: NextRequest) {
       email: email || null,
       insuranceProvider: insuranceProvider || null,
       referralSource: referralSource || null,
+      defaultBillingMode: defaultBillingMode || 'time',
+      defaultUnitDuration: defaultUnitDuration ? parseInt(defaultUnitDuration) : 50,
+      defaultUnitPriceNet: defaultUnitPriceNet ? parseFloat(defaultUnitPriceNet) : null,
+      sessionStartNumber: sessionStartNumber ? parseInt(sessionStartNumber) : 0,
       createdByUserId: userId,
       patientUserId: patientUserId,
       therapists: { create: { therapistId: userId, isPrimary: true } },
@@ -87,6 +93,48 @@ export async function POST(req: NextRequest) {
     data: { userId, patientId: patient.id, action: 'PATIENT_CREATED',
             details: { firstName, lastName } },
   }).catch(() => {})
+
+  // Leere Anamnese nach Vorlage anlegen (KDS-SCR-18)
+  try {
+    const config = await prisma.praxisConfig.findFirst({ where: { key: 'anamnesis_template' } })
+    const fields = config?.anamnesisTemplate
+      ? JSON.parse(config.anamnesisTemplate as string)
+      : [
+          { title: 'Somatische Anamnese', prefilledText: '' },
+          { title: 'Psychische Anamnese', prefilledText: '' },
+          { title: 'Sozialanamnese', prefilledText: '' },
+          { title: 'Biographie und Lebenssituation', prefilledText: '' },
+        ]
+
+    await prisma.anamnesis.create({
+      data: {
+        patientId: patient.id,
+        updatedByUserId: userId,
+        sections: {
+          create: fields.map((f: any, i: number) => ({
+            title: f.title,
+            content: f.prefilledText || '',
+            sortOrder: i,
+          })),
+        },
+      },
+    })
+  } catch (_) {}
+
+  // Timeline-Event: Profil erstellt
+  try {
+    await prisma.profileTimelineEvent.create({
+      data: {
+        patientId: patient.id,
+        eventType: 'profile_created',
+        relatedEntityType: 'patient',
+        relatedEntityId: patient.id,
+        title: `Profil: ${firstName} ${lastName} erstellt`,
+        eventDate: new Date(),
+        createdByUserId: userId,
+      },
+    })
+  } catch (_) {}
 
   return NextResponse.json({ ...patient, generatedPin: pin })
 }
