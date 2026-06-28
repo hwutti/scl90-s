@@ -408,6 +408,7 @@ model Assessment {
   answers         Answer[]
   result          AssessmentResult?
   auditLogs       AuditLog[]
+  sessionLinks    SessionAssessmentLink[]
 
   @@index([patientId])
   @@index([instrumentId])
@@ -638,6 +639,8 @@ model Appointment {
 
   notifications   Notification[]
   waitlistEntries WaitlistEntry[]
+  therapySession  TherapySession?  @relation("AppointmentSession")
+  videoCall       VideoCall?       @relation("AppointmentVideoCall")
 
   @@index([therapistId])
   @@index([patientId])
