@@ -142,8 +142,8 @@ async function main() {
       praxisName: 'Psychotherapeutische Praxis',
       slogan: 'KDS – Klinisches Dokumentationssystem',
       colorPrimary: '#4f46e5',
-      colorPrimaryLight: '#dcfce7',
-      colorAccent: '#14532d',
+      colorPrimaryLight: '#eef2ff',
+      colorAccent: '#4338ca',
       imprintHtml: '<p>Bitte Impressum im Admin-Bereich konfigurieren.</p>',
     },
   })
@@ -153,7 +153,7 @@ async function main() {
   // ─── Standard-Termintypen ──────────────────────────────────────────────────
   const appointmentTypes = [
     { name: 'Erstgespräch',        color: '#7c3aed', durationMin: 60,  description: 'Erstkontakt und Anamnese' },
-    { name: 'Einzeltherapie',      color: '#166534', durationMin: 50,  description: 'Reguläre Therapiestunde' },
+    { name: 'Einzeltherapie',      color: '#4f46e5', durationMin: 50,  description: 'Reguläre Therapiestunde' },
     { name: 'Krisenintervention',  color: '#dc2626', durationMin: 60,  description: 'Akute Krisenunterstützung' },
     { name: 'Gruppentherapie',     color: '#0369a1', durationMin: 90,  description: 'Gruppentherapeutische Sitzung' },
     { name: 'Supervision',         color: '#92400e', durationMin: 60,  description: 'Fachliche Supervision', isBlocker: true },
