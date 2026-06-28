@@ -2,22 +2,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  User, FileText, ClipboardList, MessageSquare, ChevronLeft,
-  Plus, Download, AlertCircle, CheckCircle, Clock, Edit3, Save, X
+  User, FileText, ClipboardList, MessageSquare, ChevronLeft, Plus,
+  AlertCircle, Edit3, Save, X, Camera, Calendar, Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Tab = 'stammdaten' | 'anamnese' | 'tests' | 'notizen'
-
-const GENDER_LABEL: Record<string, string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
-const NOTE_TYPE_LABEL: Record<string, string> = {
-  PROGRESS: 'Verlaufsnotiz', ANAMNESIS: 'Anamnese',
-  GOAL: 'Therapieziel', INTERVENTION: 'Intervention', OTHER: 'Sonstiges',
-}
-const STATUS_LABEL: Record<string, string> = {
-  ASSIGNED: 'Zugewiesen', IN_PROGRESS: 'Läuft', COMPLETED: 'Abgeschlossen',
-  SCORED: 'Ausgewertet', LOCKED: 'Gesperrt',
-}
+type Tab = 'stammdaten' | 'screening' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'termine' | 'verlauf'
+const GENDER_LABEL: Record<string,string> = { MALE: 'maennlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 
 function calcAge(dob: string) {
   const d = new Date(dob + 'T00:00:00')
@@ -26,10 +17,19 @@ function calcAge(dob: string) {
   if (m < 0 || (m === 0 && new Date().getDate() < d.getDate())) age--
   return age
 }
-
-function formatDate(s: string | Date) {
+function fmtDate(s: string | Date) {
   return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(s))
 }
+
+const TABS: { key: Tab; label: string; icon: any; count?: (p: any) => number }[] = [
+  { key: 'stammdaten',  label: 'Stammdaten',  icon: User },
+  { key: 'screening',   label: 'Screening',   icon: Activity, count: p => p.assessments?.length ?? 0 },
+  { key: 'therapieplan',label: 'Therapieplan',icon: ClipboardList },
+  { key: 'diagnosen',   label: 'Diagnosen',   icon: FileText },
+  { key: 'dokumente',   label: 'Dokumente',   icon: FileText },
+  { key: 'termine',     label: 'Termine',     icon: Calendar },
+  { key: 'verlauf',     label: 'Verlauf',     icon: MessageSquare, count: p => p.sessionNotes?.length ?? 0 },
+]
 
 export function PatientRecordClient({ patient, notes, instruments, currentUserId, role }: any) {
   const router = useRouter()
@@ -48,424 +48,373 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     notes: patient.record?.notes ?? '',
   })
   const [savingRecord, setSavingRecord] = useState(false)
-  const [newNote, setNewNote] = useState(false)
   const [noteForm, setNoteForm] = useState({ date: new Date().toISOString().slice(0,10), noteType: 'PROGRESS', content: '' })
+  const [newNote, setNewNote] = useState(false)
   const [savingNote, setSavingNote] = useState(false)
-  const [newAssessment, setNewAssessment] = useState(false)
   const [assessForm, setAssessForm] = useState({ instrumentId: instruments[0]?.id ?? '', occasion: '' })
+  const [newAssessment, setNewAssessment] = useState(false)
   const [savingAssessment, setSavingAssessment] = useState(false)
 
-  const patientName = `${patient.firstName} ${patient.lastName}`
   const age = calcAge(patient.dob)
-  const latestScored = patient.assessments.find((a: any) => a.status === 'SCORED' || a.status === 'LOCKED')
+  const latestScored = patient.assessments?.find((a: any) => a.status === 'SCORED' || a.status === 'LOCKED')
   const latestScores = latestScored?.result?.scores as any
   const isClinical = latestScored?.result?.isClinicalCase
+  const gsiT = latestScores?.GSI?.tScore
 
   async function saveRecord() {
     setSavingRecord(true)
-    await fetch(`/api/patients/${patient.id}/record`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(recordForm),
-    })
-    setSavingRecord(false)
-    setEditRecord(false)
-    router.refresh()
+    await fetch('/api/patients/' + patient.id + '/record', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(recordForm) })
+    setSavingRecord(false); setEditRecord(false); router.refresh()
   }
-
   async function addNote() {
     setSavingNote(true)
-    await fetch(`/api/patients/${patient.id}/notes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(noteForm),
-    })
-    setSavingNote(false)
-    setNewNote(false)
-    setNoteForm({ date: new Date().toISOString().slice(0,10), noteType: 'PROGRESS', content: '' })
-    router.refresh()
+    await fetch('/api/patients/' + patient.id + '/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(noteForm) })
+    setSavingNote(false); setNewNote(false); router.refresh()
   }
-
-  async function startAssessment() {
+  async function addAssessment() {
     setSavingAssessment(true)
-    const res = await fetch(`/api/patients/${patient.id}/assessments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(assessForm),
-    })
+    const res = await fetch('/api/assessments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: patient.id, ...assessForm }) })
     const data = await res.json()
-    setSavingAssessment(false)
-    setNewAssessment(false)
-    if (data.id) router.push(`/assessment/${data.id}`)
+    setSavingAssessment(false); setNewAssessment(false)
+    if (data.id) router.push('/assessment/' + data.id)
   }
-
-  const tabs = [
-    { id: 'stammdaten', label: 'Stammdaten', icon: User },
-    { id: 'anamnese',   label: 'Anamnese & Diagnose', icon: FileText },
-    { id: 'tests',      label: `Tests (${patient.assessments.length})`, icon: ClipboardList },
-    { id: 'notizen',    label: `Verlaufsnotizen (${notes.length})`, icon: MessageSquare },
-  ]
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-400">
-        <button onClick={() => router.push('/patients')} className="hover:text-indigo-600 transition-colors flex items-center gap-1">
-          <ChevronLeft className="w-3.5 h-3.5" /> Patienten
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--surface-page)' }}>
+      {/* Topbar */}
+      <div className="topbar">
+        <button onClick={() => router.push('/patients')} className="btn-ghost" style={{ padding: '6px 8px' }}>
+          <ChevronLeft style={{ width: 16, height: 16 }} />
         </button>
-        <span>/</span>
-        <span className="text-slate-600 font-medium">{patientName}</span>
-      </div>
-
-      {/* Header-Karte */}
-      <div className="card p-5">
-        <div className="flex items-start gap-5">
-          {/* Avatar */}
-          <div className={cn(
-            'w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold shrink-0',
-            isClinical === true  ? 'bg-red-100 text-red-700'
-            : isClinical === false ? 'bg-emerald-100 text-emerald-700'
-            : 'bg-indigo-100 text-indigo-700'
-          )}>
-            {patient.firstName[0]}{patient.lastName[0]}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-bold text-slate-800">{patient.lastName}, {patient.firstName}</h1>
-              {isClinical === true  && <span className="badge-red flex items-center gap-1"><AlertCircle className="w-3 h-3" /> klinisch auffällig</span>}
-              {isClinical === false && <span className="badge-green flex items-center gap-1"><CheckCircle className="w-3 h-3" /> unauffällig</span>}
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-slate-500">
-              <span>{GENDER_LABEL[patient.gender]}</span>
-              <span>{age} Jahre · geb. {formatDate(patient.dob + 'T00:00:00')}</span>
-              {patient.patientUser && (
-                <span className="text-indigo-500 font-mono">PIN: {patient.patientUser.pin}</span>
-              )}
-              {patient.therapists?.[0] && (
-                <span>Behandler: {patient.therapists[0].therapist.name}</span>
-              )}
-            </div>
-          </div>
-
-          {/* GSI-Wert */}
-          {latestScores?.gsiT && (
-            <div className={cn(
-              'text-center px-4 py-3 rounded-xl shrink-0',
-              isClinical ? 'bg-red-50' : 'bg-emerald-50'
-            )}>
-              <p className={cn('text-2xl font-bold tabular-nums', isClinical ? 'text-red-600' : 'text-emerald-600')}>
-                T={Math.round(latestScores.gsiT)}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5">GSI aktuell</p>
-            </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ color: 'var(--color-primary)', cursor: 'pointer' }} onClick={() => router.push('/patients')}>Patienten</span>
+          <span>/</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{patient.lastName}, {patient.firstName}</span>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {role !== 'PATIENT' && (
+            <button onClick={() => setNewAssessment(true)} className="btn-primary">
+              <Plus style={{ width: 14, height: 14 }} /> Neuer Test
+            </button>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-slate-200 flex gap-1">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as Tab)}
-            className={cn(
-              'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              tab === t.id
-                ? 'border-indigo-600 text-indigo-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            )}>
-            <t.icon className="w-4 h-4" />{t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── TAB: STAMMDATEN ── */}
-      {tab === 'stammdaten' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="card p-5 space-y-3">
-            <h3 className="font-semibold text-slate-700">Persönliche Daten</h3>
-            {[
-              ['Vorname', patient.firstName],
-              ['Nachname', patient.lastName],
-              ['Geburtsdatum', formatDate(patient.dob + 'T00:00:00')],
-              ['Alter', `${age} Jahre`],
-              ['Geschlecht', GENDER_LABEL[patient.gender]],
-              ['Telefon', patient.phone || '—'],
-              ['E-Mail', patient.email || '—'],
-            ].map(([l, v]) => (
-              <div key={l} className="flex justify-between text-sm">
-                <span className="text-slate-400">{l}</span>
-                <span className="font-medium text-slate-700">{v}</span>
-              </div>
-            ))}
-          </div>
-          <div className="card p-5 space-y-3">
-            <h3 className="font-semibold text-slate-700">Administrative Daten</h3>
-            {[
-              ['Versicherungsträger', patient.insuranceProvider || '—'],
-              ['Zuweisung durch', patient.referralSource || '—'],
-              ['Behandler', patient.therapists.map((t: any) => t.therapist.name).join(', ') || '—'],
-              ['Patient seit', formatDate(patient.createdAt)],
-              ['PIN-Login', patient.patientUser ? patient.patientUser.pin : 'kein Login'],
-              ['Status', patient.active ? 'Aktiv' : 'Inaktiv'],
-            ].map(([l, v]) => (
-              <div key={l} className="flex justify-between text-sm">
-                <span className="text-slate-400">{l}</span>
-                <span className="font-medium text-slate-700">{v}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB: ANAMNESE ── */}
-      {tab === 'anamnese' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            {editRecord
-              ? <div className="flex gap-2">
-                  <button onClick={() => setEditRecord(false)} className="btn-secondary"><X className="w-4 h-4" /> Abbrechen</button>
-                  <button onClick={saveRecord} disabled={savingRecord} className="btn-primary"><Save className="w-4 h-4" /> Speichern</button>
+      <div style={{ padding: '20px', flex: 1 }}>
+        {/* ── HERO BANNER ── */}
+        <div className="patient-banner" style={{ marginBottom: 16 }}>
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: 20 }}>
+            {/* Avatar */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div className="avatar-xl">
+                {patient.firstName[0]}{patient.lastName[0]}
+                <div style={{ position: 'absolute', bottom: -4, right: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--surface-page)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera style={{ width: 10, height: 10, stroke: '#fff', fill: 'none' }} />
                 </div>
-              : <button onClick={() => setEditRecord(true)} className="btn-secondary"><Edit3 className="w-4 h-4" /> Bearbeiten</button>
-            }
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { key: 'chiefComplaint', label: 'Hauptbeschwerde' },
-              { key: 'medicalHistory', label: 'Psychiatrische / medizinische Vorgeschichte' },
-              { key: 'medication',     label: 'Aktuelle Medikation' },
-              { key: 'allergies',      label: 'Allergien / Unverträglichkeiten' },
-              { key: 'familyHistory',  label: 'Familienanamnese' },
-              { key: 'socialHistory',  label: 'Soziale Anamnese' },
-            ].map(({ key, label }) => (
-              <div key={key} className="card p-4">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{label}</p>
-                {editRecord
-                  ? <textarea className="input text-sm" rows={3} value={(recordForm as any)[key]}
-                      onChange={e => setRecordForm(f => ({...f, [key]: e.target.value}))} />
-                  : <p className="text-sm text-slate-700 whitespace-pre-wrap">{(patient.record as any)?.[key] || <span className="text-slate-300">—</span>}</p>
-                }
               </div>
-            ))}
+            </div>
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: '#fff', margin: '0 0 6px', lineHeight: 1.2 }}>
+                {patient.lastName}, {patient.firstName}
+                {isClinical && (
+                  <span style={{ marginLeft: 10, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.25)', color: '#fca5a5', border: '0.5px solid rgba(239,68,68,0.4)', verticalAlign: 'middle' }}>
+                    <AlertCircle style={{ width: 10, height: 10, display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
+                    klinisch auffaellig
+                  </span>
+                )}
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                <span>{GENDER_LABEL[patient.gender] ?? patient.gender}</span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span>{age} Jahre</span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span>geb. {fmtDate(patient.dob)}</span>
+                {patient.therapists?.[0]?.user && (
+                  <>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span>{patient.therapists[0].user.name}</span>
+                  </>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', fontSize: 11, border: '0.5px solid rgba(255,255,255,0.2)' }}>
+                  {patient.active ? 'Aktiv' : 'Inaktiv'}
+                </span>
+                {patient.patientUser?.pin && (
+                  <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(99,102,241,0.3)', color: 'rgba(199,210,254,1)', fontSize: 11, border: '0.5px solid rgba(99,102,241,0.4)', fontFamily: 'monospace', letterSpacing: 2 }}>
+                    PIN {patient.patientUser.pin}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Score Box */}
+            {gsiT && (
+              <div style={{ flexShrink: 0, textAlign: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: 14, padding: '14px 20px', border: '0.5px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: gsiT >= 60 ? '#fca5a5' : '#86efac', lineHeight: 1 }}>T={gsiT}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>GSI aktuell</div>
+              </div>
+            )}
           </div>
-          <div className="card p-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Diagnosen (ICD-10)</p>
-            {(() => {
-              const raw = patient.record?.diagnoses ?? []
-              const diagnoses: any[] = typeof raw === 'string' ? JSON.parse(raw) : Array.isArray(raw) ? raw : []
-              return diagnoses.length === 0
-                ? <p className="text-sm text-slate-300">Keine Diagnose eingetragen</p>
-                : diagnoses.map((d: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-sm mb-1">
-                      <span className="badge-blue font-mono">{d.code}</span>
-                      <span className="text-slate-700">{d.label}</span>
-                      {d.isPrimary && <span className="badge-gray text-xs">Hauptdiagnose</span>}
-                      <span className="text-slate-400 text-xs ml-auto">{d.date}</span>
-                    </div>
-                  ))
-            })()}
-          </div>
-          <div className="card p-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Therapieziele</p>
-            {editRecord
-              ? <textarea className="input text-sm" rows={3} value={recordForm.therapyGoals}
-                  onChange={e => setRecordForm(f => ({...f, therapyGoals: e.target.value}))} />
-              : <p className="text-sm text-slate-700 whitespace-pre-wrap">{patient.record?.therapyGoals || <span className="text-slate-300">—</span>}</p>
-            }
-          </div>
-          <div className="grid grid-cols-3 gap-3">
+
+          {/* KPI Row */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '0.5px solid rgba(255,255,255,0.1)' }}>
             {[
-              { key: 'therapyStart',     label: 'Therapiebeginn', type: 'date' },
-              { key: 'sessionFrequency', label: 'Sitzungsfrequenz', type: 'text' },
-            ].map(({ key, label, type }) => (
-              <div key={key} className="card p-4">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{label}</p>
-                {editRecord
-                  ? <input type={type} className="input text-sm" value={(recordForm as any)[key]}
-                      onChange={e => setRecordForm(f => ({...f, [key]: e.target.value}))} />
-                  : <p className="text-sm text-slate-700">{(patient.record as any)?.[key]
-                      ? type === 'date' ? formatDate((patient.record as any)[key]) : (patient.record as any)[key]
-                      : '—'}
-                    </p>
-                }
+              { label: 'Tests gesamt', value: patient.assessments?.length ?? 0 },
+              { label: 'Letzte GSI', value: gsiT ? 'T=' + gsiT : '—' },
+              { label: 'Verlaufsnotizen', value: patient.sessionNotes?.length ?? notes?.length ?? 0 },
+              { label: 'Termine', value: '—' },
+            ].map(kpi => (
+              <div key={kpi.label} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', border: '0.5px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{kpi.value}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>{kpi.label}</div>
               </div>
             ))}
           </div>
         </div>
-      )}
 
-      {/* ── TAB: TESTS ── */}
-      {tab === 'tests' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button onClick={() => setNewAssessment(true)} className="btn-primary">
-              <Plus className="w-4 h-4" /> Neuen Test anlegen
-            </button>
-          </div>
-          {patient.assessments.length === 0 ? (
-            <div className="card py-16 text-center text-slate-400">
-              <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>Noch keine Tests vorhanden.</p>
+        {/* ── TABS ── */}
+        <div style={{ display: 'flex', gap: 2, padding: 4, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 12, marginBottom: 16, overflowX: 'auto' }}>
+          {TABS.map(t => {
+            const cnt = t.count ? t.count(patient) : null
+            return (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className={cn('tab-item', tab === t.key && 'active')}
+                style={{ border: 'none', cursor: 'pointer' }}>
+                <t.icon style={{ width: 13, height: 13 }} />
+                {t.label}
+                {cnt !== null && cnt > 0 && <span className="tab-count">{cnt}</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── STAMMDATEN ── */}
+        {tab === 'stammdaten' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* Persönliche Daten */}
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <h2 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Persönliche Daten</h2>
+              </div>
+              {[
+                ['Vorname', patient.firstName],
+                ['Nachname', patient.lastName],
+                ['Geburtsdatum', fmtDate(patient.dob)],
+                ['Alter', age + ' Jahre'],
+                ['Geschlecht', GENDER_LABEL[patient.gender] ?? patient.gender],
+                ['Telefon', patient.phone ?? '—'],
+                ['E-Mail', patient.email ?? '—'],
+              ].map(([l, v]) => (
+                <div key={l} className="field-row">
+                  <span className="field-label">{l}</span>
+                  <span className="field-value">{v}</span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    {['Instrument', 'Anlass', 'Status', 'Datum', 'GSI T', 'Klinisch', ''].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {patient.assessments.map((a: any) => {
-                    const scores = a.result?.scores as any
-                    const gsiT = scores?.gsiT ? Math.round(scores.gsiT) : null
-                    const isScored = a.status === 'SCORED' || a.status === 'LOCKED'
+
+            {/* Administrative Daten */}
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <h2 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Administrative Daten</h2>
+              </div>
+              {[
+                ['Versicherungsträger', patient.insuranceProvider ?? '—'],
+                ['Zuweisung durch', patient.referralSource ?? '—'],
+                ['Behandler', patient.therapists?.[0]?.user?.name ?? '—'],
+                ['Patient seit', fmtDate(patient.createdAt)],
+                ['PIN-Login', patient.patientUser?.pin ?? '—'],
+                ['Status', patient.active ? 'Aktiv' : 'Inaktiv'],
+              ].map(([l, v]) => (
+                <div key={l} className="field-row">
+                  <span className="field-label">{l}</span>
+                  <span className="field-value" style={l === 'PIN-Login' ? { fontFamily: 'monospace', background: 'var(--surface-panel)', padding: '2px 8px', borderRadius: 5, fontSize: 12 } : {}}>
+                    {l === 'Status' ? <span className={v === 'Aktiv' ? 'badge badge-green' : 'badge badge-gray'}>{v}</span> : v}
+                  </span>
+                </div>
+              ))}
+
+              {/* Foto Upload */}
+              <div style={{ marginTop: 14, border: '1.5px dashed var(--border-strong)', borderRadius: 10, padding: 16, textAlign: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget as any).style.background = 'var(--surface-hover)'}
+                onMouseLeave={e => (e.currentTarget as any).style.background = ''}>
+                <Camera style={{ width: 20, height: 20, color: 'var(--text-muted)', margin: '0 auto 6px' }} />
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Patientenfoto hochladen</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, opacity: 0.7 }}>JPG, PNG bis 5 MB</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SCREENING ── */}
+        {tab === 'screening' && (
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid var(--border)' }}>
+              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>SCL-90-S Tests</h2>
+              <button onClick={() => setNewAssessment(true)} className="btn-primary">
+                <Plus style={{ width: 13, height: 13 }} /> Neuer Test
+              </button>
+            </div>
+            {patient.assessments?.length === 0 ? (
+              <div className="empty-state">
+                <Activity style={{ width: 36, height: 36 }} className="empty-state-icon" />
+                <p className="empty-state-text">Noch keine Tests vorhanden.</p>
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead><tr>
+                  <th>Anlass</th><th>Status</th><th>Datum</th><th>GSI</th><th>T-Score</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {patient.assessments?.map((a: any) => {
+                    const gsi = a.result?.scores?.GSI
                     return (
-                      <tr key={a.id}
-                        className="hover:bg-slate-50 cursor-pointer"
-                        onClick={() => router.push(isScored ? `/assessment/${a.id}/results` : `/assessment/${a.id}`)}>
-                        <td className="px-4 py-3 font-semibold text-indigo-700">{a.instrument.shortName}</td>
-                        <td className="px-4 py-3 text-slate-500">{a.occasion || '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full',
-                            a.status === 'SCORED' ? 'bg-emerald-50 text-emerald-700'
-                            : a.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700'
-                            : a.status === 'ASSIGNED' ? 'bg-slate-100 text-slate-600'
-                            : 'bg-gray-100 text-gray-500')}>
-                            {STATUS_LABEL[a.status] ?? a.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(a.createdAt)}</td>
-                        <td className="px-4 py-3 font-semibold">{gsiT ? `T=${gsiT}` : '—'}</td>
-                        <td className="px-4 py-3">
-                          {a.result?.isClinicalCase === true && <span className="badge-red text-xs">auffällig</span>}
-                          {a.result?.isClinicalCase === false && <span className="badge-green text-xs">unauffällig</span>}
-                          {a.result === null && <span className="badge-gray text-xs">—</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isScored && (
-                            <button
-                              onClick={e => { e.stopPropagation(); fetch(`/api/assessments/${a.id}/export`, { method: 'POST' }).then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = `SCL90S_${patient.lastName}_${a.createdAt.slice(0,10)}.pdf`; l.click() }) }}
-                              className="btn-secondary p-1.5"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </td>
+                      <tr key={a.id} onClick={() => router.push(a.status === 'IN_PROGRESS' ? '/assessment/' + a.id : '/session/' + a.sessionId + '/results')}>
+                        <td className="primary">{a.session?.occasion || '—'}</td>
+                        <td><span className={a.status === 'SCORED' ? 'badge badge-green' : a.status === 'IN_PROGRESS' ? 'badge badge-blue' : 'badge badge-gray'}>{a.status}</span></td>
+                        <td>{fmtDate(a.createdAt)}</td>
+                        <td>{gsi ? gsi.raw?.toFixed(2) : '—'}</td>
+                        <td>{gsi ? 'T=' + gsi.tScore : '—'}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>›</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── TAB: VERLAUFSNOTIZEN ── */}
-      {tab === 'notizen' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button onClick={() => setNewNote(true)} className="btn-primary">
-              <Plus className="w-4 h-4" /> Neue Notiz
-            </button>
+            )}
           </div>
-          {notes.length === 0 ? (
-            <div className="card py-16 text-center text-slate-400">
-              <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>Noch keine Verlaufsnotizen vorhanden.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {notes.map((n: any) => (
-                <div key={n.id} className="card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                      {NOTE_TYPE_LABEL[n.noteType] ?? n.noteType}
-                    </span>
-                    <span className="text-xs text-slate-400">{formatDate(n.date)}</span>
-                    <span className="text-xs text-slate-400 ml-auto">{n.author?.name}</span>
-                  </div>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{n.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* Modal: Neue Notiz */}
+        {/* ── THERAPIEPLAN (placeholder) ── */}
+        {tab === 'therapieplan' && (
+          <div className="card" style={{ padding: 24 }}>
+            <div className="empty-state">
+              <ClipboardList style={{ width: 36, height: 36 }} className="empty-state-icon" />
+              <p className="empty-state-text">Therapieplan wird implementiert.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── DIAGNOSEN (placeholder) ── */}
+        {tab === 'diagnosen' && (
+          <div className="card" style={{ padding: 24 }}>
+            <div className="empty-state">
+              <FileText style={{ width: 36, height: 36 }} className="empty-state-icon" />
+              <p className="empty-state-text">ICD-10 Diagnosen werden implementiert.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── DOKUMENTE (placeholder) ── */}
+        {tab === 'dokumente' && (
+          <div className="card" style={{ padding: 24 }}>
+            <div className="empty-state">
+              <FileText style={{ width: 36, height: 36 }} className="empty-state-icon" />
+              <p className="empty-state-text">Dokumentenverwaltung wird implementiert.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── TERMINE (placeholder) ── */}
+        {tab === 'termine' && (
+          <div className="card" style={{ padding: 24 }}>
+            <div className="empty-state">
+              <Calendar style={{ width: 36, height: 36 }} className="empty-state-icon" />
+              <p className="empty-state-text">Termine werden hier angezeigt.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── VERLAUF ── */}
+        {tab === 'verlauf' && (
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid var(--border)' }}>
+              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Verlaufsnotizen</h2>
+              <button onClick={() => setNewNote(true)} className="btn-primary">
+                <Plus style={{ width: 13, height: 13 }} /> Neue Notiz
+              </button>
+            </div>
+            {(!notes || notes.length === 0) ? (
+              <div className="empty-state">
+                <MessageSquare style={{ width: 36, height: 36 }} className="empty-state-icon" />
+                <p className="empty-state-text">Noch keine Verlaufsnotizen.</p>
+              </div>
+            ) : (
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {notes.map((n: any) => (
+                  <div key={n.id} style={{ padding: 14, background: 'var(--surface-panel)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span className="badge badge-indigo">{n.noteType}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(n.date)}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>{n.author?.name}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{n.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── MODALS ── */}
       {newNote && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold mb-4">Neue Verlaufsnotiz</h2>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Datum</label>
-                  <input type="date" className="input" value={noteForm.date}
-                    onChange={e => setNoteForm(f => ({...f, date: e.target.value}))} />
-                </div>
-                <div>
-                  <label className="label">Typ</label>
-                  <select className="input" value={noteForm.noteType}
-                    onChange={e => setNoteForm(f => ({...f, noteType: e.target.value}))}>
-                    {Object.entries(NOTE_TYPE_LABEL).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
+        <div className="modal-overlay" onClick={() => setNewNote(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0, fontSize: 15 }}>Neue Verlaufsnotiz</h2>
+              <button onClick={() => setNewNote(false)} className="btn-ghost" style={{ padding: '4px' }}><X style={{ width: 16, height: 16 }} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-grid-2">
+                <div><label className="label">Datum</label><input type="date" className="input" value={noteForm.date} onChange={e => setNoteForm(f => ({...f, date: e.target.value}))} /></div>
+                <div><label className="label">Typ</label>
+                  <select className="input" value={noteForm.noteType} onChange={e => setNoteForm(f => ({...f, noteType: e.target.value}))}>
+                    <option value="PROGRESS">Verlaufsnotiz</option>
+                    <option value="ANAMNESIS">Anamnese</option>
+                    <option value="GOAL">Therapieziel</option>
+                    <option value="INTERVENTION">Intervention</option>
+                    <option value="OTHER">Sonstiges</option>
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="label">Inhalt (§16a PThG)</label>
-                <textarea className="input" rows={6} value={noteForm.content}
-                  onChange={e => setNoteForm(f => ({...f, content: e.target.value}))}
-                  placeholder="Interventionen, Verlauf, Absprachen, Veränderungen im Befinden…" />
+              <div><label className="label">Inhalt</label>
+                <textarea className="input" rows={5} placeholder="Notiz eingeben..." value={noteForm.content} onChange={e => setNoteForm(f => ({...f, content: e.target.value}))} style={{ resize: 'vertical', lineHeight: 1.6 }} />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setNewNote(false)} className="btn-secondary flex-1">Abbrechen</button>
-              <button onClick={addNote} disabled={savingNote || !noteForm.content} className="btn-primary flex-1 justify-center">
-                {savingNote ? 'Speichern…' : 'Notiz speichern'}
+            <div className="modal-footer">
+              <button onClick={() => setNewNote(false)} className="btn-secondary" style={{ flex: 1 }}>Abbrechen</button>
+              <button onClick={addNote} disabled={savingNote || !noteForm.content} className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                {savingNote ? 'Speichern...' : 'Speichern'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Neuer Test */}
       {newAssessment && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md p-6">
-            <h2 className="text-lg font-bold mb-4">Neuen Test anlegen</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="label">Instrument</label>
-                <select className="input" value={assessForm.instrumentId}
-                  onChange={e => setAssessForm(f => ({...f, instrumentId: e.target.value}))}>
-                  {instruments.map((i: any) => (
-                    <option key={i.id} value={i.id}>{i.name}</option>
-                  ))}
+        <div className="modal-overlay" onClick={() => setNewAssessment(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0, fontSize: 15 }}>Neuer Test</h2>
+              <button onClick={() => setNewAssessment(false)} className="btn-ghost" style={{ padding: '4px' }}><X style={{ width: 16, height: 16 }} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div><label className="label">Instrument</label>
+                <select className="input" value={assessForm.instrumentId} onChange={e => setAssessForm(f => ({...f, instrumentId: e.target.value}))}>
+                  {instruments.map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="label">Anlass</label>
-                <input className="input" placeholder="z.B. Ersterhebung, Verlauf Woche 4"
-                  value={assessForm.occasion}
-                  onChange={e => setAssessForm(f => ({...f, occasion: e.target.value}))} />
-              </div>
-              <div className="bg-indigo-50 rounded-lg p-3 text-xs text-indigo-700">
-                Der Patient kann den Test mit seinem PIN ausfüllen, oder Sie können ihn direkt hier starten.
+              <div><label className="label">Anlass</label>
+                <input className="input" placeholder="z.B. Ersterhebung, Verlauf Monat 3" value={assessForm.occasion} onChange={e => setAssessForm(f => ({...f, occasion: e.target.value}))} />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setNewAssessment(false)} className="btn-secondary flex-1">Abbrechen</button>
-              <button onClick={startAssessment} disabled={savingAssessment || !assessForm.instrumentId}
-                className="btn-primary flex-1 justify-center">
-                {savingAssessment ? 'Anlegen…' : 'Test starten'}
+            <div className="modal-footer">
+              <button onClick={() => setNewAssessment(false)} className="btn-secondary" style={{ flex: 1 }}>Abbrechen</button>
+              <button onClick={addAssessment} disabled={savingAssessment || !assessForm.instrumentId} className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                {savingAssessment ? 'Starte...' : 'Test starten'}
               </button>
             </div>
           </div>

@@ -141,7 +141,7 @@ async function main() {
       key: 'default',
       praxisName: 'Psychotherapeutische Praxis',
       slogan: 'KDS – Klinisches Dokumentationssystem',
-      colorPrimary: '#166534',
+      colorPrimary: '#4f46e5',
       colorPrimaryLight: '#dcfce7',
       colorAccent: '#14532d',
       imprintHtml: '<p>Bitte Impressum im Admin-Bereich konfigurieren.</p>',
