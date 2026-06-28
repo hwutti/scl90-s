@@ -55,6 +55,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
     paymentMethod: 'UNBAR_BANK_TRANSFER', notes: '', paymentInfo: '',
   })
   const [savingSession, setSavingSession] = useState(false)
+  const [sessionError, setSessionError] = useState<string|null>(null)
   const [savingTx, setSavingTx] = useState(false)
 
   const load = useCallback(async () => {
@@ -88,14 +89,26 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
 
   async function createSession() {
     setSavingSession(true)
-    const price = newSession.billingMode === 'time'
-      ? (newSession.durationMinutes / 60) * newSession.hourlyRateNet
-      : newSession.unitCount * newSession.unitPriceNet
-    await fetch('/api/therapy-sessions', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ ...newSession, patientId }),
-    })
-    setSavingSession(false); setShowNewSession(false); load()
+    setSessionError(null)
+    try {
+      const res = await fetch('/api/therapy-sessions', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ...newSession, patientId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setSessionError(data.error ?? 'Fehler beim Speichern')
+        setSavingSession(false)
+        return
+      }
+      setSavingSession(false)
+      setShowNewSession(false)
+      setSessionError(null)
+      load()
+    } catch (e: any) {
+      setSessionError(e.message ?? 'Netzwerkfehler')
+      setSavingSession(false)
+    }
   }
 
   async function createTransaction() {
@@ -336,6 +349,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
               <button onClick={()=>setShowNewSession(false)} className="btn-ghost" style={{padding:4}}><X style={{width:16,height:16}}/></button>
             </div>
             <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
+              {sessionError && (
+                <div style={{padding:'8px 12px',background:'var(--red-bg)',border:'0.5px solid var(--red-border)',borderRadius:8,color:'var(--red)',fontSize:13}}>
+                  {sessionError}
+                </div>
+              )}
               <div className="form-grid-2">
                 <div><label className="label">Datum *</label>
                   <input type="date" className="input" value={newSession.sessionDate}
