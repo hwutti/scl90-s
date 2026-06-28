@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/finance', label: 'Finanzen', icon: Euro, roles: ['ADMIN','THERAPIST'] },
   { href: '/video-calls', label: 'Video-Calls', icon: Video, roles: ['ADMIN','THERAPIST'] },
   { href: '/supervision', label: 'Supervision', icon: GraduationCap, roles: ['ADMIN','THERAPIST'] },
+  { href: '/backups', label: 'Backups', icon: Shield, roles: ['ADMIN','THERAPIST'] },
   { href: '/my/appointments', label: 'Meine Termine', icon: CalendarDays, roles: ['PATIENT'] },
   { href: '/admin/users', label: 'Administration', icon: Shield, roles: ['ADMIN'],
     sub: [

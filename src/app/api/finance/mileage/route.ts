@@ -22,8 +22,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const km  = parseFloat(body.kilometers)
   const rate = parseFloat(body.ratePerKm ?? '0.42')
+  const returnTrip = body.returnTrip ?? false
+  // Wenn returnTrip aktiv, wurde die Distanz bereits vom Aufrufer verdoppelt
+  // (SessionDetailPanel und FinanceClient machen das schon) — hier nur speichern
   const log = await prisma.mileageLog.create({
-    data: { ...body, createdBy: (session.user as any).id, date: new Date(body.date), kilometers: km, ratePerKm: rate, totalAmount: km*rate },
+    data: {
+      ...body,
+      createdBy: (session.user as any).id,
+      date: new Date(body.date),
+      kilometers: km,
+      returnTrip,
+      ratePerKm: rate,
+      totalAmount: km * rate,
+    },
   })
   return NextResponse.json(log)
 }
