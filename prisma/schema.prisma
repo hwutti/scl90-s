@@ -410,9 +410,10 @@ model PraxisConfig {
   logoMimeType    String?  // "image/png" oder "image/svg+xml"
 
   // Farben (Hex)
-  colorPrimary    String   @default("#166534")   // Dunkelgrün
-  colorPrimaryLight String @default("#dcfce7")   // Hellgrün für Hover/Bg
-  colorAccent     String   @default("#14532d")   // Dunkleres Grün für Hover
+  colorPrimary    String   @default("#4f46e5")   // Indigo
+  colorPrimaryLight String @default("#eef2ff")   // Helles Indigo für Hover/Bg
+  colorAccent     String   @default("#4338ca")   // Dunkleres Indigo für Hover
+  colorSidebarText String  @default("#475569")   // Sidebar Schriftfarbe
 
   // Footer / Impressum
   imprintHtml     String?  // HTML für Impressum/Über

@@ -8,6 +8,7 @@ export interface BrandingConfig {
   colorPrimary: string
   colorPrimaryLight: string
   colorAccent: string
+  colorSidebarText: string
   imprintHtml: string | null
   contactEmail: string | null
   contactPhone: string | null
@@ -23,6 +24,7 @@ export const DEFAULT_BRANDING: BrandingConfig = {
   colorPrimary: '#4f46e5',
   colorPrimaryLight: '#eef2ff',
   colorAccent: '#4338ca',
+  colorSidebarText: '#475569',
   imprintHtml: null,
   contactEmail: null,
   contactPhone: null,
@@ -41,10 +43,10 @@ export async function getBranding(): Promise<BrandingConfig> {
 }
 
 export function brandingToCssVars(b: BrandingConfig): string {
-  // Only override in light mode — dark mode keeps its own vars from globals.css
   return `
     --color-primary: ${b.colorPrimary};
     --color-primary-light: ${b.colorPrimaryLight};
     --color-accent: ${b.colorAccent};
+    --sb-text: ${b.colorSidebarText ?? '#475569'};
   `.trim()
 }

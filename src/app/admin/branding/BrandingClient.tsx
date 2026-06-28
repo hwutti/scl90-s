@@ -5,12 +5,20 @@ import { Save, Upload, X, Palette, Building2, FileText, Eye } from 'lucide-react
 import type { BrandingConfig } from '@/lib/branding'
 
 const PRESET_COLORS = [
-  { name: 'Therapeutisch Grün', primary: '#166534', light: '#dcfce7', accent: '#14532d' },
-  { name: 'Vertrauens Blau',    primary: '#1e3a5f', light: '#dbeafe', accent: '#1e40af' },
-  { name: 'Ruhiges Grau',       primary: '#374151', light: '#f3f4f6', accent: '#1f2937' },
-  { name: 'Warmes Violett',     primary: '#4c1d95', light: '#ede9fe', accent: '#3b0764' },
-  { name: 'Ozean Teal',         primary: '#134e4a', light: '#ccfbf1', accent: '#0f3d39' },
+  { name: 'KDS Standard',       primary: '#4f46e5', light: '#eef2ff', accent: '#4338ca', sidebarText: '#475569' },
+  { name: 'Therapeutisch Grün', primary: '#166534', light: '#dcfce7', accent: '#14532d', sidebarText: '#475569' },
+  { name: 'Vertrauens Blau',    primary: '#1e40af', light: '#dbeafe', accent: '#1e3a8a', sidebarText: '#475569' },
+  { name: 'Ruhiges Grau',       primary: '#374151', light: '#f3f4f6', accent: '#1f2937', sidebarText: '#475569' },
+  { name: 'Warmes Violett',     primary: '#7c3aed', light: '#ede9fe', accent: '#5b21b6', sidebarText: '#475569' },
+  { name: 'Ozean Teal',         primary: '#0f766e', light: '#ccfbf1', accent: '#0d5f58', sidebarText: '#475569' },
 ]
+
+const DEFAULT_VALUES = {
+  colorPrimary: '#4f46e5',
+  colorPrimaryLight: '#eef2ff',
+  colorAccent: '#4338ca',
+  colorSidebarText: '#475569',
+}
 
 export function BrandingClient({ initial }: { initial: BrandingConfig }) {
   const router = useRouter()
@@ -22,17 +30,23 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
 
   function set(k: string, v: any) {
     setForm(f => ({ ...f, [k]: v }))
-    // Sofort CSS-Variablen im Browser aktualisieren für Live-Preview
     if (k === 'colorPrimary')      document.documentElement.style.setProperty('--color-primary', v)
     if (k === 'colorPrimaryLight') document.documentElement.style.setProperty('--color-primary-light', v)
     if (k === 'colorAccent')       document.documentElement.style.setProperty('--color-accent', v)
+    if (k === 'colorSidebarText')  document.documentElement.style.setProperty('--sb-text', v)
   }
 
   function applyPreset(p: typeof PRESET_COLORS[0]) {
     set('colorPrimary', p.primary)
     set('colorPrimaryLight', p.light)
     set('colorAccent', p.accent)
-    setForm(f => ({ ...f, colorPrimary: p.primary, colorPrimaryLight: p.light, colorAccent: p.accent }))
+    set('colorSidebarText', p.sidebarText)
+    setForm(f => ({ ...f, colorPrimary: p.primary, colorPrimaryLight: p.light, colorAccent: p.accent, colorSidebarText: p.sidebarText }))
+  }
+
+  function resetToDefault() {
+    Object.entries(DEFAULT_VALUES).forEach(([k, v]) => set(k, v))
+    setForm(f => ({ ...f, ...DEFAULT_VALUES }))
   }
 
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -76,6 +90,9 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
         <div className="flex gap-2">
           <button onClick={() => setPreview(!preview)} className="btn-secondary">
             <Eye className="w-4 h-4" /> {preview ? 'Vorschau aus' : 'Live-Vorschau'}
+          </button>
+          <button onClick={resetToDefault} className="btn-secondary" title="Auf KDS-Standard zurücksetzen">
+            Auf Standard zurücksetzen
           </button>
           <button onClick={save} disabled={saving} className="btn-primary">
             <Save className="w-4 h-4" />
@@ -202,6 +219,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                 { key: 'colorPrimary',      label: 'Primärfarbe',       desc: 'Buttons, aktive Links' },
                 { key: 'colorPrimaryLight', label: 'Hintergrundton',    desc: 'Aktiver Menüpunkt' },
                 { key: 'colorAccent',       label: 'Akzentfarbe',       desc: 'Hover-Zustände' },
+                { key: 'colorSidebarText',  label: 'Sidebar Schrift',   desc: 'Menü-Textfarbe' },
               ].map(({ key, label, desc }) => (
                 <div key={key}>
                   <label className="label">{label}</label>
