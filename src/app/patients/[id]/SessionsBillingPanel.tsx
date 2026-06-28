@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, Edit3, 
          FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban } from 'lucide-react'
+import { SessionDetailPanel } from '@/components/protocol/SessionDetailPanel'
 
 const BILLING_STATUS_LABEL: Record<string,string> = {
   UNBILLED: 'Nicht verrechnet', BILLED_UNPAID: 'Verrechnet (offen)',
@@ -477,45 +478,16 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
         </div>
       )}
 
-      {/* Sitzungsdetail Modal */}
+      {/* Sitzungsdetail Modal – vollständiger 4-Tab-View */}
       {detailSession && (
-        <div className="modal-overlay" onClick={() => setDetailSession(null)}>
-          <div className="modal" style={{maxWidth:600}} onClick={e=>e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 style={{margin:0,fontSize:15}}>{detailSession.name}</h2>
-              <button onClick={()=>setDetailSession(null)} className="btn-ghost" style={{padding:4}}><X style={{width:16,height:16}}/></button>
-            </div>
-            <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:10}}>
-              {[
-                ['Datum', fmtDate(detailSession.sessionDate)],
-                ['Dauer', detailSession.durationMinutes ? detailSession.durationMinutes + ' Min.' : '—'],
-                ['Abrechnungsmodus', detailSession.billingMode === 'time' ? 'Zeit' : 'Einheiten'],
-                ['Betrag', fmtEUR(detailSession.calculatedPriceNet)],
-                ['Dienstleistung', detailSession.serviceLabel || '—'],
-                ['Status', BILLING_STATUS_LABEL[detailSession.billingStatus] ?? detailSession.billingStatus],
-              ].map(([label, value]) => (
-                <div key={label} className="field-row">
-                  <span className="field-label">{label}</span>
-                  <span className="field-value">{value}</span>
-                </div>
-              ))}
-              {detailSession.billingStatus === 'UNBILLED' && (
-                <div style={{paddingTop:8,borderTop:'0.5px solid var(--border)'}}>
-                  <button onClick={() => {
-                    setSelectedSessions([detailSession.id])
-                    setDetailSession(null)
-                    setShowCreateTx(true)
-                  }} className="btn-primary" style={{width:'100%',justifyContent:'center'}}>
-                    <Euro style={{width:13,height:13}}/> Transaktion für diese Sitzung erstellen
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button onClick={()=>setDetailSession(null)} className="btn-secondary" style={{flex:1}}>Schließen</button>
-            </div>
-          </div>
-        </div>
+        <SessionDetailPanel
+          session={detailSession}
+          patientId={patientId}
+          role={role}
+          onClose={() => setDetailSession(null)}
+          onDeleted={() => { setDetailSession(null); load() }}
+          onUpdated={() => { load(); setDetailSession(null) }}
+        />
       )}
 
       {/* Rechnungsvorschau */}

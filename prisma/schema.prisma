@@ -935,8 +935,9 @@ model MileageLog {
   purpose     TripPurpose @default(OTHER)
   purposeNote String?     // Freitext-Beschreibung
   kilometers  Decimal     @db.Decimal(8, 2)
+  returnTrip  Boolean     @default(false)   // Retour → Distanz wird verdoppelt
   ratePerKm   Decimal     @db.Decimal(5, 4) @default(0.42)  // österreichischer Kilometersatz
-  totalAmount Decimal     @db.Decimal(10, 2)                // km × rate
+  totalAmount Decimal     @db.Decimal(10, 2)                // km × rate (× 2 wenn returnTrip)
   patientId   String?     // optional bei Hausbesuchen
   patient     Patient?    @relation(fields: [patientId], references: [id])
   createdAt   DateTime    @default(now())
@@ -1005,6 +1006,9 @@ model TherapySession {
   audioRecordings       AudioRecording[]        @relation("SessionAudio")
   supervisionEntries    SupervisionEntry[]      @relation("SessionSupervision")
   ratings               SessionRating[]         @relation("SessionRatings")
+  serviceLines          SessionServiceLine[]    @relation("SessionServiceLines")
+  assessmentValues      SessionAssessmentValue[] @relation("SessionAssessmentValues")
+  supervisionLinks      SupervisionSessionLink[] @relation("SupervisionSessionLinks")
 
   @@index([patientId])
   @@index([therapistId])
@@ -1148,6 +1152,7 @@ model Transaction {
   lineItems               TxLineItem[]
   sessionAllocations      TxSessionAllocation[]
   invoiceDocuments        InvoiceDocument[]
+  receipts                TransactionReceipt[]    @relation("TxReceipts")
 
   @@index([patientId])
   @@index([transactionDate])
@@ -1431,22 +1436,32 @@ model AudioRecording {
 // ─── Supervision ─────────────────────────────────────────────────────────────
 
 model SupervisionEntry {
-  id              String         @id @default(cuid())
-  superviseeId    String         // User (Therapeut in Ausbildung)
-  supervisee      User           @relation("SuperviseeEntries", fields: [superviseeId], references: [id])
-  supervisorId    String?        // User (Supervisor)
-  supervisor      User?          @relation("SupervisorEntries", fields: [supervisorId], references: [id])
-  sessionId       String?        // verknüpfte Sitzung
-  session         TherapySession? @relation("SessionSupervision", fields: [sessionId], references: [id])
-  date            DateTime
-  durationMinutes Int
-  supervisionType String         @default("INDIVIDUAL") // INDIVIDUAL | GROUP | SELF
-  content         String?        // Inhalt / Notizen
-  fachspezifikum  Boolean        @default(false) // zählt für Fachspezifikum
-  approved        Boolean        @default(false)
-  approvedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                  String         @id @default(cuid())
+  superviseeId        String         // User (Therapeut in Ausbildung)
+  supervisee          User           @relation("SuperviseeEntries", fields: [superviseeId], references: [id])
+  supervisorId        String?        // User (Supervisor, optional)
+  supervisor          User?          @relation("SupervisorEntries", fields: [supervisorId], references: [id])
+  sessionId           String?        // verknüpfte Sitzung (legacy, single-session)
+  session             TherapySession? @relation("SessionSupervision", fields: [sessionId], references: [id])
+
+  // Spec-konforme Felder (KDS-SCR-08B)
+  name                String?        // optionaler Bezeichner z.B. "Sv_1_02.05.2026"
+  supervisorName      String?        // Freitext-Name des Supervisors (wenn kein User)
+  groupParticipants   String?        // Komma-getrennte Namen der Gruppe
+  unitCount           Decimal?       @db.Decimal(8, 2)  // z.B. 0.5, 1, 2
+
+  date                DateTime
+  durationMinutes     Int
+  supervisionType     String         @default("INDIVIDUAL") // INDIVIDUAL | GROUP | SELF
+  content             String?        // Inhalt / Notizen
+  fachspezifikum      Boolean        @default(false)
+  approved            Boolean        @default(false)
+  approvedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Verknüpfte Sessions (many-to-many via Link-Tabelle)
+  sessionLinks        SupervisionSessionLink[] @relation("SupervisionLinks")
 
   @@index([superviseeId])
   @@index([date])
@@ -1474,3 +1489,137 @@ model SessionRating {
   @@index([patientId])
   @@index([sessionId])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 2: SESSION-VORLAGEN, LEISTUNGEN & BEWERTUNGEN (KDS-Spec v2.0)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Session-Vorlage ─────────────────────────────────────────────────────────
+// Definiert, welche Protokollvorlage + Leistungsvorlage eine Session-Art hat
+
+model SessionTemplate {
+  id                      String    @id @default(cuid())
+  name                    String    // z.B. "Standardsession", "Erstgespräch"
+  isDefault               Boolean   @default(false)
+  shortProtocolTemplateId String?
+  shortProtocolTemplate   ProtocolTemplate? @relation("ShortTemplate", fields: [shortProtocolTemplateId], references: [id])
+  longProtocolTemplateId  String?
+  longProtocolTemplate    ProtocolTemplate? @relation("LongTemplate", fields: [longProtocolTemplateId], references: [id])
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+// ─── Protokollvorlage ────────────────────────────────────────────────────────
+// Definiert die konfigurierbaren Felder eines Protokolls
+
+model ProtocolTemplate {
+  id           String                @id @default(cuid())
+  templateType String                // "SHORT" | "LONG"
+  name         String
+  version      Int                   @default(1)
+  isActive     Boolean               @default(true)
+  fields       ProtocolTemplateField[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  shortForTemplates SessionTemplate[] @relation("ShortTemplate")
+  longForTemplates  SessionTemplate[] @relation("LongTemplate")
+}
+
+// ─── Protokollvorlagen-Feld ──────────────────────────────────────────────────
+
+model ProtocolTemplateField {
+  id             String           @id @default(cuid())
+  templateId     String
+  template       ProtocolTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label          String           // Überschrift (z.B. "Thema der Stunde")
+  prefilledText  String?          // Vorausgefüllter Text
+  sortOrder      Int              @default(0)
+  required       Boolean          @default(false)
+  exportable     Boolean          @default(true)
+  visible        Boolean          @default(true)
+  // Breite im Grid: "full" | "half" | "third"
+  widthMode      String           @default("full")
+  heightMode     String           @default("medium") // "small" | "medium" | "large"
+
+  @@index([templateId])
+}
+
+// ─── Session-Leistungszeile ──────────────────────────────────────────────────
+// Zusatzleistungen pro Session (Diagnose, Testverfahren, eigene Positionen)
+
+model SessionServiceLine {
+  id              String         @id @default(cuid())
+  sessionId       String
+  session         TherapySession @relation("SessionServiceLines", fields: [sessionId], references: [id], onDelete: Cascade)
+  description     String
+  quantity        Decimal        @db.Decimal(8, 2) @default(1)
+  unitPriceNet    Decimal        @db.Decimal(10, 2)
+  vatRate         Decimal        @db.Decimal(5, 4) @default(0)
+  amountNet       Decimal        @db.Decimal(10, 2)
+  amountGross     Decimal        @db.Decimal(10, 2)
+  sortOrder       Int            @default(0)
+  category        String?        // "diagnose" | "testverfahren" | "zusatzleistung" | "freitext"
+  catalogCode     String?        // GOÄ/GebüH-Code wenn vorhanden
+  createdAt       DateTime       @default(now())
+
+  @@index([sessionId])
+}
+
+// ─── Sitzungsbewertung (spec-konform: Motivation, Pünktlichkeit, Lebensfreude) 
+// Ersetzt/ergänzt SessionRating mit den 3 Spec-Feldern
+
+model SessionAssessmentValue {
+  id             String         @id @default(cuid())
+  sessionId      String
+  session        TherapySession @relation("SessionAssessmentValues", fields: [sessionId], references: [id], onDelete: Cascade)
+  assessmentName String         // "motivation" | "punctuality" | "joie_de_vivre" | custom
+  value          Int?           // 0-10
+  scaleMin       Int            @default(0)
+  scaleMax       Int            @default(10)
+  createdAt      DateTime       @default(now())
+
+  @@unique([sessionId, assessmentName])
+  @@index([sessionId])
+}
+
+// ─── MileageLog: returnTrip Feld ─────────────────────────────────────────────
+// Hinweis: returnTrip wird direkt zu MileageLog hinzugefügt (siehe Migration)
+// Hier das separate TravelLog für Sessions (bereits vorhanden als TravelLogEntry)
+// returnTrip wird via ALTER TABLE hinzugefügt
+
+// ─── Supervisions-Session-Verknüpfung ───────────────────────────────────────
+
+model SupervisionSessionLink {
+  id                          String          @id @default(cuid())
+  supervisionEntryId          String
+  supervisionEntry            SupervisionEntry @relation("SupervisionLinks", fields: [supervisionEntryId], references: [id], onDelete: Cascade)
+  sessionId                   String
+  session                     TherapySession  @relation("SupervisionSessionLinks", fields: [sessionId], references: [id])
+  profileId                   String
+  clientDisplayNameSnapshot   String?         // anonymisierter Name zum Zeitpunkt der Supervision
+  createdAt                   DateTime        @default(now())
+
+  @@unique([supervisionEntryId, sessionId])
+  @@index([supervisionEntryId])
+  @@index([sessionId])
+}
+
+// ─── Transaktionsbeleg ───────────────────────────────────────────────────────
+
+model TransactionReceipt {
+  id            String   @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation("TxReceipts", fields: [transactionId], references: [id], onDelete: Cascade)
+  fileId        String?
+  receiptType   String   @default("external_voucher") // "external_voucher" | "manual"
+  fileName      String?
+  mimeType      String?
+  size          Int?
+  data          Bytes?
+  createdAt     DateTime @default(now())
+  deletedAt     DateTime?
+
+  @@index([transactionId])
+}
+
