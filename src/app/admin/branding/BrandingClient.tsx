@@ -265,8 +265,7 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
         <div className="hidden lg:block">
           <div className="sticky top-6">
             <p style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Vorschau Sidebar</p>
-            <div style={{ borderRadius: 14, border: "0.5px solid var(--border)", overflow: "hidden", background: "var(--surface-card)" }}
-                 style={{ '--color-primary': form.colorPrimary, '--color-primary-light': form.colorPrimaryLight } as any}>
+            <div style={{ borderRadius: 14, border: "0.5px solid var(--border)", overflow: "hidden", background: "var(--surface-card)", '--color-primary': form.colorPrimary, '--color-primary-light': form.colorPrimaryLight } as any}>
               {/* Mini-Sidebar */}
               <div style={{ padding: 12, borderBottom: "0.5px solid var(--border)" }}>
                 <div className="flex items-center gap-2">
