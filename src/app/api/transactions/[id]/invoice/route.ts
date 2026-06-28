@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const branding = await getBranding()
   const template = await getDefaultTemplate()
-  const fmtEUR = (n: number | string) => parseFloat(n.toString()).toFixed(2).replace('.', ',')
+  const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
   const invoiceData = {
