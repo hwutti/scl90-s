@@ -1,28 +1,35 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
 import { PageShell } from '@/components/layout/PageShell'
+import { ProfileClient } from './ProfileClient'
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
-  const user = session.user as any
+  const userId = (session.user as any).id
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true, name: true, email: true, role: true,
+      active: true, createdAt: true,
+      _count: {
+        select: {
+          createdPatients: true,
+          therapistPatients: true,
+          therapySessions: true,
+          createdAssessments: true,
+        }
+      }
+    }
+  })
+  if (!user) redirect('/login')
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold text-[var(--text-primary)]">Mein Profil</h1>
-      <div className="card p-6 max-w-md space-y-3">
-        {[
-          ['Name',  user.name  ?? '—'],
-          ['E-Mail', user.email ?? '—'],
-          ['Rolle',  user.role  ?? '—'],
-        ].map(([l, v]) => (
-          <div key={l} className="flex justify-between text-sm border-b border-slate-50 pb-3 last:border-0 last:pb-0">
-            <span className="text-[var(--text-muted)]">{l}</span>
-            <span className="font-medium text-[var(--text-secondary)]">{v}</span>
-          </div>
-        ))}
-      </div>
+      <ProfileClient user={user as any} />
     </PageShell>
   )
 }
