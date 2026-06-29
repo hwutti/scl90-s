@@ -84,6 +84,9 @@ sudo -u "$APP_USER" bash -c "
 " && success "Schema aktualisiert" || warn "Schema-Update fehlgeschlagen – App läuft mit altem Schema weiter"
 
 # Session-Namen einmalig migrieren (idempotent)
+# Rechnungsvorlage: Status-Badge aus gespeicherten Vorlagen entfernen
+sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"htmlContent\" = REPLACE(\"htmlContent\", '<span class=\"badge badge-unpaid\">Offen</span>', '') WHERE \"htmlContent\" LIKE '%badge-unpaid%';" 2>/dev/null || true
+
 # Rechnungsvorlage: erste aktive Vorlage als Standard setzen wenn keine gesetzt ist
 sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"isDefault\" = true WHERE id = (SELECT id FROM \"InvoiceTemplate\" WHERE \"isActive\" = true ORDER BY \"createdAt\" ASC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM \"InvoiceTemplate\" WHERE \"isDefault\" = true AND \"isActive\" = true);" 2>/dev/null || true
 

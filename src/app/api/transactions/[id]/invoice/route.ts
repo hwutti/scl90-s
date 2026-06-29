@@ -21,7 +21,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const templateId = (tx.patient as any)?.defaultInvoiceTemplateId ?? null
   const branding = await getBranding()
-  const { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  let { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  // Wenn die gespeicherte Vorlage veraltet ist (Status-Badge oder leer), DEFAULT nehmen
+  if (!templateHtml || templateHtml.includes('badge-unpaid') || templateHtml.includes('badge-paid')) {
+    templateHtml = (await import('@/lib/invoice/template')).DEFAULT_INVOICE_HTML
+  }
   const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
@@ -124,7 +128,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Template-Priorität: 1. Patient-Default, 2. Globaler Default
   const templateId = (tx.patient as any)?.defaultInvoiceTemplateId ?? null
   const branding = await getBranding()
-  const { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  let { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  // Wenn die gespeicherte Vorlage veraltet ist (Status-Badge oder leer), DEFAULT nehmen
+  if (!templateHtml || templateHtml.includes('badge-unpaid') || templateHtml.includes('badge-paid')) {
+    templateHtml = (await import('@/lib/invoice/template')).DEFAULT_INVOICE_HTML
+  }
   const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
