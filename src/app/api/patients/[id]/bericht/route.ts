@@ -55,7 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         ...(zeitraumVon && { completedAt: { gte: new Date(zeitraumVon) } }),
         ...(zeitraumBis && { completedAt: { lte: new Date(zeitraumBis) } }),
       },
-      include: { result: true },
+      include: { result: true, instrument: { select: { name: true, shortName: true } } },
       orderBy: { completedAt: 'asc' },
     })
   }
@@ -342,7 +342,7 @@ function generateReportHtml(opts: any): string {
     ${assessments.map((a: any) => {
       const scores = a.result?.scores ? (typeof a.result.scores === 'string' ? JSON.parse(a.result.scores) : a.result.scores) : {}
       return `<div class="assessment-box">
-        <div class="name">${a.instrumentId ?? a.instrument?.name ?? 'Assessment'} — ${fmtDateShort(a.completedAt)}</div>
+        <div class="name">${a.instrument?.shortName ?? a.instrument?.name ?? a.instrumentId ?? 'Assessment'} — ${fmtDateShort(a.completedAt)}</div>
         ${a.result?.clinicalSummary ? `<div class="summary">${a.result.clinicalSummary}</div>` : ''}
         ${a.result?.isClinicalCase ? `<div class="score" style="color:#c0392b">Klinisch auffällig</div>` : ''}
       </div>`
