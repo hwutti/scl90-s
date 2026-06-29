@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -14,9 +15,13 @@ export default async function SettingsPage() {
   const invoiceTemplates = await prisma.invoiceTemplate.findMany({ where: { isActive: true } })
   const txTypes = await prisma.txType.findMany({ where: { active: true } })
 
-  return <SettingsClient
-    googleCal={googleCal ? { email: googleCal.googleAccountEmail, enabled: googleCal.syncEnabled, status: googleCal.syncStatus } : null}
-    invoiceTemplates={invoiceTemplates}
-    txTypes={txTypes}
-  />
+  return (
+    <Suspense fallback={null}>
+      <SettingsClient
+        googleCal={googleCal ? { email: googleCal.googleAccountEmail, enabled: googleCal.syncEnabled, status: googleCal.syncStatus } : null}
+        invoiceTemplates={invoiceTemplates}
+        txTypes={txTypes}
+      />
+    </Suspense>
+  )
 }

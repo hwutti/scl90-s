@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
@@ -52,13 +53,15 @@ export default async function PatientPage({ params }: { params: { id: string } }
 
   return (
     <PageShell>
-      <PatientRecordClient
-        patient={patient as any}
-        notes={notes as any}
-        instruments={instruments}
-        currentUserId={userId}
-        role={role}
-      />
+      <Suspense fallback={null}>
+        <PatientRecordClient
+          patient={patient as any}
+          notes={notes as any}
+          instruments={instruments}
+          currentUserId={userId}
+          role={role}
+        />
+      </Suspense>
     </PageShell>
   )
 }

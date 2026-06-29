@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Providers } from './providers'
+import { Suspense } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { getBranding, brandingToCssVars } from '@/lib/branding'
 import { getServerSession } from 'next-auth'
@@ -30,7 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers>
           {isLoggedIn ? (
             <div className="flex min-h-screen" style={{ background: 'var(--surface-page)' }}>
-              <Sidebar branding={branding} />
+              <Suspense fallback={null}><Sidebar branding={branding} /></Suspense>
               <main
                 className="flex-1 min-h-screen flex flex-col"
                 style={{ marginLeft: 'var(--sidebar-width)' }}
