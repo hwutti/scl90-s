@@ -323,7 +323,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                 </div>
               </div>
               <div>
-                <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Session hinzufügen</h4>
+                <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sitzungshinzufügen</h4>
                 <Toggle label="Uhrzeit-Option anzeigen" value={general.showTimeOption}
                   onChange={v => setGeneral(g => ({ ...g, showTimeOption: v }))} />
                 <Toggle label="Audio- & Dokumentoption anzeigen" value={general.showAudioDocOption}
@@ -408,9 +408,9 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
         </Section>
 
         {/* ── SESSIONS ── */}
-        <Section title="Sessions">
+        <Section title="Sitzungen">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Session Textboxen</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sitzungs-Textboxen</h4>
             <Toggle label="Formatierbare Protokolltexte" value={sessionSettings.formatableProtocols}
               onChange={v => setSessionSettings(s => ({ ...s, formatableProtocols: v }))} />
             <Toggle label="Text-Änderungsprotokoll" value={sessionSettings.changeLog}
@@ -420,21 +420,21 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
               onChange={v => setSessionSettings(s => ({ ...s, showChanges: v }))} />
             <Toggle label="Datenimport-Beschleunigung (Lazy Loading)" value={sessionSettings.lazyLoading}
               onChange={v => setSessionSettings(s => ({ ...s, lazyLoading: v }))}
-              description="Sessions erst bei Verwendung eines Profils importieren" />
+              description="Sitzungen erst bei Verwendung eines Profils importieren" />
             <Toggle label="Rechtschreibprüfung aktivieren" value={sessionSettings.spellCheck}
               onChange={v => setSessionSettings(s => ({ ...s, spellCheck: v }))}
-              description="Sessionprotokolle markieren Rechtschreibfehler. Kann die Leistung verschlechtern." />
+              description="Sitzungsprotokolle markieren Rechtschreibfehler. Kann die Leistung verschlechtern." />
 
             <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 
             <Toggle label="Zusätzliche Leistungen aktivieren" value={sessionSettings.extraServices}
               onChange={v => setSessionSettings(s => ({ ...s, extraServices: v }))}
-              description="Mit dem zusätzlichen Leistungen-Modus ist es möglich, bei Sessions weitere Leistungen (z.B. Diagnose, Testverfahren) hinzuzufügen." />
+              description="Mit dem zusätzlichen Leistungen-Modus ist es möglich, bei Sitzungen weitere Leistungen (z.B. Diagnose, Testverfahren) hinzuzufügen." />
 
             <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 
-            {/* Sessionvorlagen */}
-            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sessionvorlagen</h4>
+            {/* Sitzungsvorlagen */}
+            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sitzungsvorlagen</h4>
             {sessionTemplates.map((t: any) => (
               <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
                 <div>
@@ -454,7 +454,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
             ))}
             {!showSessionTplForm ? (
               <button onClick={() => setShowSessionTplForm(true)} className="btn-secondary" style={{ fontSize: 12, marginTop: 8, alignSelf: 'flex-start' }}>
-                <Plus style={{ width: 12, height: 12 }} /> Sessionvorlage hinzufügen
+                <Plus style={{ width: 12, height: 12 }} /> Sitzungsvorlage hinzufügen
               </button>
             ) : (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
@@ -464,7 +464,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                   <input type="checkbox" checked={sessionTplForm.isDefault}
                     onChange={e => setSessionTplForm(f => ({ ...f, isDefault: e.target.checked }))} />
-                  Als Standard-Sessionvorlage setzen
+                  Als Standard-Sitzungsvorlage setzen
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setShowSessionTplForm(false)} className="btn-secondary">Abbrechen</button>
@@ -701,7 +701,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
               <div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-                  Alle Daten löschen: Profile, Sessions, Finanzen, Dokumente und alle Einträge werden unwiderruflich gelöscht.
+                  Alle Daten löschen: Profile, Sitzungen, Finanzen, Dokumente und alle Einträge werden unwiderruflich gelöscht.
                 </p>
                 <button onClick={() => setDeleteScope('all')} className="btn-danger" style={{ fontSize: 12 }}>
                   Alle Daten löschen
@@ -710,7 +710,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
               <div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-                  Alle Finanzdaten löschen: Die Profile und Sessions bleiben erhalten.
+                  Alle Finanzdaten löschen: Die Profile und Sitzungen bleiben erhalten.
                 </p>
                 <button onClick={() => setDeleteScope('finance')} className="btn-danger" style={{ fontSize: 12 }}>
                   Finanzdaten löschen
