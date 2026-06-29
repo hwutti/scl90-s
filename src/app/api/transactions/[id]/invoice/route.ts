@@ -14,13 +14,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { id: params.id },
     include: {
       lineItems: { orderBy: { sortOrder: 'asc' } },
-      patient: { select: { firstName: true, lastName: true } },
+      patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
     },
   })
   if (!tx) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const templateId = (tx.patient as any)?.defaultInvoiceTemplateId ?? null
   const branding = await getBranding()
-  const { html: templateHtml, guiFields } = await getDefaultTemplate()
+  const { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
   const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
@@ -115,13 +116,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     where: { id: params.id },
     include: {
       lineItems: { orderBy: { sortOrder: 'asc' } },
-      patient: { select: { firstName: true, lastName: true } },
+      patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
     },
   })
   if (!tx) return new NextResponse('Not found', { status: 404 })
 
+  // Template-Priorität: 1. Patient-Default, 2. Globaler Default
+  const templateId = (tx.patient as any)?.defaultInvoiceTemplateId ?? null
   const branding = await getBranding()
-  const { html: templateHtml, guiFields } = await getDefaultTemplate()
+  const { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
   const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 

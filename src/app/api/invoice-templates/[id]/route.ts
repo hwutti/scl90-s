@@ -34,6 +34,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     if (data.isDefault) {
       await prisma.invoiceTemplate.updateMany({ data: { isDefault: false } })
+    } else {
+      // Wenn keine andere Vorlage isDefault ist -> diese als Default setzen
+      const hasDefault = await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true } })
+      if (!hasDefault) data.isDefault = true
     }
     const t = await prisma.invoiceTemplate.update({ where: { id: params.id }, data })
     return NextResponse.json(t)
