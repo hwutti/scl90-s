@@ -84,6 +84,12 @@ sudo -u "$APP_USER" bash -c "
 " && success "Schema aktualisiert" || warn "Schema-Update fehlgeschlagen – App läuft mit altem Schema weiter"
 
 # Session-Namen einmalig migrieren (idempotent)
+# Rechnungsvorlage: erste aktive Vorlage als Standard setzen wenn keine gesetzt ist
+sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"isDefault\" = true WHERE id = (SELECT id FROM \"InvoiceTemplate\" WHERE \"isActive\" = true ORDER BY \"createdAt\" ASC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM \"InvoiceTemplate\" WHERE \"isDefault\" = true AND \"isActive\" = true);" 2>/dev/null || true
+
+# Status-Badge aus gespeicherten Rechnungsvorlagen entfernen
+sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"htmlContent\" = REGEXP_REPLACE(\"htmlContent\", \'<tr><td>Status</td><td>[\\s\\S]*?</td></tr>\', \'\', \'g\') WHERE \"htmlContent\" LIKE '%Status</td><td>%';" 2>/dev/null || true
+
 sudo -u postgres psql kds_db -c "DELETE FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL AND id NOT IN (SELECT DISTINCT ON (\"transactionId\") id FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL ORDER BY \"transactionId\", \"createdAt\" DESC);" 2>/dev/null || true
 sudo -u postgres psql kds_db -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
 

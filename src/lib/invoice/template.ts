@@ -26,8 +26,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   .invoice-info td:first-child { color: #666; text-align: left; }
   .invoice-info td:last-child { font-weight: 600; text-align: right; }
   .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 9pt; font-weight: 600; }
-  .badge-paid { background: #dcfce7; color: #166534; }
-  .badge-unpaid { background: #fef3c7; color: #92400e; }
+
 
   /* Titel */
   .invoice-title { font-size: 16pt; font-weight: 700; color: #1a1a2e; margin-bottom: 6mm; }
@@ -340,6 +339,13 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
       ? await prisma.invoiceTemplate.findFirst({ where: { id: templateId, isActive: true } })
         ?? await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
       : await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
+    // Fallback: irgendeine aktive Vorlage nehmen wenn keine als Default gesetzt
+    if (!template) {
+      template = await prisma.invoiceTemplate.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' }
+      })
+    }
     if (!template) return { html: DEFAULT_INVOICE_HTML }
     return {
       html: template.htmlContent,
