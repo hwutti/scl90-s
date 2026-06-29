@@ -24,7 +24,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
     setLoading(true); setError('')
     const res = await signIn('credentials', { email, password, redirect: false })
     setLoading(false)
-    if (res?.ok) router.push('/dashboard')
+    if (res?.ok) { window.location.href = '/dashboard' }
     else setError('E-Mail oder Passwort ungueltig.')
   }
 
@@ -33,7 +33,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
     setLoading(true); setError('')
     const res = await signIn('credentials', { pin, redirect: false })
     setLoading(false)
-    if (res?.ok) router.push('/my')
+    if (res?.ok) { window.location.href = '/my' }
     else setError('PIN ungueltig oder nicht gefunden.')
   }
 

@@ -31,9 +31,126 @@ const GENDER_SHORT:  Record<string, string> = { MALE: 'm', FEMALE: 'w', DIVERSE:
 const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
 const GENDER_COLOR:  Record<string, string> = { MALE: '#3b82f6', FEMALE: '#ec4899', DIVERSE: '#8b5cf6' }
 
-// ── PatientIcon: Umriss-Silhouette mit Geschlechts-Pill ───────────────────────
+// ── Figur-Teile je Geschlecht ──────────────────────────────────────────────────
+function FigureIcon({ gender, isKind, size }: { gender: string; isKind: boolean; size: number }) {
+  const s = size
+  if (gender === 'MALE') {
+    // Blau — kurze Haare
+    return (
+      <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+        <circle cx="36" cy="36" r="35" fill="#dbeafe"/>
+        <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="#93c5fd"/>
+        <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="#bfdbfe"/>
+        <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 8 : 10} ry={isKind ? 4 : 5} fill="#3b82f6"/>
+        <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".5"/>
+        <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".5"/>
+        <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#1d4ed8"/>
+        <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#1d4ed8"/>
+        <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="#1d4ed8" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+      </svg>
+    )
+  }
+  if (gender === 'FEMALE') {
+    // Pink — lange Haare
+    return (
+      <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+        <circle cx="36" cy="36" r="35" fill="#fce7f3"/>
+        <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="#f9a8d4"/>
+        <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="#fbcfe8"/>
+        <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 9 : 11} ry={isKind ? 5 : 6} fill="#ec4899"/>
+        {!isKind && <><ellipse cx="23" cy="28" rx="4" ry="9" fill="#ec4899"/><ellipse cx="49" cy="28" rx="4" ry="9" fill="#ec4899"/></>}
+        <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".6"/>
+        <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".6"/>
+        <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#9d174d"/>
+        <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#9d174d"/>
+        <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="#9d174d" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+        {isKind && <circle cx="36" cy="21" r="4" fill="#f97316" opacity=".9"/>}
+      </svg>
+    )
+  }
+  // DIVERSE — lila + Regenbogen
+  return (
+    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+      <circle cx="36" cy="36" r="35" fill="#ede9fe"/>
+      <ellipse cx="36" cy="54" rx="14" ry="10" fill="#c4b5fd"/>
+      <circle cx="36" cy="28" r="12" fill="#ddd6fe"/>
+      <ellipse cx="36" cy="18" rx="10" ry="5" fill="#8b5cf6"/>
+      <ellipse cx="24" cy="23" rx="3.5" ry="7" fill="#8b5cf6"/>
+      <ellipse cx="48" cy="23" rx="3.5" ry="7" fill="#8b5cf6"/>
+      <circle cx="28" cy="31" r="3" fill="#a78bfa" opacity=".5"/>
+      <circle cx="44" cy="31" r="3" fill="#a78bfa" opacity=".5"/>
+      <circle cx="31" cy="27" r="2" fill="#5b21b6"/>
+      <circle cx="41" cy="27" r="2" fill="#5b21b6"/>
+      <path d="M31 33 Q36 37 41 33" stroke="#5b21b6" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+      <path d="M23 19 Q36 11 49 19" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity=".7"/>
+      <path d="M25 23 Q36 16 47 23" stroke="#ec4899" strokeWidth="2" strokeLinecap="round" fill="none" opacity=".5"/>
+    </svg>
+  )
+}
+
+// ── Paar/Familie/Gruppe Icons ───────────────────────────────────────────────
+function GroupIcon({ type, size }: { type: string; size: number }) {
+  const s = size
+  if (type === 'PAIR') return (
+    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+      <circle cx="36" cy="36" r="35" fill="#d1fae5"/>
+      <ellipse cx="24" cy="54" rx="9" ry="7" fill="#6ee7b7"/>
+      <ellipse cx="48" cy="54" rx="9" ry="7" fill="#5eead4"/>
+      <circle cx="24" cy="28" r="9" fill="#a7f3d0"/>
+      <circle cx="48" cy="28" r="9" fill="#99f6e4"/>
+      <ellipse cx="24" cy="20" rx="7" ry="4" fill="#10b981"/>
+      <ellipse cx="48" cy="20" rx="7" ry="4" fill="#0d9488"/>
+      <circle cx="20" cy="30" r="2" fill="#065f46"/><circle cx="28" cy="30" r="2" fill="#065f46"/>
+      <circle cx="44" cy="30" r="2" fill="#0f766e"/><circle cx="52" cy="30" r="2" fill="#0f766e"/>
+      <path d="M20 34 Q24 38 28 34" stroke="#065f46" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M44 34 Q48 38 52 34" stroke="#0f766e" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M31 40 Q36 45 41 40" stroke="#10b981" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
+  if (type === 'FAMILY') return (
+    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+      <circle cx="36" cy="36" r="35" fill="#ffedd5"/>
+      <ellipse cx="20" cy="56" rx="8" ry="6" fill="#fdba74"/>
+      <ellipse cx="52" cy="56" rx="8" ry="6" fill="#fb923c"/>
+      <ellipse cx="36" cy="58" rx="7" ry="5" fill="#fcd34d"/>
+      <circle cx="20" cy="26" r="9" fill="#fed7aa"/>
+      <circle cx="52" cy="26" r="9" fill="#fdba74"/>
+      <circle cx="36" cy="40" r="7" fill="#fde68a"/>
+      <ellipse cx="20" cy="18" rx="7" ry="4" fill="#f97316"/>
+      <ellipse cx="52" cy="18" rx="7" ry="4" fill="#ea580c"/>
+      <ellipse cx="36" cy="33" rx="5" ry="3" fill="#f59e0b"/>
+      <circle cx="17" cy="27" r="1.8" fill="#7c2d12"/><circle cx="23" cy="27" r="1.8" fill="#7c2d12"/>
+      <circle cx="49" cy="27" r="1.8" fill="#7c2d12"/><circle cx="55" cy="27" r="1.8" fill="#7c2d12"/>
+      <circle cx="33" cy="40" r="1.5" fill="#92400e"/><circle cx="39" cy="40" r="1.5" fill="#92400e"/>
+      <path d="M17 31 Q20 35 23 31" stroke="#7c2d12" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M49 31 Q52 35 55 31" stroke="#7c2d12" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M33 44 Q36 47 39 44" stroke="#92400e" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
+  // GROUP
+  return (
+    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
+      <circle cx="36" cy="36" r="35" fill="#e0e7ff"/>
+      <ellipse cx="12" cy="56" rx="7" ry="5" fill="#a5b4fc" opacity=".6"/>
+      <ellipse cx="36" cy="58" rx="9" ry="6" fill="#818cf8"/>
+      <ellipse cx="60" cy="56" rx="7" ry="5" fill="#a5b4fc" opacity=".6"/>
+      <circle cx="12" cy="27" r="7" fill="#c7d2fe" opacity=".7"/>
+      <circle cx="36" cy="25" r="9" fill="#c7d2fe"/>
+      <circle cx="60" cy="27" r="7" fill="#c7d2fe" opacity=".7"/>
+      <ellipse cx="12" cy="21" rx="5" ry="3" fill="#6366f1" opacity=".6"/>
+      <ellipse cx="36" cy="17" rx="7" ry="4" fill="#6366f1"/>
+      <ellipse cx="60" cy="21" rx="5" ry="3" fill="#6366f1" opacity=".6"/>
+      <circle cx="9" cy="28" r="1.5" fill="#312e81" opacity=".6"/><circle cx="15" cy="28" r="1.5" fill="#312e81" opacity=".6"/>
+      <circle cx="33" cy="26" r="2" fill="#312e81"/><circle cx="39" cy="26" r="2" fill="#312e81"/>
+      <circle cx="57" cy="28" r="1.5" fill="#312e81" opacity=".6"/><circle cx="63" cy="28" r="1.5" fill="#312e81" opacity=".6"/>
+      <path d="M33 31 Q36 34 39 31" stroke="#312e81" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
+}
+
+// ── PatientIcon: freundliche Figur + Pill ──────────────────────────────────
 function PatientIcon({
-  gender, dob, categoryType, size = 44,
+  gender, dob, categoryType, size = 52,
 }: {
   gender: string
   dob: string
@@ -45,73 +162,28 @@ function PatientIcon({
   const color  = categoryType === 'PAIR'   ? '#10b981'
                : categoryType === 'FAMILY' ? '#f97316'
                : categoryType === 'GROUP'  ? '#6366f1'
-               : (GENDER_COLOR[gender] ?? '#6366f1')
+               : gender === 'MALE'   ? '#3b82f6'
+               : gender === 'FEMALE' ? '#ec4899'
+               : '#8b5cf6'
 
-  // Pill-Label
   const pillLabel = categoryType === 'PAIR'   ? 'Paar'
                   : categoryType === 'FAMILY' ? 'Familie'
                   : categoryType === 'GROUP'  ? 'Gruppe'
                   : isKind
                     ? (GENDER_SYMBOL[gender] ?? '?') + ' <18'
-                    : (GENDER_SYMBOL[gender] ?? '?')
+                    : (GENDER_LABEL[gender] ?? gender)
 
-  // SVG-Silhouette: kleiner Kopf für Kind, zwei Köpfe für Paar, drei für Gruppe
-  const inner = categoryType === 'PAIR' ? (
-    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
-      <circle cx="13" cy="13" r="5" stroke={color} strokeWidth="2" />
-      <path d="M2 34c0-5.5 4.9-10 11-10" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <circle cx="25" cy="13" r="5" stroke="#0d9488" strokeWidth="2" />
-      <path d="M36 34c0-5.5-4.9-10-11-10" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" />
-      <path d="M18 19.5c0-1.5 1.5-2 2-1.5c.5-.5 2 0 2 1.5c0 2-2 3.5-2 3.5s-2-1.5-2-3.5z" stroke={color} strokeWidth="1.2" fill="none" />
-    </svg>
-  ) : categoryType === 'FAMILY' ? (
-    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
-      <circle cx="11" cy="11" r="4.5" stroke={color} strokeWidth="2" />
-      <circle cx="23" cy="11" r="4.5" stroke={color} strokeWidth="2" />
-      <circle cx="17" cy="24" r="3.5" stroke={color} strokeWidth="1.8" />
-      <line x1="11" y1="15.5" x2="17" y2="20.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="23" y1="15.5" x2="17" y2="20.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="11" y1="13" x2="23" y2="13" stroke={color} strokeWidth="1" strokeDasharray="2 2" />
-      <circle cx="27" cy="25" r="2.8" stroke={color} strokeWidth="1.5" opacity="0.6" />
-      <line x1="23" y1="15.5" x2="27" y2="22.2" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-    </svg>
-  ) : categoryType === 'GROUP' ? (
-    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
-      <circle cx="7" cy="14" r="4" stroke={color} strokeWidth="1.8" opacity="0.5" />
-      <circle cx="19" cy="11" r="5" stroke={color} strokeWidth="2" />
-      <circle cx="31" cy="14" r="4" stroke={color} strokeWidth="1.8" opacity="0.5" />
-      <path d="M2 35c0-5 4-9 9-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
-      <path d="M36 35c0-5-4-9-9-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
-      <path d="M10 33c0-5 4.5-9 9-9s9 4 9 9" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  ) : (
-    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
-      {isKind ? (
-        <>
-          <circle cx="19" cy="15" r="5.5" stroke={color} strokeWidth="2" />
-          <path d="M9 35c0-5.5 4.5-10 10-10s10 4.5 10 10" stroke={color} strokeWidth="2" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          <circle cx="19" cy="13" r="7" stroke={color} strokeWidth="2" />
-          <path d="M6 35c0-7.18 5.82-13 13-13s13 5.82 13 13" stroke={color} strokeWidth="2" strokeLinecap="round" />
-        </>
-      )}
-    </svg>
-  )
+  const icon = (categoryType === 'PAIR' || categoryType === 'FAMILY' || categoryType === 'GROUP')
+    ? <GroupIcon type={categoryType} size={size} />
+    : <FigureIcon gender={gender} isKind={isKind} size={size} />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        background: 'var(--surface-1)',
-        border: `2px solid ${color}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {inner}
+      <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${color}` }}>
+        {icon}
       </div>
       <span style={{
-        fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
+        fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
         background: color, color: 'white', whiteSpace: 'nowrap', lineHeight: 1.6,
       }}>
         {pillLabel}
