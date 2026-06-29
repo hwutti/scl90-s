@@ -56,16 +56,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 500 })
   }
 
-  // E-Mail-Versand im Audit-Log festhalten
-  await prisma.auditLog.create({
-    data: {
-      action: 'EMAIL_SENT',
-      entityType: 'Transaction',
-      entityId: transactionId,
-      userId: (session.user as any).id,
-      details: JSON.stringify({ to: toEmail, subject }),
-    },
-  }).catch(() => {}) // Audit-Log-Fehler ignorieren
-
   return NextResponse.json({ ok: true })
 }
