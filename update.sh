@@ -81,19 +81,10 @@ step "Datenbank-Schema migrieren"
 sudo -u "$APP_USER" bash -c "
   set -a; source $APP_DIR/.env; set +a
   cd $APP_DIR && npx prisma db push --accept-data-loss 2>&1 | tail -5
-
-# Bestehende Session-Namen auf neues Format migrieren (einmalig, idempotent)
-sudo -u "$APP_USER" bash -c "
-  export DATABASE_URL='postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}'
-  cd $APP_DIR
-  npx prisma db execute --stdin <<'SQL'
-UPDATE "TherapySession"
-SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', 'Sitzung-\1')
-WHERE name ~ '^Session-[0-9]+';
-SQL
-" 2>/dev/null || true
-info "Session-Namen auf Sitzung-N Format migriert"
 " && success "Schema aktualisiert" || warn "Schema-Update fehlgeschlagen – App läuft mit altem Schema weiter"
+
+# Session-Namen einmalig migrieren (idempotent)
+sudo -u postgres psql ${DB_NAME} -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
 
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
 step "Seed: Basisdaten prüfen"
