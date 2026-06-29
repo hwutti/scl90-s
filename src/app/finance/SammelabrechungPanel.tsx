@@ -33,7 +33,8 @@ export function SammelabrechungPanel({ year }: { year: number }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   // Pro Patient: Overrides (falls Therapeut etwas anpassen will)
-  const [overrides, setOverrides] = useState<Record<string, { vatRate: number; paymentMethod: string; markAsPaid: boolean; generateInvoice: boolean }>>({})
+  interface Override { vatRate: number; paymentMethod: string; markAsPaid: boolean; generateInvoice: boolean }
+  const [overrides, setOverrides] = useState<Record<string, Override>>({})
 
   // Ergebnisse
   const [running, setRunning]   = useState(false)
