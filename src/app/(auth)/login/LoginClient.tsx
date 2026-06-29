@@ -24,7 +24,7 @@ export function LoginClient({ branding }: { branding: BrandingConfig }) {
     setLoading(true); setError('')
     const res = await signIn('credentials', { email, password, redirect: false })
     setLoading(false)
-    if (res?.ok) router.push('/patients')
+    if (res?.ok) router.push('/dashboard')
     else setError('E-Mail oder Passwort ungueltig.')
   }
 
