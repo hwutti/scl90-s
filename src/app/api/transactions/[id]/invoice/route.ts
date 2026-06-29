@@ -32,6 +32,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
     : (body.paymentInfo ?? '')
 
+  const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
+  const bgMode    = guiFields?.bgImageMode ?? 'behind'
+
   const invoiceData = {
     praxis_name: guiFields?.praxisName || branding.praxisName,
     praxis_slogan: branding.slogan ?? '',
@@ -77,10 +80,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // QR-Code Platzhalter
-  // Bild-Felder aus Template
-  const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
-  const bgMode    = guiFields?.bgImageMode ?? 'behind'
-
   const qrPlaceholder = (guiFields?.showQrCode && iban)
     ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
     : ''
