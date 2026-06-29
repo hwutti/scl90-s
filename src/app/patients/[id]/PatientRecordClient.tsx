@@ -939,10 +939,10 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                   diagnosis_added: '🩺', document_uploaded: '📄', appointment_created: '📅',
                 }
                 const EVENT_LABELS: Record<string, string> = {
-                  profile_created: 'Profil', session_created: 'Session', transaction_created: 'Transaktion',
+                  profile_created: 'Profil', session_created: 'Sitzung', transaction_created: 'Transaktion',
                   transaction_cancelled: 'Transaktion', diagnosis_added: 'Diagnose', document_uploaded: 'Dokument',
-                  appointment_created: 'Termin', session_excluded_from_finances: 'Session',
-                  session_included_in_finances: 'Session',
+                  appointment_created: 'Termin', session_excluded_from_finances: 'Sitzung',
+                  session_included_in_finances: 'Sitzung',
                 }
                 const EVENT_CLASSES: Record<string, string> = {
                   session_created: 'badge-indigo', transaction_created: 'badge-green',
