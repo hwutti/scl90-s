@@ -56,7 +56,7 @@ export function AppointmentTypesClient({ initial, role }: { initial: any[]; role
                 <td className="px-4 py-3">
                   <div className="w-5 h-5 rounded-full border-2 border-white shadow" style={{ backgroundColor: t.color }} />
                 </td>
-                <td className="px-4 py-3 font-semibold text-slate-800">{t.name}</td>
+                <td className="px-4 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{t.name}</td>
                 <td className="px-4 py-3 text-slate-500"><Clock className="w-3.5 h-3.5 inline mr-1" />{t.durationMin} Min.</td>
                 <td className="px-4 py-3 text-slate-400">{t.description || '—'}</td>
                 <td className="px-4 py-3">
