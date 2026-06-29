@@ -422,12 +422,11 @@ export function SitzungDetailClient({
                   onClick={() => setTab(item.key)}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 14px', background: 'none', border: 'none',
+                    padding: '7px 14px', background: active ? 'var(--color-primary-light)' : 'none', border: 'none',
                     borderLeft: active ? '2px solid var(--color-primary)' : '2px solid transparent',
-                    cursor: 'pointer', fontSize: 13, textAlign: 'left',
+                    cursor: 'pointer', fontSize: 13, textAlign: 'left' as const,
                     color: active ? 'var(--color-primary)' : 'var(--text-secondary)',
                     fontWeight: active ? 600 : 400,
-                    background: active ? 'var(--color-primary-light)' : 'none' as any,
                   }}
                 >
                   <Icon style={{ width: 14, height: 14, flexShrink: 0 }} />
