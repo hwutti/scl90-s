@@ -1725,3 +1725,21 @@ model UsageTelemetryConsent {
   source      String   @default("settings")
 }
 
+
+model SmtpConfig {
+  id            String   @id @default(cuid())
+  provider      String   @default("custom")  // gmail | office365 | custom
+  host          String
+  port          Int      @default(587)
+  secure        Boolean  @default(false)     // true = TLS/SSL (Port 465)
+  user          String
+  password      String                       // verschlüsselt gespeichert
+  fromName      String   @default("KDS Praxis")
+  fromEmail     String
+  replyTo       String?
+  isActive      Boolean  @default(true)
+  lastTestedAt  DateTime?
+  lastTestOk    Boolean?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

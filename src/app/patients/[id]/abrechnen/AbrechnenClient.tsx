@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ChevronRight, Euro, Calendar, Clock,
-  Check, AlertCircle, FileText, Loader,
+  Check, AlertCircle, FileText, Loader, Printer, Mail, X,
 } from 'lucide-react'
 
 function fmtEUR(n: any) {
@@ -66,7 +66,13 @@ export function AbrechnenClient({
 
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
-  const [done,   setDone]     = useState<{ referenceNumber: string } | null>(null)
+  const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string } | null>(null)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [emailTo, setEmailTo]   = useState('')
+  const [emailMsg, setEmailMsg] = useState('')
+  const [sending,  setSending]  = useState(false)
+  const [emailDone, setEmailDone] = useState(false)
+  const [emailErr,  setEmailErr]  = useState('')
 
   const backUrl = `/patients/${patient.id}?tab=sitzungen`
 
@@ -95,11 +101,29 @@ export function AbrechnenClient({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`)
-      setDone({ referenceNumber: data.referenceNumber })
+      setDone({ referenceNumber: data.referenceNumber, transactionId: data.id ?? data.transactionId })
+      // E-Mail-Adresse aus Patientenprofil vorausfüllen
+      if ((patient as any).email) setEmailTo((patient as any).email)
     } catch (e: any) {
       setError(e.message)
     }
     setSaving(false)
+  }
+
+  async function sendInvoiceEmail() {
+    if (!done?.transactionId || !emailTo) return
+    setSending(true); setEmailErr('')
+    try {
+      const res = await fetch('/api/transactions/send-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: done.transactionId, toEmail: emailTo, message: emailMsg }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Fehler')
+      setEmailDone(true)
+      setShowEmailForm(false)
+    } catch (e: any) { setEmailErr(e.message) }
+    setSending(false)
   }
 
   const inputStyle = {
@@ -131,14 +155,53 @@ export function AbrechnenClient({
             </div>
             {form.markAsPaid && <div style={{ fontSize: 13, color: 'var(--green)', marginTop: 4 }}>✓ Als bezahlt markiert ({PAYMENT_LABELS[form.paymentMethod]})</div>}
           </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={() => router.push(backUrl)} className="btn-secondary" style={{ fontSize: 13 }}>
               Zurück zur Akte
+            </button>
+            {done?.transactionId && (
+              <button
+                onClick={() => {
+                  const w = window.open(`/api/transactions/${done.transactionId}/invoice`, '_blank')
+                }}
+                className="btn-secondary" style={{ fontSize: 13 }}>
+                <Printer style={{ width: 13, height: 13 }} /> Drucken / PDF
+              </button>
+            )}
+            <button onClick={() => setShowEmailForm(s => !s)} className="btn-primary" style={{ fontSize: 13 }}>
+              <Mail style={{ width: 13, height: 13 }} /> Per E-Mail senden
             </button>
             <button onClick={() => router.push(`/finance`)} className="btn-secondary" style={{ fontSize: 13 }}>
               Zu Finanzen
             </button>
           </div>
+
+          {/* E-Mail Formular */}
+          {showEmailForm && (
+            <div style={{ width: '100%', maxWidth: 440, marginTop: 16, padding: 16, background: 'var(--surface-card)', borderRadius: 12, border: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Honorarnote per E-Mail senden</span>
+                <button onClick={() => setShowEmailForm(false)} className="btn-ghost" style={{ padding: 4 }}><X style={{ width: 14, height: 14 }} /></button>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Empfänger *</label>
+                <input type="email"
+                  style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '0.5px solid var(--border)', borderRadius: 7, background: 'var(--surface-page)', color: 'var(--text-primary)', boxSizing: 'border-box' as const }}
+                  value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="patient@email.at" />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Persönliche Nachricht (optional)</label>
+                <textarea
+                  style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '0.5px solid var(--border)', borderRadius: 7, background: 'var(--surface-page)', color: 'var(--text-primary)', boxSizing: 'border-box' as const, resize: 'vertical', minHeight: 70 }}
+                  value={emailMsg} onChange={e => setEmailMsg(e.target.value)} placeholder="Optionale Nachricht an den Patienten..." />
+              </div>
+              {emailErr && <div style={{ fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}><AlertCircle style={{ width: 13, height: 13 }} />{emailErr}</div>}
+              {emailDone && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}><Check style={{ width: 13, height: 13 }} />E-Mail erfolgreich gesendet!</div>}
+              <button onClick={sendInvoiceEmail} disabled={sending || !emailTo || emailDone} className="btn-primary" style={{ fontSize: 13, justifyContent: 'center' }}>
+                {sending ? 'Sende...' : <><Mail style={{ width: 13, height: 13 }} /> Senden</>}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )

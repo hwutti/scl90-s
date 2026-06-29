@@ -31,6 +31,7 @@ const NAV_ITEMS = [
       { href: '/admin/norm-tables', label: 'Normwerte' },
       { href: '/admin/branding', label: 'Branding & Praxis' },
       { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlage' },
+      { href: '/admin/smtp', label: 'E-Mail / SMTP' },
     ]
   },
 ]
