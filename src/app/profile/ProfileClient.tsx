@@ -13,7 +13,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> 
   SUPERVISOR: { label: 'Supervisor*in',  color: '#92400e', bg: '#fef3c7' },
 }
 
-export function ProfileClient({ user }: { user: any }) {
+export function ProfileClient({ user, patientCount = 0 }: { user: any; patientCount?: number }) {
   const router = useRouter()
 
   // Bearbeitungs-States
@@ -216,7 +216,7 @@ export function ProfileClient({ user }: { user: any }) {
       {user.role !== 'PATIENT' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
           {[
-            { label: 'Patienten', value: user._count?.therapistPatients ?? user._count?.createdPatients ?? 0, icon: User },
+            { label: 'Patienten', value: patientCount, icon: User },
             { label: 'Sitzungen', value: user._count?.therapySessions ?? 0, icon: Calendar },
             { label: 'Assessments', value: user._count?.createdAssessments ?? 0, icon: BarChart2 },
           ].map(s => (

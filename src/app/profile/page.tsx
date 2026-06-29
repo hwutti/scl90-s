@@ -17,7 +17,6 @@ export default async function ProfilePage() {
       active: true, createdAt: true, avatarBase64: true, avatarMime: true,
       _count: {
         select: {
-          createdPatients: true,
           therapistPatients: true,
           therapySessions: true,
           createdAssessments: true,
@@ -25,11 +24,17 @@ export default async function ProfilePage() {
       }
     }
   })
+
+  // Alle aktiven Patienten zählen (für ADMIN alle, für THERAPIST zugewiesene)
+  const role = (user as any)?.role
+  const patientCount = role === 'ADMIN'
+    ? await prisma.patient.count({ where: { deletedAt: null } })
+    : await prisma.therapistPatient.count({ where: { therapistId: userId } })
   if (!user) redirect('/login')
 
   return (
     <PageShell>
-      <ProfileClient user={user as any} />
+      <ProfileClient user={user as any} patientCount={patientCount} />
     </PageShell>
   )
 }
