@@ -139,7 +139,7 @@ export function DashboardHomeClient({ role, userName }: { role: string; userName
                     />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                     <Bar dataKey="sitzungen" name="Sitzungen" fill="var(--color-primary)" radius={[3,3,0,0]} />
-                    <Bar dataKey="transaktionen" name="Transaktionen" fill="var(--blue)" radius={[3,3,0,0]} />
+                    <Bar dataKey="transaktionen" name="Rechnungen" fill="var(--blue)" radius={[3,3,0,0]} />
                     <Bar dataKey="termine" name="Termine" fill="var(--amber)" radius={[3,3,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>

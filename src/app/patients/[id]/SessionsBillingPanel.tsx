@@ -154,7 +154,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   }
 
   async function cancelTx(txId: string) {
-    if (!confirm('Transaktion wirklich stornieren? Es wird eine Gegenbuchung erstellt.')) return
+    if (!confirm('Rechnung wirklich stornieren? Es wird eine Gegenbuchung erstellt.')) return
     await fetch(`/api/transactions/${txId}/cancel`, { method: 'POST' })
     load()
   }
@@ -181,7 +181,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
           { label: 'Sitzungen gesamt', value: sessions.length, color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
           { label: 'Nicht verrechnet', value: unbilledSessions.length, color: 'var(--amber)', bg: 'var(--amber-bg)' },
           { label: 'Offener Betrag', value: fmtEUR(totalUnbilled), color: 'var(--red)', bg: 'var(--red-bg)' },
-          { label: 'Transaktionen', value: transactions.length, color: 'var(--green)', bg: 'var(--green-bg)' },
+          { label: 'Rechnungen', value: transactions.length, color: 'var(--green)', bg: 'var(--green-bg)' },
         ].map(k => (
           <div key={k.label} className="stat-card">
             <div className="stat-icon" style={{ background: k.bg }}>
@@ -195,7 +195,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
 
       {/* Sub-Tabs */}
       <div style={{ display: 'flex', gap: 0 }}>
-        {[['sessions','Sitzungen'],['transactions','Transaktionen']].map(([key,label]) => (
+        {[['sessions','Sitzungen'],['transactions','Rechnungen']].map(([key,label]) => (
           <button key={key} onClick={() => setSelectedTab(key as any)}
             style={{ padding: '7px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13,
               fontWeight: selectedTab===key ? 600 : 400,
@@ -278,7 +278,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
             <div className="card" style={{ padding: 24 }}>
               <div className="empty-state">
                 <Euro className="empty-state-icon" style={{width:36,height:36}}/>
-                <p className="empty-state-text">Noch keine Transaktionen.</p>
+                <p className="empty-state-text">Noch keine Rechnungen.</p>
               </div>
             </div>
           ) : (

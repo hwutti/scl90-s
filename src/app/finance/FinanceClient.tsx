@@ -71,7 +71,7 @@ export function FinanceClient() {
   const [showMileForm,  setShowMileForm]  = useState(false)
   const [showWizard,    setShowWizard]    = useState(false)  // 4-Schritt-Wizard
 
-  // Manuelle Transaktion
+  // Manuelle Rechnung
   const [manualDir, setManualDir] = useState<'INCOME'|'EXPENSE'>('EXPENSE')
   const [manualForm, setManualForm] = useState({
     payerName: '', payerAddress: '', payeeName: '', payeeAddress: '',
@@ -230,13 +230,13 @@ export function FinanceClient() {
   }
 
   async function deleteLegacyTx(id: string) {
-    if (!confirm('Transaktion löschen?')) return
+    if (!confirm('Rechnung löschen?')) return
     await fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' })
     load()
   }
 
   async function cancelNewTx(id: string) {
-    if (!confirm('Transaktion stornieren? Es wird eine Gegenbuchung erstellt.')) return
+    if (!confirm('Rechnung stornieren? Es wird eine Gegenbuchung erstellt.')) return
     await fetch(`/api/transactions/${id}/cancel`, { method: 'POST' })
     load()
   }
@@ -342,11 +342,11 @@ export function FinanceClient() {
               ))}
             </div>
 
-            {/* Letzte Transaktionen */}
+            {/* Letzte Rechnungen */}
             <div className="card" style={{ overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', borderBottom: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Letzte Transaktionen
+                  Letzte Rechnungen
                 </h2>
                 <button onClick={() => exportCSV(incomeRows.slice(0, 20), `finanzen-${year}.csv`)} className="btn-secondary" style={{ fontSize: 12 }}>
                   <Download style={{ width: 13, height: 13 }} /> CSV
@@ -778,13 +778,13 @@ export function FinanceClient() {
         )}
       </div>
 
-      {/* ══ MODAL: Manuelle Transaktion ══ */}
+      {/* ══ MODAL: Manuelle Rechnung ══ */}
       {showManualTx && (
         <div className="modal-overlay" onClick={() => setShowManualTx(false)}>
           <div className="modal" style={{ maxWidth: 620 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                <h2 style={{ margin: 0, fontSize: 15 }}>Transaktion hinzufügen</h2>
+                <h2 style={{ margin: 0, fontSize: 15 }}>Rechnung hinzufügen</h2>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {(['INCOME', 'EXPENSE'] as const).map(d => (
                     <button key={d} onClick={() => setManualDir(d)}
@@ -845,7 +845,7 @@ export function FinanceClient() {
                 </div>
                 <div>
                   <label className="label">
-                    {manualDir === 'INCOME' ? 'Rechnungstyp' : 'Transaktionstyp / Kategorie'}
+                    {manualDir === 'INCOME' ? 'Rechnungstyp' : 'Rechnungstyp / Kategorie'}
                   </label>
                   {manualDir === 'INCOME' ? (
                     <select className="input" value={manualForm.incomeCategory}

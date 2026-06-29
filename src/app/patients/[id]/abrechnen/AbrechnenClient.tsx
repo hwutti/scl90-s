@@ -389,7 +389,7 @@ export function AbrechnenClient({
           <div>
             <div style={sectionStyle}>Notiz (optional)</div>
             <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
-              value={form.notes} placeholder="Interne Notiz zur Transaktion"
+              value={form.notes} placeholder="Interne Notiz zur Rechnung"
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
 

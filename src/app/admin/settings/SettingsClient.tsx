@@ -557,8 +557,8 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
             <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
 
-            {/* Transaktionstypen */}
-            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Eigene Transaktionstypen</h4>
+            {/* Rechnungstypen */}
+            <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Eigene Rechnungstypen</h4>
             {txTypes?.map((t: any) => (
               <div key={t.id} style={{ padding: '6px 0', borderBottom: '0.5px solid var(--border)', fontSize: 13, display: 'flex', gap: 10 }}>
                 <span style={{ fontWeight: 500 }}>{t.name}</span>

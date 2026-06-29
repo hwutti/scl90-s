@@ -1018,8 +1018,8 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                   diagnosis_added: '🩺', document_uploaded: '📄', appointment_created: '📅',
                 }
                 const EVENT_LABELS: Record<string, string> = {
-                  profile_created: 'Profil', session_created: 'Sitzung', transaction_created: 'Transaktion',
-                  transaction_cancelled: 'Transaktion', diagnosis_added: 'Diagnose', document_uploaded: 'Dokument',
+                  profile_created: 'Profil', session_created: 'Sitzung', transaction_created: 'Rechnung',
+                  transaction_cancelled: 'Rechnung', diagnosis_added: 'Diagnose', document_uploaded: 'Dokument',
                   appointment_created: 'Termin', session_excluded_from_finances: 'Sitzung',
                   session_included_in_finances: 'Sitzung',
                 }

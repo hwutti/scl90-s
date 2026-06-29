@@ -218,7 +218,7 @@ export function SitzungDetailClient({
 
   async function toggleExclude() {
     const newExclude = session.billingStatus !== 'EXCLUDED'
-    if (newExclude && !confirm('Diese Sitzung von der automatischen Transaktionserstellung ausnehmen?')) return
+    if (newExclude && !confirm('Diese Sitzung von der automatischen Rechnungserstellung ausnehmen?')) return
     setExcluding(true)
     await fetch(`/api/therapy-sessions/${session.id}/exclude`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

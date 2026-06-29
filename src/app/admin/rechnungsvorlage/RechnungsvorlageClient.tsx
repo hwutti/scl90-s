@@ -893,7 +893,7 @@ export function RechnungsvorlageClient({
                   onClick={() => setPreviewMode('real')}
                   className={previewMode === 'real' ? 'btn-primary' : 'btn-secondary'}
                   style={{ fontSize: 11, padding: '4px 10px' }}
-                  title={`Letzte Transaktion: ${lastTransaction.referenceNumber} – ${lastTransaction.payerName}`}
+                  title={`Letzte Rechnung: ${lastTransaction.referenceNumber} – ${lastTransaction.payerName}`}
                 >
                   Echte Daten
                 </button>
