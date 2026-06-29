@@ -124,9 +124,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
         <tr><td>Rechnungsnummer</td><td><strong>{{reference_number}}</strong></td></tr>
         <tr><td>Rechnungsdatum</td><td>{{transaction_date}}</td></tr>
         <tr><td>Fällig bis</td><td>{{due_date}}</td></tr>
-        <tr><td>Status</td><td>
-          {{#if is_paid}}<span class="badge badge-paid">✓ Bezahlt</span>{{else}}<span class="badge badge-unpaid">Offen</span>{{/if}}
-        </td></tr>
+
       </table>
     </div>
   </div>
