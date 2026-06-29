@@ -277,15 +277,14 @@ export type InvoiceData = {
 export function renderInvoice(template: string, data: InvoiceData): string {
   let html = template
 
-  // Simple if blocks
-  html = html.replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_match, key, content) => {
-    return (data as any)[key] ? content : ''
-  })
-
-  // Each loops for line_items
+  // 1. Each loops ZUERST (damit innere {{#if this.X}} danach aufgelöst werden)
   html = html.replace(/\{\{#each line_items\}\}([\s\S]*?)\{\{\/each\}\}/g, (_match, itemTemplate) => {
     return data.line_items.map(item => {
       let row = itemTemplate
+      // Innere {{#if this.X}}...{{/if}} auflösen
+      row = row.replace(/\{\{#if this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m: string, key: string, inner: string) => {
+        return (item as any)[key] ? inner : ''
+      })
       row = row.replace(/\{\{this\.date\}\}/g, item.date)
       row = row.replace(/\{\{this\.description\}\}/g, item.description)
       row = row.replace(/\{\{this\.service_label\}\}/g, item.service_label || '')
@@ -295,6 +294,14 @@ export function renderInvoice(template: string, data: InvoiceData): string {
       return row
     }).join('')
   })
+
+  // 2. Outer {{#if key}}...{{else}}...{{/if}} mit optionalem {{else}}
+  html = html.replace(/\{\{#if ([\w.]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_match: string, key: string, truePart: string, falsePart: string = '') => {
+      const val = (data as any)[key]
+      return (val && val !== 'false' && val !== '0') ? truePart : falsePart
+    }
+  )
 
   // Simple replacements
   const simpleKeys: (keyof InvoiceData)[] = [
