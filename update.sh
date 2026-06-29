@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SCL-90-S – Update-Script (vollautomatisch)
+# KDS – Klinisches Dokumentationssystem – Update-Script (vollautomatisch)
 # =============================================================================
 set -u
 # KEIN set -e damit einzelne Fehler nicht das ganze Script abbrechen
@@ -18,7 +18,7 @@ fail()    { echo -e "${RED}✗ $1${NC}"; exit 1; }
 [[ $EUID -ne 0 ]] && fail "Bitte als root ausführen: sudo bash update.sh"
 
 echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"
-echo -e "${GREEN}  SCL-90-S Update   $(date '+%d.%m.%Y %H:%M')${NC}"
+echo -e "${GREEN}  KDS – Klinisches Dokumentationssystem   $(date '+%d.%m.%Y %H:%M')${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════${NC}"
 
 # ─── 1. Git ───────────────────────────────────────────────────────────────────
@@ -84,7 +84,8 @@ sudo -u "$APP_USER" bash -c "
 " && success "Schema aktualisiert" || warn "Schema-Update fehlgeschlagen – App läuft mit altem Schema weiter"
 
 # Session-Namen einmalig migrieren (idempotent)
-sudo -u postgres psql ${DB_NAME} -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
+DB_NAME=$(grep "^DATABASE_URL=" "$ENV_FILE" 2>/dev/null | sed 's|.*://[^/]*/||;s|?.*||')
+sudo -u postgres psql "${DB_NAME:-kds_db}" -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
 
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
 step "Seed: Basisdaten prüfen"
