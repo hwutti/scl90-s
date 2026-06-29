@@ -314,7 +314,9 @@ export function renderInvoice(template: string, data: InvoiceData): string {
     'bg_image_base64','bg_image_mime','bg_image_opacity',
   ]
   for (const key of simpleKeys) {
-    html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String((data as any)[key] || ''))
+    const val = String((data as any)[key] || '')
+    // Replacement als Funktion übergeben — verhindert $-Sonderzeichen-Bug bei Base64
+    html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), () => val)
   }
 
   return html
