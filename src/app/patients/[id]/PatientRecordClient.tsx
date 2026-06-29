@@ -195,7 +195,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     setGoalsLoading(true)
     fetch(`/api/patients/${patient.id}/goals`).then(r=>r.json()).then(d=>{setGoals(d);setGoalsLoading(false)}).catch(()=>setGoalsLoading(false))
   }, [patient.id])
-  useEffect(() => { if (tab==='therapieplan') loadGoals() }, [tab, loadGoals])
+  useEffect(() => { if (tab==='klinik') loadGoals() }, [tab, loadGoals])
 
   // Diagnoses
   const [diags, setDiags] = useState<any[]>([])
