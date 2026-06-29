@@ -719,7 +719,10 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                     classicMode: visual.classicMode,
                   }),
                 })
-                window.location.reload()
+                // Theme sofort anwenden ohne Reload
+                localStorage.setItem('kds-theme', visual.theme)
+                document.documentElement.setAttribute('data-theme', visual.theme)
+                setSaved(true); setTimeout(() => setSaved(false), 2500)
               }} className="btn-primary" style={{ fontSize: 12 }}>
                 <Save style={{ width: 12, height: 12 }} /> Visuelle Einstellungen speichern
               </button>
