@@ -264,7 +264,7 @@ function generateReportHtml(opts: any): string {
     </div>
     <div class="meta-item">
       <div class="label">Geburtsdatum</div>
-      <div class="value">${fmtDate(patient.dateOfBirth)} (${age(patient.dateOfBirth)})</div>
+      <div class="value">${fmtDate(patient.dob)} (${age(patient.dob)})</div>
     </div>
     <div class="meta-item">
       <div class="label">Behandlungszeitraum</div>

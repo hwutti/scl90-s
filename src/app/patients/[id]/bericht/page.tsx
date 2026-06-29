@@ -15,7 +15,7 @@ export default async function BerichtPage({ params }: { params: { id: string } }
     where: { id: params.id, deletedAt: null },
     select: {
       id: true, firstName: true, lastName: true, gender: true,
-      dateOfBirth: true,
+      dob: true,
       diagnoses: { orderBy: [{ diagnosisType: 'asc' }, { diagnosedAt: 'asc' }] },
       _count: { select: { therapySessions: true } },
     }
