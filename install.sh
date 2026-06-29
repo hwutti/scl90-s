@@ -171,13 +171,13 @@ cd "$APP_DIR"
 
 # pnpm-lock.yaml prüfen
 if [[ ! -f "pnpm-lock.yaml" ]]; then
-  warn "pnpm-lock.yaml fehlt – führe pnpm install aus (ohne --frozen-lockfile)"
+  warn "pnpm-lock.yaml fehlt – führe pnpm install aus (ohne )"
   sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --no-frozen-lockfile" \
     || error "pnpm install fehlgeschlagen"
 else
-  info "pnpm-lock.yaml vorhanden – nutze --frozen-lockfile"
-  sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --frozen-lockfile" \
-    || error "pnpm install --frozen-lockfile fehlgeschlagen"
+  info "pnpm-lock.yaml vorhanden – nutze "
+  sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install " \
+    || error "pnpm install  fehlgeschlagen"
 fi
 success "Abhängigkeiten installiert"
 
@@ -265,7 +265,7 @@ Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$APP_DIR/.env
-ExecStart=$(which node) $APP_DIR/.next/standalone/server.js
+ExecStart=/usr/local/bin/pnpm start
 Restart=always
 RestartSec=5
 StandardOutput=journal

@@ -63,7 +63,7 @@ fi
 
 # ─── 3. Dependencies ──────────────────────────────────────────────────────────
 step "pnpm install"
-sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install --frozen-lockfile 2>&1 | tail -3" \
+sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install 2>&1 | tail -3" \
   || sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install 2>&1 | tail -3" \
   || fail "pnpm install fehlgeschlagen"
 success "Abhängigkeiten installiert"

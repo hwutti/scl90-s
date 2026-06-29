@@ -170,18 +170,10 @@ export async function createTransactionFromSessions(params: {
     // InvoiceDocument anlegen wenn gewünscht
     if (params.generateInvoiceDoc !== false) {
       try {
-        const template = params.invoiceTemplateId
-          ? await prisma.invoiceTemplate.findUnique({ where: { id: params.invoiceTemplateId } })
-          : await prisma.invoiceTemplate.findFirst({ where: { isDefault: true } })
-
         await prisma.invoiceDocument.create({
           data: {
             transactionId: result.transactionId,
-            templateId: template?.id ?? null,
-            invoiceNumber: result.referenceNumber,
-            isAnonymized: params.anonymizeInvoice ?? false,
-            status: 'GENERATED',
-            generatedAt: new Date(),
+            anonymized: params.anonymizeInvoice ?? false,
           },
         })
       } catch (_) { /* Invoice-Generierung ist nicht kritisch */ }

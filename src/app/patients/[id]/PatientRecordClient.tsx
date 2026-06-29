@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -88,7 +89,6 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     billRecipientName: (patient as any).billRecipientName ?? '',
     billRecipientAddress: (patient as any).billRecipientAddress ?? '',
     billRecipientCity: (patient as any).billRecipientCity ?? '',
-    // Abrechnungs-Einstellungen
     defaultBillingMode: (patient as any).defaultBillingMode ?? 'time',
     defaultUnitDuration: (patient as any).defaultUnitDuration ?? 50,
     defaultUnitPriceNet: (patient as any).defaultUnitPriceNet ?? '',
@@ -553,8 +553,8 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Abrechnung</div>
                       <div className="field-row"><span className="field-label">Modus</span><span className="field-value">{(patient as any).defaultBillingMode === 'unit' ? 'Einheitenmodus' : 'Zeitmodus'}</span></div>
-                      {(patient as any).defaultUnitDuration && <div className="field-row"><span className="field-label">Einheitendauer</span><span className="field-value">{(patient as any).defaultUnitDuration} min</span></div>}
-                      {(patient as any).defaultUnitPriceNet && <div className="field-row"><span className="field-label">Kosten/Einheit</span><span className="field-value">€ {Number((patient as any).defaultUnitPriceNet).toFixed(2)}</span></div>}
+                      {(patient as any).defaultUnitDuration ? <div className="field-row"><span className="field-label">Einheitendauer</span><span className="field-value">{(patient as any).defaultUnitDuration} min</span></div> : null}
+                      {(patient as any).defaultUnitPriceNet ? <div className="field-row"><span className="field-label">Kosten/Einheit</span><span className="field-value">{'EUR ' + Number((patient as any).defaultUnitPriceNet).toFixed(2)}</span></div> : null}
                       <div className="field-row"><span className="field-label">Session-Startzahl</span><span className="field-value">{(patient as any).sessionStartNumber ?? 0}</span></div>
                     </div>
                   </>
@@ -576,22 +576,22 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                       <input className="input" value={stammForm.billRecipientAddress} onChange={e => setStammForm(f => ({ ...f, billRecipientAddress: e.target.value }))} /></div>
                     <div><label className="label">PLZ / Stadt</label>
                       <input className="input" value={stammForm.billRecipientCity} onChange={e => setStammForm(f => ({ ...f, billRecipientCity: e.target.value }))} /></div>
-                  </div>
-                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Abrechnung</div>
-                  <div><label className="label">Einheitenmodus</label>
-                    <select className="input" value={stammForm.defaultBillingMode} onChange={e => setStammForm(f => ({ ...f, defaultBillingMode: e.target.value }))}>
-                      <option value="time">Zeitmodus (Minuten)</option>
-                      <option value="unit">Einheitenmodus (Einheiten)</option>
-                    </select>
-                  </div>
-                  <div className="form-grid-2">
-                    <div><label className="label">Einheitendauer (Min.)</label>
-                      <input type="number" className="input" value={stammForm.defaultUnitDuration} onChange={e => setStammForm(f => ({ ...f, defaultUnitDuration: +e.target.value }))} /></div>
-                    <div><label className="label">Kosten/Einheit (€)</label>
-                      <input type="number" step="0.01" className="input" value={stammForm.defaultUnitPriceNet} onChange={e => setStammForm(f => ({ ...f, defaultUnitPriceNet: e.target.value }))} /></div>
-                    <div><label className="label">Startzahl Sessionzähler</label>
-                      <input type="number" min="0" className="input" value={stammForm.sessionStartNumber} onChange={e => setStammForm(f => ({ ...f, sessionStartNumber: +e.target.value }))} /></div>
+                    <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Abrechnung</div>
+                    <div><label className="label">Einheitenmodus</label>
+                      <select className="input" value={stammForm.defaultBillingMode} onChange={e => setStammForm(f => ({ ...f, defaultBillingMode: e.target.value }))}>
+                        <option value="time">Zeitmodus (Minuten)</option>
+                        <option value="unit">Einheitenmodus (Einheiten)</option>
+                      </select>
+                    </div>
+                    <div className="form-grid-2">
+                      <div><label className="label">Einheitendauer (Min.)</label>
+                        <input type="number" className="input" value={stammForm.defaultUnitDuration} onChange={e => setStammForm(f => ({ ...f, defaultUnitDuration: +e.target.value }))} /></div>
+                      <div><label className="label">Kosten/Einheit (EUR)</label>
+                        <input type="number" step="0.01" className="input" value={stammForm.defaultUnitPriceNet} onChange={e => setStammForm(f => ({ ...f, defaultUnitPriceNet: e.target.value }))} /></div>
+                      <div><label className="label">Startzahl Sessionzähler</label>
+                        <input type="number" min="0" className="input" value={stammForm.sessionStartNumber} onChange={e => setStammForm(f => ({ ...f, sessionStartNumber: +e.target.value }))} /></div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -623,14 +623,14 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                   {faktenbookData.firstSession && <span>Erste Session: <strong>{fmtDate(faktenbookData.firstSession)}</strong></span>}
                   {faktenbookData.lastSession  && <span>· Letzte Session: <strong>{fmtDate(faktenbookData.lastSession)}</strong></span>}
                   {faktenbookData.diagnoses.length > 0 && (
-                    <span>· ICD-10: {faktenbookData.diagnoses.map((c: string) => (
+                    <span>{'· '}ICD-10: {faktenbookData.diagnoses.map((c: string) => (
                       <span key={c} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)', marginLeft: 4 }}>{c}</span>
                     ))}</span>
                   )}
                   {faktenbookData.contingents?.length > 0 && (
-                    <span>· Kontingente: {faktenbookData.contingents.map((c: any) => (
+                    <span>{'· '}Kontingente: {faktenbookData.contingents.map((c: any) => (
                       <span key={c.id} style={{ marginLeft: 6, fontSize: 12 }}>
-                        <strong>{c.name}</strong>: {Number(c.remainingUnits).toFixed(1)}/{Number(c.initialUnits).toFixed(1)} {c.unitLabel}
+                        <strong>{c.name}</strong>{': '}{Number(c.remainingUnits).toFixed(1)}/{Number(c.initialUnits).toFixed(1)} {c.unitLabel}
                       </span>
                     ))}</span>
                   )}

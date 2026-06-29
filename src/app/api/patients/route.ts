@@ -109,7 +109,6 @@ export async function POST(req: NextRequest) {
     await prisma.anamnesis.create({
       data: {
         patientId: patient.id,
-        updatedByUserId: userId,
         sections: {
           create: fields.map((f: any, i: number) => ({
             title: f.title,
