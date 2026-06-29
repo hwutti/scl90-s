@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { DEFAULT_INVOICE_HTML } from '@/lib/invoice/template'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -33,6 +34,13 @@ export async function POST(req: NextRequest) {
     if (ALLOWED_FIELDS.has(k)) data[k] = v
   }
   try {
+    // duplicateFrom: HTML aus einer anderen Vorlage kopieren
+    if (body.duplicateFrom) {
+      const src = await prisma.invoiceTemplate.findUnique({ where: { id: body.duplicateFrom } })
+      if (src) data.htmlContent = src.htmlContent
+    }
+    // htmlContent fallback auf Default
+    if (!data.htmlContent) data.htmlContent = DEFAULT_INVOICE_HTML
     if (data.isDefault) await prisma.invoiceTemplate.updateMany({ data: { isDefault: false } })
     const template = await prisma.invoiceTemplate.create({ data })
     return NextResponse.json(template)

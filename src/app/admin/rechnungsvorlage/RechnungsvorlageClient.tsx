@@ -204,15 +204,20 @@ export function RechnungsvorlageClient({
     if (!activeId) return
     setSaving(true); setError('')
     try {
+      // GUI-Felder und Name immer speichern
+      // htmlContent nur wenn im HTML-Editor (vermeidet großen Request)
+      const saveBody: any = {
+        name: templateName,
+        description: templateDesc,
+        ...gui,
+      }
+      if (editorMode === 'html') {
+        saveBody.htmlContent = htmlContent
+      }
       const res = await fetch(`/api/invoice-templates/${activeId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: templateName,
-          description: templateDesc,
-          htmlContent,
-          ...gui,
-        }),
+        body: JSON.stringify(saveBody),
       })
       let updated: any
       try { updated = await res.json() } catch {
@@ -238,7 +243,6 @@ export function RechnungsvorlageClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'Neue Vorlage',
-          htmlContent: defaultHtml,
           isDefault: templates.length === 0,
           ...EMPTY_GUI,
         }),
@@ -260,10 +264,10 @@ export function RechnungsvorlageClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...active,
-          id: undefined,
           name: `${active.name} (Kopie)`,
+          description: active.description,
           isDefault: false,
+          duplicateFrom: active.id,
         }),
       })
       const t = await res.json()
@@ -315,6 +319,72 @@ export function RechnungsvorlageClient({
 
   // ── Bild-Upload Helfer ────────────────────────────────────────────────────────
 
+  // Maximale Dimensionen je nach Bildtyp
+  const MAX_DIMS: Record<string, { w: number; h: number }> = {
+    headerImage: { w: 2480, h: 400 },
+    footerImage:  { w: 2480, h: 300 },
+    bgImage:      { w: 1240, h: 1754 }, // A4 halbe Auflösung
+  }
+  const JPEG_QUALITY = 0.82
+
+  function compressAndStore(
+    field: 'headerImage' | 'footerImage' | 'bgImage',
+    file: File,
+  ) {
+    const isSvg = file.type === 'image/svg+xml'
+    const isPdf = file.type === 'application/pdf'
+
+    // SVG und PDF: direkt als Base64 ohne Komprimierung (sind meist klein)
+    if (isSvg || isPdf) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1]
+        updateGui(`${field}Base64` as keyof GuiFields, base64)
+        updateGui(`${field}Mime` as keyof GuiFields, file.type)
+      }
+      reader.readAsDataURL(file)
+      return
+    }
+
+    // PNG/JPG: über Canvas skalieren + als JPEG komprimieren
+    const { w: maxW, h: maxH } = MAX_DIMS[field]
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      // Skalieren falls zu groß
+      if (width > maxW || height > maxH) {
+        const ratio = Math.min(maxW / width, maxH / height)
+        width  = Math.round(width  * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width  = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+      const base64  = dataUrl.split(',')[1]
+      const kbBefore = Math.round(file.size / 1024)
+      const kbAfter  = Math.round(base64.length * 0.75 / 1024)
+      console.log(`${field}: ${kbBefore} KB → ${kbAfter} KB (${width}×${height}px)`)
+      updateGui(`${field}Base64` as keyof GuiFields, base64)
+      updateGui(`${field}Mime` as keyof GuiFields, 'image/jpeg')
+    }
+    img.onerror = () => {
+      // Fallback: direkt speichern
+      URL.revokeObjectURL(url)
+      const reader = new FileReader()
+      reader.onload = () => {
+        updateGui(`${field}Base64` as keyof GuiFields, (reader.result as string).split(',')[1])
+        updateGui(`${field}Mime` as keyof GuiFields, file.type)
+      }
+      reader.readAsDataURL(file)
+    }
+    img.src = url
+  }
+
   function handleImageUpload(
     field: 'headerImage' | 'footerImage' | 'bgImage',
     e: React.ChangeEvent<HTMLInputElement>
@@ -326,13 +396,7 @@ export function RechnungsvorlageClient({
       alert('Nur PNG, JPG, SVG und PDF sind erlaubt.')
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1]
-      updateGui(`${field}Base64` as keyof GuiFields, base64)
-      updateGui(`${field}Mime` as keyof GuiFields, file.type)
-    }
-    reader.readAsDataURL(file)
+    compressAndStore(field, file)
   }
 
   function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage') {
