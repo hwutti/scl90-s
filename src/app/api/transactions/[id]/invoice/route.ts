@@ -35,9 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const invoiceData = {
     praxis_name: guiFields?.praxisName || branding.praxisName,
     praxis_slogan: branding.slogan ?? '',
-    praxis_address: guiFields?.praxisAddress || branding.address ?? '',
-    praxis_email: guiFields?.praxisEmail || branding.contactEmail ?? '',
-    praxis_phone: guiFields?.praxisPhone || branding.contactPhone ?? '',
+    praxis_address: (guiFields?.praxisAddress || branding.address) ?? '',
+    praxis_email: (guiFields?.praxisEmail || branding.contactEmail) ?? '',
+    praxis_phone: (guiFields?.praxisPhone || branding.contactPhone) ?? '',
     logo_base64: branding.logoBase64 ?? '',
     logo_mime: branding.logoMimeType ?? '',
     primary_color: guiFields?.primaryColor || branding.colorPrimary,
