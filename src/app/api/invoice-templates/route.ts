@@ -10,11 +10,33 @@ export async function GET() {
   return NextResponse.json(templates)
 }
 
+const ALLOWED_FIELDS = new Set([
+  'name','description','htmlContent','cssContent','isDefault','isActive',
+  'invoiceTitle','primaryColor','paymentDays',
+  'iban','bic','bankName','taxNumber','vatId',
+  'praxisName','praxisAddress','praxisPhone','praxisEmail',
+  'footerText','showQrCode',
+  'headerImageBase64','headerImageMime',
+  'footerImageBase64','footerImageMime',
+  'bgImageBase64','bgImageMime','bgImageOpacity','bgImageMode',
+])
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json()
-  if (body.isDefault) await prisma.invoiceTemplate.updateMany({ data: { isDefault: false } })
-  const template = await prisma.invoiceTemplate.create({ data: body })
-  return NextResponse.json(template)
+  let body: any
+  try { body = await req.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const data: any = {}
+  for (const [k, v] of Object.entries(body)) {
+    if (ALLOWED_FIELDS.has(k)) data[k] = v
+  }
+  try {
+    if (data.isDefault) await prisma.invoiceTemplate.updateMany({ data: { isDefault: false } })
+    const template = await prisma.invoiceTemplate.create({ data })
+    return NextResponse.json(template)
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message ?? 'Datenbankfehler' }, { status: 500 })
+  }
 }

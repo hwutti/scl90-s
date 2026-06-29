@@ -214,8 +214,11 @@ export function RechnungsvorlageClient({
           ...gui,
         }),
       })
-      if (!res.ok) throw new Error((await res.json()).error ?? 'Fehler')
-      const updated = await res.json()
+      let updated: any
+      try { updated = await res.json() } catch {
+        throw new Error(`Server-Fehler (${res.status})`)
+      }
+      if (!res.ok) throw new Error(updated?.error ?? `Fehler ${res.status}`)
       setTemplates(ts => ts.map(t => t.id === activeId ? { ...t, ...updated } : t))
       setSaved(true); setDirty(false)
       setTimeout(() => setSaved(false), 3000)
