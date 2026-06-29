@@ -45,6 +45,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     tax_number: guiFields?.taxNumber ?? '',
     vat_id: guiFields?.vatId ?? '',
     footer_text: guiFields?.footerText ?? '',
+    header_image_base64: guiFields?.headerImageBase64 ?? '',
+    header_image_mime:   guiFields?.headerImageMime   ?? 'image/png',
+    footer_image_base64: guiFields?.footerImageBase64 ?? '',
+    footer_image_mime:   guiFields?.footerImageMime   ?? 'image/png',
+    bg_image_base64:     guiFields?.bgImageBase64     ?? '',
+    bg_image_mime:       guiFields?.bgImageMime       ?? 'image/png',
+    bg_image_opacity:    bgOpacity,
+    bg_is_watermark:     bgMode === 'watermark',
     reference_number: tx.referenceNumber,
     transaction_date: fmtDate(tx.transactionDate),
     due_date: fmtDate(new Date(tx.transactionDate.getTime() + paymentDays * 24 * 3600000)),
@@ -69,6 +77,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // QR-Code Platzhalter
+  // Bild-Felder aus Template
+  const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
+  const bgMode    = guiFields?.bgImageMode ?? 'behind'
+
   const qrPlaceholder = (guiFields?.showQrCode && iban)
     ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
     : ''

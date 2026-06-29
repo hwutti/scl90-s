@@ -70,6 +70,18 @@ export async function POST(req: NextRequest) {
     data.payment_info = `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
   }
 
+  // Bild-Felder
+  const bgOpacity = (guiFields?.bgImageOpacity ?? 0.08).toFixed(2)
+  const bgMode    = guiFields?.bgImageMode ?? 'behind'
+  data.header_image_base64 = guiFields?.headerImageBase64 ?? ''
+  data.header_image_mime   = guiFields?.headerImageMime   ?? 'image/png'
+  data.footer_image_base64 = guiFields?.footerImageBase64 ?? ''
+  data.footer_image_mime   = guiFields?.footerImageMime   ?? 'image/png'
+  data.bg_image_base64     = guiFields?.bgImageBase64     ?? ''
+  data.bg_image_mime       = guiFields?.bgImageMime       ?? 'image/png'
+  data.bg_image_opacity    = bgOpacity
+  data.bg_is_watermark     = bgMode === 'watermark'
+
   // Echte Transaktion laden
   if (useReal && transactionId) {
     try {

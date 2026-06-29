@@ -63,12 +63,30 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   /* Footer */
   .footer { border-top: 0.5px solid #e5e7eb; padding-top: 5mm; display: flex; justify-content: space-between; font-size: 8.5pt; color: #888; }
   .footer a { color: {{primary_color}}; text-decoration: none; }
+
+  /* Hintergrundbild */
+  {{#if bg_image_base64}}
+  .bg-layer {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-image: url(data:{{bg_image_mime}};base64,{{bg_image_base64}});
+    background-size: cover; background-position: center;
+    opacity: {{bg_image_opacity}};
+    {{#if bg_is_watermark}}z-index: 999; pointer-events: none;{{else}}z-index: -1;{{/if}}
+  }
+  {{/if}}
 </style>
 </head>
 <body>
 <div class="page">
+  {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
 
-  <div class="header">
+  {{#if header_image_base64}}
+  <div style="margin: -20mm -20mm 8mm -20mm; line-height: 0;">
+    <img src="data:{{header_image_mime}};base64,{{header_image_base64}}" style="width: 100%; display: block; max-height: 50mm; object-fit: cover;" alt="">
+  </div>
+  {{/if}}
+
+  <div class="header" {{#if header_image_base64}}style="border-top: none;"{{/if}}>
     <div class="logo-area">
       {{#if logo_base64}}<img src="data:{{logo_mime}};base64,{{logo_base64}}" style="height:50px;margin-bottom:6px;display:block;" alt="Logo">{{/if}}
       <h1>{{praxis_name}}</h1>
@@ -163,10 +181,16 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div>
   {{/if}}
 
+  {{#if footer_image_base64}}
+  <div style="margin: 8mm -20mm -15mm -20mm; line-height: 0;">
+    <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}" style="width: 100%; display: block; max-height: 40mm; object-fit: cover;" alt="">
+  </div>
+  {{else}}
   <div class="footer">
     <div>{{praxis_name}} · {{praxis_address}}</div>
     <div>{{praxis_email}} · {{praxis_phone}}</div>
   </div>
+  {{/if}}
 
 </div>
 </body>
@@ -232,6 +256,14 @@ export type InvoiceData = {
   tax_number?: string
   vat_id?: string
   footer_text?: string
+  header_image_base64?: string
+  header_image_mime?: string
+  footer_image_base64?: string
+  footer_image_mime?: string
+  bg_image_base64?: string
+  bg_image_mime?: string
+  bg_image_opacity?: string
+  bg_is_watermark?: boolean
   line_items: Array<{
     date: string
     description: string
@@ -271,6 +303,8 @@ export function renderInvoice(template: string, data: InvoiceData): string {
     'due_date','payer_name','payer_address','amount_net','vat_rate','vat_amount',
     'amount_gross','payment_info','notes',
     'invoice_title','tax_number','vat_id','footer_text',
+    'header_image_base64','header_image_mime','footer_image_base64','footer_image_mime',
+    'bg_image_base64','bg_image_mime','bg_image_opacity',
   ]
   for (const key of simpleKeys) {
     html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String((data as any)[key] || ''))
@@ -289,20 +323,28 @@ export async function getDefaultTemplate(): Promise<{ html: string; guiFields?: 
     return {
       html: template.htmlContent,
       guiFields: {
-        invoiceTitle:  template.invoiceTitle  ?? 'Honorarnote',
-        primaryColor:  template.primaryColor  ?? '#4f46e5',
-        paymentDays:   template.paymentDays   ?? 14,
-        iban:          template.iban          ?? '',
-        bic:           template.bic           ?? '',
-        bankName:      template.bankName      ?? '',
-        taxNumber:     template.taxNumber     ?? '',
-        vatId:         template.vatId         ?? '',
-        praxisName:    template.praxisName    ?? '',
-        praxisAddress: template.praxisAddress ?? '',
-        praxisPhone:   template.praxisPhone   ?? '',
-        praxisEmail:   template.praxisEmail   ?? '',
-        footerText:    template.footerText    ?? '',
-        showQrCode:    template.showQrCode    ?? true,
+        invoiceTitle:       template.invoiceTitle       ?? 'Honorarnote',
+        primaryColor:       template.primaryColor       ?? '#4f46e5',
+        paymentDays:        template.paymentDays        ?? 14,
+        iban:               template.iban               ?? '',
+        bic:                template.bic                ?? '',
+        bankName:           template.bankName           ?? '',
+        taxNumber:          template.taxNumber          ?? '',
+        vatId:              template.vatId              ?? '',
+        praxisName:         template.praxisName         ?? '',
+        praxisAddress:      template.praxisAddress      ?? '',
+        praxisPhone:        template.praxisPhone        ?? '',
+        praxisEmail:        template.praxisEmail        ?? '',
+        footerText:         template.footerText         ?? '',
+        showQrCode:         template.showQrCode         ?? true,
+        headerImageBase64:  template.headerImageBase64  ?? '',
+        headerImageMime:    template.headerImageMime    ?? '',
+        footerImageBase64:  template.footerImageBase64  ?? '',
+        footerImageMime:    template.footerImageMime    ?? '',
+        bgImageBase64:      template.bgImageBase64      ?? '',
+        bgImageMime:        template.bgImageMime        ?? '',
+        bgImageOpacity:     template.bgImageOpacity     ?? 0.08,
+        bgImageMode:        template.bgImageMode        ?? 'behind',
       }
     }
   } catch {

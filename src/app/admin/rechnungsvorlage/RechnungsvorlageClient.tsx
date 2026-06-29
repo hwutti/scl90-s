@@ -23,6 +23,14 @@ interface GuiFields {
   praxisEmail: string
   footerText: string
   showQrCode: boolean
+  headerImageBase64: string
+  headerImageMime: string
+  footerImageBase64: string
+  footerImageMime: string
+  bgImageBase64: string
+  bgImageMime: string
+  bgImageOpacity: number
+  bgImageMode: string
 }
 
 interface Template {
@@ -62,6 +70,14 @@ const EMPTY_GUI: GuiFields = {
   praxisEmail: '',
   footerText: '',
   showQrCode: true,
+  headerImageBase64: '',
+  headerImageMime: '',
+  footerImageBase64: '',
+  footerImageMime: '',
+  bgImageBase64: '',
+  bgImageMime: '',
+  bgImageOpacity: 0.08,
+  bgImageMode: 'behind',
 }
 
 function templateToGui(t: Template): GuiFields {
@@ -78,8 +94,16 @@ function templateToGui(t: Template): GuiFields {
     praxisAddress:t.praxisAddress ?? '',
     praxisPhone:  t.praxisPhone ?? '',
     praxisEmail:  t.praxisEmail ?? '',
-    footerText:   t.footerText ?? '',
-    showQrCode:   t.showQrCode ?? true,
+    footerText:        t.footerText        ?? '',
+    showQrCode:        t.showQrCode        ?? true,
+    headerImageBase64: (t as any).headerImageBase64 ?? '',
+    headerImageMime:   (t as any).headerImageMime   ?? '',
+    footerImageBase64: (t as any).footerImageBase64 ?? '',
+    footerImageMime:   (t as any).footerImageMime   ?? '',
+    bgImageBase64:     (t as any).bgImageBase64     ?? '',
+    bgImageMime:       (t as any).bgImageMime       ?? '',
+    bgImageOpacity:    (t as any).bgImageOpacity    ?? 0.08,
+    bgImageMode:       (t as any).bgImageMode       ?? 'behind',
   }
 }
 
@@ -286,7 +310,34 @@ export function RechnungsvorlageClient({
     marginBottom: 10, paddingBottom: 6, borderBottom: '0.5px solid var(--border)',
   }
 
-  return (
+  // ── Bild-Upload Helfer ────────────────────────────────────────────────────────
+
+  function handleImageUpload(
+    field: 'headerImage' | 'footerImage' | 'bgImage',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const allowed = ['image/png','image/jpeg','image/svg+xml','application/pdf']
+    if (!allowed.includes(file.type)) {
+      alert('Nur PNG, JPG, SVG und PDF sind erlaubt.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1]
+      updateGui(`${field}Base64` as keyof GuiFields, base64)
+      updateGui(`${field}Mime` as keyof GuiFields, file.type)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage') {
+    updateGui(`${field}Base64` as keyof GuiFields, '')
+    updateGui(`${field}Mime` as keyof GuiFields, '')
+  }
+
+    return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
 
       {/* ── Topbar ── */}
@@ -559,6 +610,125 @@ export function RechnungsvorlageClient({
                       </div>
                     </div>
 
+                    {/* Design-Elemente */}
+                    <div>
+                      <div style={sectionHeadStyle}>Design-Elemente</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                        {/* Header-Bild */}
+                        <div>
+                          <label style={labelStyle}>Header-Bild (Briefkopf-Banner)</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {gui.headerImageBase64 ? (
+                              <div style={{ position: 'relative', border: '0.5px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                <img
+                                  src={`data:${gui.headerImageMime};base64,${gui.headerImageBase64}`}
+                                  style={{ width: '100%', maxHeight: 80, objectFit: 'cover', display: 'block' }}
+                                  alt="Header"
+                                />
+                                <button onClick={() => clearImage('headerImage')}
+                                  style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', padding: '2px 6px', fontSize: 11 }}>
+                                  ✕ Entfernen
+                                </button>
+                              </div>
+                            ) : (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1.5px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
+                                <input type="file" accept="image/png,image/jpeg,image/svg+xml,application/pdf" style={{ display: 'none' }}
+                                  onChange={e => handleImageUpload('headerImage', e)} />
+                                📁 PNG, JPG, SVG oder PDF hochladen
+                              </label>
+                            )}
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Empfohlen: 2480 × 300 px, volle Breite</div>
+                          </div>
+                        </div>
+
+                        {/* Footer-Bild */}
+                        <div>
+                          <label style={labelStyle}>Footer-Bild (Brieffuß-Banner)</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {gui.footerImageBase64 ? (
+                              <div style={{ position: 'relative', border: '0.5px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                <img
+                                  src={`data:${gui.footerImageMime};base64,${gui.footerImageBase64}`}
+                                  style={{ width: '100%', maxHeight: 60, objectFit: 'cover', display: 'block' }}
+                                  alt="Footer"
+                                />
+                                <button onClick={() => clearImage('footerImage')}
+                                  style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', padding: '2px 6px', fontSize: 11 }}>
+                                  ✕ Entfernen
+                                </button>
+                              </div>
+                            ) : (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1.5px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
+                                <input type="file" accept="image/png,image/jpeg,image/svg+xml,application/pdf" style={{ display: 'none' }}
+                                  onChange={e => handleImageUpload('footerImage', e)} />
+                                📁 PNG, JPG, SVG oder PDF hochladen
+                              </label>
+                            )}
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Empfohlen: 2480 × 200 px, volle Breite</div>
+                          </div>
+                        </div>
+
+                        {/* Hintergrundbild */}
+                        <div>
+                          <label style={labelStyle}>Hintergrundbild / Briefpapier</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {gui.bgImageBase64 ? (
+                              <div style={{ position: 'relative', border: '0.5px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                <img
+                                  src={`data:${gui.bgImageMime};base64,${gui.bgImageBase64}`}
+                                  style={{ width: '100%', maxHeight: 100, objectFit: 'cover', display: 'block', opacity: gui.bgImageOpacity }}
+                                  alt="Hintergrund"
+                                />
+                                <button onClick={() => clearImage('bgImage')}
+                                  style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', padding: '2px 6px', fontSize: 11 }}>
+                                  ✕ Entfernen
+                                </button>
+                              </div>
+                            ) : (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1.5px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
+                                <input type="file" accept="image/png,image/jpeg,image/svg+xml,application/pdf" style={{ display: 'none' }}
+                                  onChange={e => handleImageUpload('bgImage', e)} />
+                                📁 PNG, JPG, SVG oder PDF hochladen
+                              </label>
+                            )}
+
+                            {gui.bgImageBase64 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div>
+                                  <label style={labelStyle}>Modus</label>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    {[
+                                      { value: 'behind', label: '🖼 Briefpapier (hinter Text)' },
+                                      { value: 'watermark', label: '💧 Wasserzeichen (über Text)' },
+                                    ].map(opt => (
+                                      <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', padding: '6px 10px', border: `1.5px solid ${gui.bgImageMode === opt.value ? 'var(--color-primary)' : 'var(--border)'}`, borderRadius: 7, flex: 1, background: gui.bgImageMode === opt.value ? 'var(--color-primary-light)' : 'var(--surface-page)' }}>
+                                        <input type="radio" name="bgMode" value={opt.value} checked={gui.bgImageMode === opt.value}
+                                          onChange={() => updateGui('bgImageMode', opt.value)} style={{ display: 'none' }} />
+                                        {opt.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label style={labelStyle}>Deckkraft: {Math.round(gui.bgImageOpacity * 100)}%</label>
+                                  <input type="range" min="1" max="100" step="1"
+                                    value={Math.round(gui.bgImageOpacity * 100)}
+                                    onChange={e => updateGui('bgImageOpacity', parseInt(e.target.value) / 100)}
+                                    style={{ width: '100%' }} />
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                                    <span>1% (kaum sichtbar)</span><span>100% (vollständig)</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Empfohlen: A4 (2480 × 3508 px) für Briefpapier</div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
                     {/* Platzhalter-Referenz */}
                     <div>
                       <div style={sectionHeadStyle}>Verfügbare Platzhalter (für HTML-Editor)</div>
@@ -578,6 +748,14 @@ export function RechnungsvorlageClient({
                           ['{{tax_number}}', 'Steuernummer'],
                           ['{{vat_id}}', 'UID-Nummer'],
                           ['{{footer_text}}', 'Fußzeile'],
+                          ['{{header_image_base64}}', 'Header-Bild (Base64)'],
+                          ['{{header_image_mime}}', 'Header-Bild MIME-Typ'],
+                          ['{{footer_image_base64}}', 'Footer-Bild (Base64)'],
+                          ['{{bg_image_base64}}', 'Hintergrundbild (Base64)'],
+                          ['{{bg_image_opacity}}', 'Hintergrund-Deckkraft (0.0–1.0)'],
+                          ['{{#if header_image_base64}}...{{/if}}', 'Nur wenn Header-Bild vorhanden'],
+                          ['{{#if footer_image_base64}}...{{/if}}', 'Nur wenn Footer-Bild vorhanden'],
+                          ['{{#if bg_image_base64}}...{{/if}}', 'Nur wenn Hintergrund vorhanden'],
                         ].map(([ph, desc]) => (
                           <div key={ph} style={{ display: 'flex', gap: 8, fontSize: 11, alignItems: 'baseline' }}>
                             <code style={{ background: 'var(--surface-panel)', padding: '1px 5px', borderRadius: 4, color: 'var(--color-primary)', fontFamily: 'monospace', flexShrink: 0 }}>{ph}</code>

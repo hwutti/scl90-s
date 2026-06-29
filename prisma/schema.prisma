@@ -1273,6 +1273,16 @@ model InvoiceTemplate {
   footerText      String?
   showQrCode      Boolean   @default(true)
 
+  // Design-Elemente (Base64)
+  headerImageBase64  String?   // Briefkopf-Banner
+  headerImageMime    String?
+  footerImageBase64  String?   // Brieffuß-Banner
+  footerImageMime    String?
+  bgImageBase64      String?   // Hintergrundbild / Briefpapier
+  bgImageMime        String?
+  bgImageOpacity     Float     @default(0.08)   // 0.0–1.0
+  bgImageMode        String    @default("behind") // "behind" | "watermark"
+
   patients        Patient[] @relation("PatientInvoiceTemplate")
 }
 
