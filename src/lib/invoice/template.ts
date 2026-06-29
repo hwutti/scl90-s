@@ -335,7 +335,7 @@ export function renderInvoice(template: string, data: InvoiceData): string {
 
 export async function getDefaultTemplate(templateId?: string | null): Promise<{ html: string; guiFields?: any }> {
   try {
-    const template = templateId
+    let template = templateId
       ? await prisma.invoiceTemplate.findFirst({ where: { id: templateId, isActive: true } })
         ?? await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
       : await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
