@@ -14,6 +14,7 @@ interface PatientRow {
   dob: string
   gender: string
   active: boolean
+  categoryType?: string | null  // PAIR | FAMILY | GROUP | null
   patientUser: { pin: string } | null
   assessments: Array<{
     status: string
@@ -25,8 +26,99 @@ interface PatientRow {
 interface Instrument { id: string; code: string; shortName: string; name: string }
 interface Props { patients: PatientRow[]; instruments: Instrument[]; role: string }
 
-const GENDER_LABEL: Record<string, string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
+const GENDER_LABEL:  Record<string, string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 const GENDER_SHORT:  Record<string, string> = { MALE: 'm', FEMALE: 'w', DIVERSE: 'd' }
+const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
+const GENDER_COLOR:  Record<string, string> = { MALE: '#3b82f6', FEMALE: '#ec4899', DIVERSE: '#8b5cf6' }
+
+// ── PatientIcon: Umriss-Silhouette mit Geschlechts-Pill ───────────────────────
+function PatientIcon({
+  gender, dob, categoryType, size = 44,
+}: {
+  gender: string
+  dob: string
+  categoryType?: string | null
+  size?: number
+}) {
+  const age    = calcAge(dob)
+  const isKind = age < 18
+  const color  = categoryType === 'PAIR'   ? '#10b981'
+               : categoryType === 'FAMILY' ? '#f97316'
+               : categoryType === 'GROUP'  ? '#6366f1'
+               : (GENDER_COLOR[gender] ?? '#6366f1')
+
+  // Pill-Label
+  const pillLabel = categoryType === 'PAIR'   ? 'Paar'
+                  : categoryType === 'FAMILY' ? 'Familie'
+                  : categoryType === 'GROUP'  ? 'Gruppe'
+                  : isKind
+                    ? (GENDER_SYMBOL[gender] ?? '?') + ' <18'
+                    : (GENDER_SYMBOL[gender] ?? '?')
+
+  // SVG-Silhouette: kleiner Kopf für Kind, zwei Köpfe für Paar, drei für Gruppe
+  const inner = categoryType === 'PAIR' ? (
+    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
+      <circle cx="13" cy="13" r="5" stroke={color} strokeWidth="2" />
+      <path d="M2 34c0-5.5 4.9-10 11-10" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="25" cy="13" r="5" stroke="#0d9488" strokeWidth="2" />
+      <path d="M36 34c0-5.5-4.9-10-11-10" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" />
+      <path d="M18 19.5c0-1.5 1.5-2 2-1.5c.5-.5 2 0 2 1.5c0 2-2 3.5-2 3.5s-2-1.5-2-3.5z" stroke={color} strokeWidth="1.2" fill="none" />
+    </svg>
+  ) : categoryType === 'FAMILY' ? (
+    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
+      <circle cx="11" cy="11" r="4.5" stroke={color} strokeWidth="2" />
+      <circle cx="23" cy="11" r="4.5" stroke={color} strokeWidth="2" />
+      <circle cx="17" cy="24" r="3.5" stroke={color} strokeWidth="1.8" />
+      <line x1="11" y1="15.5" x2="17" y2="20.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="23" y1="15.5" x2="17" y2="20.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="11" y1="13" x2="23" y2="13" stroke={color} strokeWidth="1" strokeDasharray="2 2" />
+      <circle cx="27" cy="25" r="2.8" stroke={color} strokeWidth="1.5" opacity="0.6" />
+      <line x1="23" y1="15.5" x2="27" y2="22.2" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+    </svg>
+  ) : categoryType === 'GROUP' ? (
+    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
+      <circle cx="7" cy="14" r="4" stroke={color} strokeWidth="1.8" opacity="0.5" />
+      <circle cx="19" cy="11" r="5" stroke={color} strokeWidth="2" />
+      <circle cx="31" cy="14" r="4" stroke={color} strokeWidth="1.8" opacity="0.5" />
+      <path d="M2 35c0-5 4-9 9-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
+      <path d="M36 35c0-5-4-9-9-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
+      <path d="M10 33c0-5 4.5-9 9-9s9 4 9 9" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 38 38" fill="none">
+      {isKind ? (
+        <>
+          <circle cx="19" cy="15" r="5.5" stroke={color} strokeWidth="2" />
+          <path d="M9 35c0-5.5 4.5-10 10-10s10 4.5 10 10" stroke={color} strokeWidth="2" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle cx="19" cy="13" r="7" stroke={color} strokeWidth="2" />
+          <path d="M6 35c0-7.18 5.82-13 13-13s13 5.82 13 13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: 'var(--surface-1)',
+        border: `2px solid ${color}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {inner}
+      </div>
+      <span style={{
+        fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
+        background: color, color: 'white', whiteSpace: 'nowrap', lineHeight: 1.6,
+      }}>
+        {pillLabel}
+      </span>
+    </div>
+  )
+}
 
 function calcAge(dob: string) {
   const d = new Date(dob + 'T00:00:00')
@@ -204,13 +296,13 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                 >
                   {/* Patient */}
                   <div className="flex items-center gap-3">
-                    <Avatar firstName={p.firstName} lastName={p.lastName} clinical={clinical} />
+                    <PatientIcon gender={p.gender} dob={p.dob} categoryType={(p as any).categoryType} size={44} />
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--text-primary)] truncate">
                         {p.lastName}, {p.firstName}
                       </p>
                       <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                        {age} J. · {GENDER_SHORT[p.gender]}
+                        {age} J.
                         {(p as any).codeName && (
                           <span className="ml-2 font-mono opacity-60">{(p as any).codeName}</span>
                         )}

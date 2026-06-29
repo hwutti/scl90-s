@@ -15,7 +15,9 @@ import { PatientStatsPanel } from './PatientStatsPanel'
 
 type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'statistik'
 
-const GENDER_LABEL: Record<string,string> = { MALE: 'maennlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
+const GENDER_LABEL:  Record<string,string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
+const GENDER_SYMBOL: Record<string,string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
+const GENDER_COLOR:  Record<string,string> = { MALE: '#3b82f6', FEMALE: '#ec4899', DIVERSE: '#8b5cf6' }
 
 const DOC_CATEGORY_LABEL: Record<string,string> = {
   REFERRAL: 'Zuweisung', REPORT: 'Befund', CERTIFICATE: 'Attest',
@@ -378,14 +380,42 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
             {/* Photo/Avatar */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
               {photoSrc ? (
-                <img src={photoSrc} alt="Foto" style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover', border: '2px solid rgba(255,255,255,0.3)' }} />
-              ) : (
-                <div style={{ width: 64, height: 64, borderRadius: 14, background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff' }}>
-                  {patient.firstName[0]}{patient.lastName[0]}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <img src={photoSrc} alt="Foto" style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.5)' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
+                    {GENDER_SYMBOL[patient.gender] ?? ''} {GENDER_LABEL[patient.gender] ?? patient.gender}
+                    {calcAge(patient.dob) < 18 ? ' · <18' : ''}
+                  </span>
                 </div>
-              )}
+              ) : (() => {
+                const gColor = GENDER_COLOR[patient.gender] ?? '#6366f1'
+                const gSymbol = GENDER_SYMBOL[patient.gender] ?? '?'
+                const isKind = calcAge(patient.dob) < 18
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="42" height="42" viewBox="0 0 38 38" fill="none">
+                        {isKind ? (
+                          <>
+                            <circle cx="19" cy="15" r="5.5" stroke="white" strokeWidth="2" />
+                            <path d="M9 35c0-5.5 4.5-10 10-10s10 4.5 10 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                          </>
+                        ) : (
+                          <>
+                            <circle cx="19" cy="13" r="7" stroke="white" strokeWidth="2" />
+                            <path d="M6 35c0-7.18 5.82-13 13-13s13 5.82 13 13" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                          </>
+                        )}
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
+                      {gSymbol} {GENDER_LABEL[patient.gender] ?? patient.gender}{isKind ? ' · <18' : ''}
+                    </span>
+                  </div>
+                )
+              })()}
               <button onClick={() => photoRef.current?.click()}
-                style={{ position: 'absolute', bottom: -4, right: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--surface-page)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                style={{ position: 'absolute', bottom: 22, right: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--surface-page)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <Camera style={{ width: 10, height: 10, stroke: '#fff', fill: 'none' }} />
               </button>
               <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadPhoto} />
@@ -403,8 +433,6 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                 )}
               </h1>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                <span>{GENDER_LABEL[patient.gender] ?? patient.gender}</span>
-                <span style={{ opacity: 0.4 }}>·</span>
                 <span>{age} Jahre · geb. {fmtDate(patient.dob)}</span>
                 {patient.therapists?.[0]?.user && <><span style={{ opacity: 0.4 }}>·</span><span>{patient.therapists[0].user.name}</span></>}
               </div>
