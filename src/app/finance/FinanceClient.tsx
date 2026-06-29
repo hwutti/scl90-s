@@ -421,6 +421,11 @@ export function FinanceClient() {
                                 <Check style={{ width: 11, height: 11 }} />
                               </button>
                             )}
+                            <button
+                              onClick={() => window.open(`/api/transactions/${r.id}/invoice`, '_blank')}
+                              className="btn-ghost" style={{ padding: '2px 4px' }} title="Drucken / PDF">
+                              <Download style={{ width: 12, height: 12 }} />
+                            </button>
                             {r.raw.lifecycleStatus === 'ACTIVE' && (
                               <button onClick={() => cancelNewTx(r.id)} className="btn-ghost" style={{ padding: '2px 4px', color: 'var(--red)' }}>
                                 <Ban style={{ width: 12, height: 12 }} />

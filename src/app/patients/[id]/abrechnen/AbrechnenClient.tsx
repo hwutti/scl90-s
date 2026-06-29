@@ -161,9 +161,7 @@ export function AbrechnenClient({
             </button>
             {done?.transactionId && (
               <button
-                onClick={() => {
-                  const w = window.open(`/api/transactions/${done.transactionId}/invoice`, '_blank')
-                }}
+                onClick={() => window.open(`/api/transactions/${done.transactionId}/invoice`, '_blank')}
                 className="btn-secondary" style={{ fontSize: 13 }}>
                 <Printer style={{ width: 13, height: 13 }} /> Drucken / PDF
               </button>
