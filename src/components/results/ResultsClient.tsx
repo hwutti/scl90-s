@@ -73,7 +73,7 @@ export function ResultsClient({ sessionId, patientName, patientGender, patientDo
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2">
+          <button onClick={() => router.push(backUrl)} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2">
             <ArrowLeft className="w-4 h-4" /> Zurück
           </button>
           <h1 className="text-2xl font-bold text-slate-800">Auswertung SCL-90-S</h1>

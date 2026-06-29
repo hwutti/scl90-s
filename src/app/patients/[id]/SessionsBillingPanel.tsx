@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, Edit3, 
          FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban } from 'lucide-react'
-import { SessionDetailPanel } from '@/components/protocol/SessionDetailPanel'
 
 const BILLING_STATUS_LABEL: Record<string,string> = {
   UNBILLED: 'Nicht verrechnet', BILLED_UNPAID: 'Verrechnet (offen)',
@@ -60,9 +60,9 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   })
   const [savingSession, setSavingSession] = useState(false)
   const [sessionError, setSessionError] = useState<string|null>(null)
-  const [detailSession, setDetailSession] = useState<any>(null)
   const [savingTx, setSavingTx] = useState(false)
 
+  const router = useRouter()
   const load = useCallback(async () => {
     setLoading(true)
     const [sRes, tRes] = await Promise.all([
@@ -245,7 +245,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                 <tbody>
                   {sessions.map((s: any) => (
                     <tr key={s.id} style={{cursor:'pointer'}}
-                      onClick={() => setDetailSession(s)}>
+                      onClick={() => router.push(`/patients/${patientId}/sitzungen/${s.id}`)}>
                       <td onClick={e => e.stopPropagation()}>
                         {s.billingStatus === 'UNBILLED' && (
                           <input type="checkbox" checked={selectedSessions.includes(s.id)}
@@ -565,17 +565,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
         )
       })()}
 
-      {/* Sitzungsdetail Modal – vollständiger 4-Tab-View */}
-      {detailSession && (
-        <SessionDetailPanel
-          session={detailSession}
-          patientId={patientId}
-          role={role}
-          onClose={() => setDetailSession(null)}
-          onDeleted={() => { setDetailSession(null); load() }}
-          onUpdated={() => { load(); setDetailSession(null) }}
-        />
-      )}
+
 
       {/* Rechnungsvorschau */}
       {showInvoice && (

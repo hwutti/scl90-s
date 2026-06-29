@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import {
   User, FileText, ClipboardList, MessageSquare, ChevronLeft, Plus,
@@ -62,7 +63,9 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   const fileRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<Tab>('uebersicht')
+  const searchParams = useSearchParams()
+  const initialTab = (searchParams.get('tab') as Tab) ?? 'uebersicht'
+  const [tab, setTab] = useState<Tab>(initialTab)
 
   // Photo
   const [photoSrc, setPhotoSrc] = useState<string|null>(null)
