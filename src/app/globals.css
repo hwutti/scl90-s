@@ -242,7 +242,7 @@
     transition: all 0.15s;
     text-decoration: none;
   }
-  .nav-link:hover { background: var(--sb-hover); color: var(--text-primary); }
+  .nav-link:hover { background: var(--sb-hover); color: var(--sb-text); }
   .nav-link.active { background: var(--sb-active); color: var(--sb-active-text); }
 
   /* ── Tables ── */

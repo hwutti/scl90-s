@@ -90,11 +90,11 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
               </div>
           }
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sb-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
               {branding.praxisName}
             </div>
             {branding.slogan && (
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+              <div style={{ fontSize: 10, color: 'var(--sb-text)', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
                 {branding.slogan}
               </div>
             )}
@@ -126,7 +126,7 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
                         display: 'flex', alignItems: 'center', gap: 7,
                         padding: '5px 10px', borderRadius: 7,
                         fontSize: 12, fontWeight: sa ? 600 : 400,
-                        color: sa ? 'var(--sb-active-text)' : 'var(--text-muted)',
+                        color: sa ? 'var(--sb-active-text)' : 'var(--sb-text)',
                         textDecoration: 'none',
                         transition: 'all 0.15s',
                       }}>
@@ -141,7 +141,7 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
           )
         })}
 
-        <div style={{ margin: '8px 0 4px', padding: '0 10px', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+        <div style={{ margin: '8px 0 4px', padding: '0 10px', fontSize: 10, fontWeight: 600, color: 'var(--sb-text)', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
           Einstellungen
         </div>
         <Link href="/profile" className={cn('nav-link', pathname.startsWith('/profile') && 'active')}>
@@ -160,10 +160,10 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
 
         {/* Theme Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', marginBottom: 2 }}>
-          <Sun style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }} />
+          <Sun style={{ width: 14, height: 14, color: 'var(--sb-text)', opacity: 0.7, flexShrink: 0 }} />
           <button onClick={toggle} className="theme-toggle" aria-label="Theme umschalten" />
-          <Moon style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 2 }}>
+          <Moon style={{ width: 14, height: 14, color: 'var(--sb-text)', opacity: 0.7, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'var(--sb-text)', opacity: 0.7, marginLeft: 2 }}>
             {theme === 'dark' ? 'Dark' : 'Light'}
           </span>
         </div>
@@ -173,13 +173,13 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
             {initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{roleLabel}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sb-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+            <div style={{ fontSize: 10, color: 'var(--sb-text)', opacity: 0.7 }}>{roleLabel}</div>
           </div>
         </div>
 
         <button onClick={() => signOut({ callbackUrl: '/login' })} className="nav-link w-full"
-          style={{ color: 'var(--text-muted)', width: '100%', background: 'none', border: 'none', cursor: 'pointer' }}
+          style={{ color: 'var(--sb-text)', opacity: 0.7, width: '100%', background: 'none', border: 'none', cursor: 'pointer' }}
           onMouseEnter={e => { (e.currentTarget as any).style.color = 'var(--red)'; (e.currentTarget as any).style.background = 'var(--red-bg)' }}
           onMouseLeave={e => { (e.currentTarget as any).style.color = 'var(--text-muted)'; (e.currentTarget as any).style.background = '' }}>
           <LogOut style={{ width: 15, height: 15 }} />
