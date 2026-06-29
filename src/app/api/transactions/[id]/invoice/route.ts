@@ -86,30 +86,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
   const html = renderInvoice(tmpl, invoiceData)
 
-  // Save invoice document
-  // Wrap with print styles for PDF via browser print
-  const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>@media print { @page { margin: 0; } body { margin: 1cm; } .no-print { display: none; } }</style>
-</head><body>
-<div class="no-print" style="position:fixed;top:10px;right:10px;z-index:999">
-  <button onclick="window.print()" style="padding:8px 16px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">
-    Als PDF speichern / Drucken
-  </button>
-</div>
-${html}</body></html>`
-
-  const invoiceDoc = await prisma.invoiceDocument.create({
-    data: {
-      transactionId: tx.id,
-      documentType: 'INVOICE_PDF',
-      format: 'html',
-      anonymized: body.anonymized ?? false,
-      data: Buffer.from(html, 'utf8'),
-      mimeType: 'text/html',
-    },
+  // Einmalig ein InvoiceDocument anlegen falls noch keines existiert
+  const existing = await prisma.invoiceDocument.findFirst({
+    where: { transactionId: tx.id, deletedAt: null },
   })
+  if (!existing) {
+    await prisma.invoiceDocument.create({
+      data: {
+        transactionId: tx.id,
+        documentType: 'INVOICE_PDF',
+        format: 'html',
+        anonymized: body.anonymized ?? false,
+        data: Buffer.from(html, 'utf8'),
+        mimeType: 'text/html',
+      },
+    })
+  }
 
-  return NextResponse.json({ id: invoiceDoc.id, html, printHtml: printHtml ?? html })
+  return NextResponse.json({ html })
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

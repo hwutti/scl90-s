@@ -321,7 +321,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                           <RotateCcw style={{width:12,height:12}} /> Rückgängig
                         </button>
                       )}
-                      <button onClick={() => generateInvoice(tx.id)} className="btn-secondary" style={{fontSize:12,padding:'4px 8px'}} title="Rechnung generieren">
+                      <button onClick={() => window.open(`/api/transactions/${tx.id}/invoice`, '_blank')} className="btn-secondary" style={{fontSize:12,padding:'4px 8px'}} title="Rechnung anzeigen / drucken">
                         <FileText style={{width:13,height:13}} />
                       </button>
                       {tx.lifecycleStatus === 'ACTIVE' && (
@@ -335,7 +335,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                   {tx.invoiceDocuments?.length > 0 && (
                     <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
                       {tx.invoiceDocuments.map((doc: any) => (
-                        <button key={doc.id} onClick={() => generateInvoice(tx.id)} className="btn-secondary" style={{fontSize:11,padding:'2px 8px'}}>
+                        <button key={doc.id} onClick={() => window.open(`/api/transactions/${tx.id}/invoice`, '_blank')} className="btn-secondary" style={{fontSize:11,padding:'2px 8px'}}>
                           <FileText style={{width:11,height:11}} /> Rechnung {new Date(doc.createdAt).toLocaleDateString('de-AT')}
                         </button>
                       ))}
