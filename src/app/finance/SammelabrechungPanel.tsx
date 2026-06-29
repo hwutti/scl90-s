@@ -21,6 +21,8 @@ interface PatientEntry {
   totalNet: number
 }
 
+interface Override { vatRate: number; paymentMethod: string; markAsPaid: boolean; generateInvoice: boolean }
+
 export function SammelabrechungPanel({ year }: { year: number }) {
   const now = new Date()
   const [from, setFrom] = useState(`${year}-01-01`)
@@ -33,7 +35,6 @@ export function SammelabrechungPanel({ year }: { year: number }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   // Pro Patient: Overrides (falls Therapeut etwas anpassen will)
-  interface Override { vatRate: number; paymentMethod: string; markAsPaid: boolean; generateInvoice: boolean }
   const [overrides, setOverrides] = useState<Record<string, Override>>({})
 
   // Ergebnisse
@@ -214,7 +215,7 @@ export function SammelabrechungPanel({ year }: { year: number }) {
               const pid     = entry.patient.id
               const checked = selected.has(pid)
               const isOpen  = expanded.has(pid)
-              const ov      = overrides[pid] ?? { vatRate: 0, paymentMethod: 'UNBAR_BANK_TRANSFER', markAsPaid: false, generateInvoice: true }
+              const ov      = (overrides[pid] ?? { vatRate: 0, paymentMethod: 'UNBAR_BANK_TRANSFER', markAsPaid: false, generateInvoice: true }) as Override
               const vatAmt  = entry.totalNet * ov.vatRate
               const total   = entry.totalNet + vatAmt
 
