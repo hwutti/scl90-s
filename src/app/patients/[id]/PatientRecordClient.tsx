@@ -738,8 +738,8 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                   </div>
                 </div>
                 <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {faktenbookData.firstSession && <span>Erste Session: <strong>{fmtDate(faktenbookData.firstSession)}</strong></span>}
-                  {faktenbookData.lastSession  && <span>· Letzte Session: <strong>{fmtDate(faktenbookData.lastSession)}</strong></span>}
+                  {faktenbookData.firstSession && <span>Erste Sitzung: <strong>{fmtDate(faktenbookData.firstSession)}</strong></span>}
+                  {faktenbookData.lastSession  && <span>· Letzte Sitzung: <strong>{fmtDate(faktenbookData.lastSession)}</strong></span>}
                   {faktenbookData.diagnoses.length > 0 && (
                     <span>{'· '}ICD-10: {faktenbookData.diagnoses.map((c: string) => (
                       <span key={c} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-primary)', marginLeft: 4 }}>{c}</span>

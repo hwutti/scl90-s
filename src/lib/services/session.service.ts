@@ -74,7 +74,7 @@ export async function createSessionFromAppointment(params: {
     })
     if (!appt) throw new Error('Termin nicht gefunden')
     if (!appt.patientId) throw new Error('Termin hat keinen Patienten')
-    if (appt.therapySession) throw new Error('Aus diesem Termin wurde bereits eine Session erstellt')
+    if (appt.therapySession) throw new Error('Aus diesem Termin wurde bereits eine Sitzung erstellt')
 
     // 2. Laufende Sessionsnummer ermitteln
     const count = await tx.therapySession.count({

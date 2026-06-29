@@ -115,7 +115,7 @@ export function FinanceClient() {
   const incomeRows = [
     ...newTxs.filter(t => t.direction === 'INCOME' && t.lifecycleStatus === 'ACTIVE').map(t => ({
       id: t.id, source: 'new', date: t.transactionDate, amount: Number(t.amountGross),
-      type: 'Sessiontransaktion', status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
+      type: 'Sitzungsrechnung', status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
       statusClass: t.paymentStatus === 'PAID' ? 'badge-green' : 'badge-amber',
       ref: t.referenceNumber, payer: t.payerName,
       paymentMethod: TX_PAYMENT_METHODS[t.paymentMethod] ?? '—',

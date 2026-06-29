@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { id: params.id },
     select: { billingStatus: true },
   })
-  if (!ts) return NextResponse.json({ error: 'Session nicht gefunden' }, { status: 404 })
+  if (!ts) return NextResponse.json({ error: 'Sitzung nicht gefunden' }, { status: 404 })
   if (ts.billingStatus === 'PAID') {
     return NextResponse.json(
       { error: 'Bezahlte Sessions können nur über Korrektur/Storno geändert werden' },
