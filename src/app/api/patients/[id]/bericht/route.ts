@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getBranding } from '@/lib/branding'
+import { getDefaultReportTemplate, renderReportTemplate } from '@/lib/report/template'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -70,13 +71,61 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const branding = await getBranding()
-  const html = generateReportHtml({
+  const { html: templateHtml, guiFields } = await getDefaultReportTemplate(reportType, body.templateId)
+
+  const bgOpacity   = ((guiFields?.bgImageOpacity ?? 0.06) as number).toFixed(2)
+  const bgMode      = guiFields?.bgImageMode ?? 'behind'
+
+  // Hauptinhalt generieren
+  const contentHtml = generateContentHtml({
     reportType, patient, sessions: patient.therapySessions, assessments, goals,
     adressat, adressatTitel, adressatAdresse,
     zeitraumVon, zeitraumBis, freitext, anonymize,
     includeSessions, includeAssessments, includeGoals, includeAnamnese,
-    branding, therapistName: session.user?.name ?? '',
+    therapistName: session.user?.name ?? '',
   })
+
+  const patName = anonymize
+    ? `${patient.firstName.charAt(0)}.${patient.lastName.charAt(0)}.`
+    : `${patient.firstName} ${patient.lastName}`
+
+  const TITLES: Record<string, string> = {
+    therapiebericht: 'Therapiebericht',
+    arztbrief:       'Ärztlicher Bericht',
+    verlaufsbericht: 'Verlaufsbericht',
+  }
+
+  const data: Record<string, any> = {
+    praxis_name:          guiFields?.praxisName    || branding.praxisName    || 'Psychotherapeutische Praxis',
+    praxis_address:       guiFields?.praxisAddress || branding.address       || '',
+    praxis_email:         guiFields?.praxisEmail   || branding.contactEmail  || '',
+    praxis_phone:         guiFields?.praxisPhone   || branding.contactPhone  || '',
+    primary_color:        guiFields?.primaryColor  || '#1a1a2e',
+    font_family:          guiFields?.fontFamily    || 'Times New Roman, serif',
+    font_size:            guiFields?.fontSize      || '11pt',
+    tax_number:           guiFields?.taxNumber     || '',
+    vat_id:               guiFields?.vatId         || '',
+    footer_text:          guiFields?.footerText    || '',
+    show_data_protection: guiFields?.showDataProtection !== false,
+    report_title:         `${TITLES[reportType] ?? 'Bericht'} – ${patName}`,
+    today:                new Date().toLocaleDateString('de-AT', { dateStyle: 'long' }),
+    therapist_name:       session.user?.name ?? '',
+    patient_name:         patName,
+    patient_dob:          patient.dob ? new Date(patient.dob).toLocaleDateString('de-AT', { dateStyle: 'long' }) : '—',
+    header_image_base64:  guiFields?.headerImageBase64 || '',
+    header_image_mime:    guiFields?.headerImageMime   || 'image/png',
+    footer_image_base64:  guiFields?.footerImageBase64 || '',
+    footer_image_mime:    guiFields?.footerImageMime   || 'image/png',
+    bg_image_base64:      guiFields?.bgImageBase64     || '',
+    bg_image_mime:        guiFields?.bgImageMime       || 'image/png',
+    bg_image_opacity:     bgOpacity,
+    bg_is_watermark:      bgMode === 'watermark',
+    has_header_image:     !!(guiFields?.headerImageBase64),
+    has_footer_image:     !!(guiFields?.footerImageBase64),
+    content:              contentHtml,
+  }
+
+  const html = renderReportTemplate(templateHtml, data)
 
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' }
@@ -99,7 +148,7 @@ function age(dob: Date | null | undefined) {
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) + ' Jahre'
 }
 
-function generateReportHtml(opts: any): string {
+function generateContentHtml(opts: any): string {
   const { reportType, patient, sessions, assessments, goals, branding,
     adressat, adressatTitel, adressatAdresse, zeitraumVon, zeitraumBis,
     freitext, anonymize, includeSessions, includeAssessments, includeGoals,
@@ -129,106 +178,7 @@ function generateReportHtml(opts: any): string {
   // Anamnese-Abschnitte
   const anamneseSections = patient.anamnesis?.sections ?? []
 
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>${title} – ${patName}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Times New Roman', serif;
-    font-size: 11pt;
-    line-height: 1.6;
-    color: #1a1a1a;
-    background: #fff;
-    padding: 0;
-  }
-  .page {
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 20mm 20mm 25mm 20mm;
-    min-height: 297mm;
-  }
-  @media print {
-    @page { size: A4; margin: 20mm 20mm 25mm 20mm; }
-    body { padding: 0; }
-    .page { padding: 0; max-width: none; }
-    .no-print { display: none !important; }
-    .page-break { page-break-before: always; }
-  }
-
-  /* Header */
-  .letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8mm; border-bottom: 2px solid #1a1a1a; padding-bottom: 4mm; }
-  .letterhead-left h1 { font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
-  .letterhead-left p { font-size: 9pt; color: #444; line-height: 1.4; }
-  .letterhead-right { text-align: right; font-size: 9pt; color: #444; line-height: 1.5; }
-
-  /* Adressblock */
-  .adress-block { margin-bottom: 6mm; }
-  .adress-block .label { font-size: 8pt; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1mm; }
-  .adress-block p { font-size: 10pt; line-height: 1.5; }
-
-  /* Betreff */
-  .betreff { font-size: 12pt; font-weight: bold; margin: 6mm 0 4mm 0; border-bottom: 1px solid #ddd; padding-bottom: 2mm; }
-  .meta-row { display: flex; gap: 20mm; margin-bottom: 6mm; }
-  .meta-item { flex: 1; }
-  .meta-item .label { font-size: 8pt; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
-  .meta-item .value { font-size: 10pt; font-weight: 600; }
-
-  /* Abschnitte */
-  .section { margin-bottom: 6mm; }
-  .section h2 { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid #999; padding-bottom: 1mm; margin-bottom: 3mm; color: #333; }
-  .section p { margin-bottom: 2mm; font-size: 10.5pt; }
-  .section .empty { color: #999; font-style: italic; font-size: 10pt; }
-
-  /* Diagnose-Liste */
-  .diag-list { list-style: none; }
-  .diag-list li { padding: 1.5mm 0; border-bottom: 0.5px solid #eee; display: flex; gap: 4mm; font-size: 10.5pt; }
-  .diag-list li .icd { font-family: monospace; font-size: 10pt; color: #555; min-width: 18mm; }
-  .diag-list li .certainty { font-size: 9pt; color: #888; margin-left: auto; }
-
-  /* Sitzungstabelle */
-  .session-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-top: 2mm; }
-  .session-table th { background: #f0f0f0; padding: 2mm 3mm; text-align: left; font-weight: 600; border: 0.5px solid #ccc; }
-  .session-table td { padding: 2mm 3mm; border: 0.5px solid #ddd; vertical-align: top; }
-  .session-table tr:nth-child(even) td { background: #fafafa; }
-  .session-table .protocol-text { font-size: 9pt; color: #444; margin-top: 1mm; }
-
-  /* Assessment */
-  .assessment-box { border: 0.5px solid #ccc; border-radius: 4px; padding: 3mm; margin-bottom: 3mm; }
-  .assessment-box .name { font-weight: 600; font-size: 10pt; }
-  .assessment-box .score { font-size: 10pt; color: #333; }
-  .assessment-box .summary { font-size: 9pt; color: #555; margin-top: 1mm; font-style: italic; }
-
-  /* Unterschrift */
-  .signature { margin-top: 15mm; }
-  .signature .line { border-top: 1px solid #1a1a1a; width: 70mm; margin-top: 12mm; padding-top: 1mm; font-size: 9pt; color: #444; }
-
-  /* Footer */
-  .footer { margin-top: 10mm; padding-top: 3mm; border-top: 0.5px solid #ccc; font-size: 8pt; color: #888; display: flex; justify-content: space-between; }
-
-  /* Druck-Button */
-  .no-print {
-    position: fixed; top: 12px; right: 12px; z-index: 9999;
-    display: flex; gap: 8px;
-  }
-  .no-print button {
-    padding: 8px 18px; border: none; border-radius: 8px;
-    cursor: pointer; font-size: 13px; font-family: sans-serif;
-  }
-  .btn-print { background: #1a1a1a; color: #fff; }
-  .btn-close { background: #e5e7eb; color: #374151; }
-</style>
-</head>
-<body>
-
-<div class="no-print">
-  <button class="btn-print" onclick="window.print()">🖨 Drucken / Als PDF</button>
-  <button class="btn-close" onclick="window.close()">✕ Schließen</button>
-</div>
-
-<div class="page">
+  return `<div style="font-family: inherit;">
 
   <!-- Briefkopf -->
   <div class="letterhead">
@@ -412,8 +362,5 @@ function generateReportHtml(opts: any): string {
     <span>${praxis} · ${branding.address ?? ''}</span>
     <span>Erstellt: ${today} · Vertraulich</span>
   </div>
-
-</div>
-</body>
-</html>`
+  </div>`
 }
