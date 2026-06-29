@@ -283,7 +283,8 @@ model Patient {
   defaultUnitDuration    Int?      @default(50)       // Minuten pro Einheit
   defaultUnitPriceNet    Decimal?  @db.Decimal(10,2)  // Kosten pro Einheit
   defaultHourlyRateNet   Decimal?  @db.Decimal(10,2)  // Stundensatz
-  defaultInvoiceTemplate String?   // invoiceTemplateId
+  defaultInvoiceTemplateId String?
+  defaultInvoiceTemplate   InvoiceTemplate? @relation("PatientInvoiceTemplate", fields: [defaultInvoiceTemplateId], references: [id])
   sessionStartNumber     Int       @default(0)        // Startzahl für Sessionzähler
 
   // Beziehungen zu Users
@@ -1255,6 +1256,24 @@ model InvoiceTemplate {
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // GUI-Felder
+  invoiceTitle    String?   @default("Honorarnote")
+  primaryColor    String?   @default("#4f46e5")
+  paymentDays     Int       @default(14)
+  iban            String?
+  bic             String?
+  bankName        String?
+  taxNumber       String?   // Steuernummer
+  vatId           String?   // UID-Nummer
+  praxisName      String?
+  praxisAddress   String?
+  praxisPhone     String?
+  praxisEmail     String?
+  footerText      String?
+  showQrCode      Boolean   @default(true)
+
+  patients        Patient[] @relation("PatientInvoiceTemplate")
 }
 
 // ─── Transaktionstyp ─────────────────────────────────────────────────────────

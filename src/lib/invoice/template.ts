@@ -102,7 +102,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
     </div>
   </div>
 
-  <div class="invoice-title">Honorarnote / Rechnung</div>
+  <div class="invoice-title">{{invoice_title}}</div>
 
   <table class="items-table">
     <thead>
@@ -228,6 +228,10 @@ export type InvoiceData = {
   vat_enabled: boolean
   payment_info?: string
   notes?: string
+  invoice_title?: string
+  tax_number?: string
+  vat_id?: string
+  footer_text?: string
   line_items: Array<{
     date: string
     description: string
@@ -266,6 +270,7 @@ export function renderInvoice(template: string, data: InvoiceData): string {
     'logo_base64','logo_mime','primary_color','reference_number','transaction_date',
     'due_date','payer_name','payer_address','amount_net','vat_rate','vat_amount',
     'amount_gross','payment_info','notes',
+    'invoice_title','tax_number','vat_id','footer_text',
   ]
   for (const key of simpleKeys) {
     html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String((data as any)[key] || ''))
@@ -274,14 +279,33 @@ export function renderInvoice(template: string, data: InvoiceData): string {
   return html
 }
 
-export async function getDefaultTemplate(): Promise<string> {
+export async function getDefaultTemplate(): Promise<{ html: string; guiFields?: any }> {
   try {
     const template = await prisma.invoiceTemplate.findFirst({
       where: { isDefault: true, isActive: true },
       orderBy: { createdAt: 'desc' },
     })
-    return template?.htmlContent ?? DEFAULT_INVOICE_HTML
+    if (!template) return { html: DEFAULT_INVOICE_HTML }
+    return {
+      html: template.htmlContent,
+      guiFields: {
+        invoiceTitle:  template.invoiceTitle  ?? 'Honorarnote',
+        primaryColor:  template.primaryColor  ?? '#4f46e5',
+        paymentDays:   template.paymentDays   ?? 14,
+        iban:          template.iban          ?? '',
+        bic:           template.bic           ?? '',
+        bankName:      template.bankName      ?? '',
+        taxNumber:     template.taxNumber     ?? '',
+        vatId:         template.vatId         ?? '',
+        praxisName:    template.praxisName    ?? '',
+        praxisAddress: template.praxisAddress ?? '',
+        praxisPhone:   template.praxisPhone   ?? '',
+        praxisEmail:   template.praxisEmail   ?? '',
+        footerText:    template.footerText    ?? '',
+        showQrCode:    template.showQrCode    ?? true,
+      }
+    }
   } catch {
-    return DEFAULT_INVOICE_HTML
+    return { html: DEFAULT_INVOICE_HTML }
   }
 }

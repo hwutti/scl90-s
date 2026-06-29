@@ -20,22 +20,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!tx) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const branding = await getBranding()
-  const template = await getDefaultTemplate()
+  const { html: templateHtml, guiFields } = await getDefaultTemplate()
   const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
+  const paymentDays = guiFields?.paymentDays ?? 14
+  const iban = guiFields?.iban ?? ''
+  const bic  = guiFields?.bic  ?? ''
+  const bankName = guiFields?.bankName ?? ''
+  const paymentInfo = iban
+    ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
+    : (body.paymentInfo ?? '')
+
   const invoiceData = {
-    praxis_name: branding.praxisName,
+    praxis_name: guiFields?.praxisName || branding.praxisName,
     praxis_slogan: branding.slogan ?? '',
-    praxis_address: branding.address ?? '',
-    praxis_email: branding.contactEmail ?? '',
-    praxis_phone: branding.contactPhone ?? '',
+    praxis_address: guiFields?.praxisAddress || branding.address ?? '',
+    praxis_email: guiFields?.praxisEmail || branding.contactEmail ?? '',
+    praxis_phone: guiFields?.praxisPhone || branding.contactPhone ?? '',
     logo_base64: branding.logoBase64 ?? '',
     logo_mime: branding.logoMimeType ?? '',
-    primary_color: branding.colorPrimary,
+    primary_color: guiFields?.primaryColor || branding.colorPrimary,
+    invoice_title: guiFields?.invoiceTitle ?? 'Honorarnote',
+    tax_number: guiFields?.taxNumber ?? '',
+    vat_id: guiFields?.vatId ?? '',
+    footer_text: guiFields?.footerText ?? '',
     reference_number: tx.referenceNumber,
     transaction_date: fmtDate(tx.transactionDate),
-    due_date: fmtDate(new Date(tx.transactionDate.getTime() + 14 * 24 * 3600000)),
+    due_date: fmtDate(new Date(tx.transactionDate.getTime() + paymentDays * 24 * 3600000)),
     payer_name: tx.payerName,
     payer_address: tx.payerAddress ?? '',
     amount_net: fmtEUR(tx.amountNet),
@@ -44,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     amount_gross: fmtEUR(tx.amountGross),
     is_paid: tx.paymentStatus === 'PAID',
     vat_enabled: parseFloat(tx.vatRate.toString()) > 0,
-    payment_info: body.paymentInfo ?? '',
+    payment_info: paymentInfo,
     notes: tx.notes ?? '',
     line_items: tx.lineItems.map(li => ({
       date: li.lineDate ? fmtDate(li.lineDate) : '',
@@ -56,7 +68,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })),
   }
 
-  const html = renderInvoice(template, invoiceData)
+  // QR-Code Platzhalter
+  const qrPlaceholder = (guiFields?.showQrCode && iban)
+    ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
+    : ''
+  let tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
+  const html = renderInvoice(tmpl, invoiceData)
 
   // Save invoice document
   // Wrap with print styles for PDF via browser print

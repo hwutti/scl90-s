@@ -30,6 +30,7 @@ const NAV_ITEMS = [
       { href: '/admin/availability', label: 'Verfügbarkeit' },
       { href: '/admin/norm-tables', label: 'Normwerte' },
       { href: '/admin/branding', label: 'Branding & Praxis' },
+      { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlage' },
     ]
   },
 ]
