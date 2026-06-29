@@ -12,7 +12,7 @@ import { searchICD10 } from '@/lib/icd10/codes'
 import { SessionsBillingPanel } from './SessionsBillingPanel'
 import { PatientStatsPanel } from './PatientStatsPanel'
 
-type Tab = 'stammdaten' | 'screening' | 'sessions' | 'anamnese' | 'therapieplan' | 'diagnosen' | 'dokumente' | 'medikamente' | 'termine' | 'verlauf' | 'statistik'
+type Tab = 'uebersicht' | 'klinik' | 'sitzungen' | 'verlauf'
 
 const GENDER_LABEL:  Record<string,string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 const GENDER_SYMBOL: Record<string,string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
@@ -50,17 +50,11 @@ function fmtBytes(b: number) {
   return (b/1024/1024).toFixed(1) + ' MB'
 }
 
-const TABS: { key: Tab; label: string; icon: any }[] = [
-  { key: 'stammdaten',   label: 'Stammdaten',   icon: User },
-  { key: 'sessions',     label: 'Sitzungen',      icon: ClipboardList },
-  { key: 'screening',    label: 'Screening',     icon: Activity },
-  { key: 'anamnese',     label: 'Anamnese',      icon: FileText },
-  { key: 'therapieplan', label: 'Therapieplan',  icon: Target },
-  { key: 'diagnosen',    label: 'Diagnosen',     icon: Stethoscope },
-  { key: 'medikamente',  label: 'Medikamente',   icon: Activity },
-  { key: 'dokumente',    label: 'Dokumente',     icon: FileText },
-  { key: 'termine',      label: 'Termine',       icon: Calendar },
-  { key: 'verlauf',      label: 'Verlauf',       icon: MessageSquare },
+const GROUP_TABS: { key: Tab; label: string; emoji: string; sub: string }[] = [
+  { key: 'uebersicht', label: 'Übersicht',  emoji: '🏠', sub: 'Stammdaten · Zahlen · Nächster Termin' },
+  { key: 'klinik',     label: 'Klinik',     emoji: '🩺', sub: 'Anamnese · Diagnosen · Therapieplan · Screening' },
+  { key: 'sitzungen',  label: 'Sitzungen',  emoji: '📋', sub: 'Sitzungen · Termine · Dokumente' },
+  { key: 'verlauf',    label: 'Verlauf',    emoji: '📈', sub: 'Profilverlauf · Notizen · Statistik' },
 ]
 
 export function PatientRecordClient({ patient, notes, instruments, currentUserId, role }: any) {
@@ -68,7 +62,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   const fileRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<Tab>('stammdaten')
+  const [tab, setTab] = useState<Tab>('uebersicht')
 
   // Photo
   const [photoSrc, setPhotoSrc] = useState<string|null>(null)
@@ -153,6 +147,15 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   const [showDocUpload, setShowDocUpload] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<any>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+
+  // ── Anamnese ────────────────────────────────────────────────────────────
+  const [anamnesis, setAnamnesis] = useState<any>(null)
+  useEffect(() => {
+    if (tab !== 'klinik') return
+    fetch(`/api/patients/${patient.id}/anamnesis`).then(r=>r.json()).then(d=>{
+      setAnamnesis(d ?? null)
+    }).catch(()=>{})
+  }, [patient.id, tab])
 
   const loadDocs = useCallback(() => {
     setDocsLoading(true)
@@ -343,11 +346,10 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     if (data.id) router.push('/assessment/' + data.id)
   }
 
-  const tabCounts: Partial<Record<Tab,number>> = {
-    screening: patient.assessments?.length ?? 0,
-    therapieplan: goals.length,
-    diagnosen: diags.length,
-    dokumente: docs.length,
+  const groupCounts: Record<Tab, number> = {
+    uebersicht: 0,
+    klinik: (patient.assessments?.length ?? 0) + goals.length + diags.length,
+    sitzungen: docs.length,
     verlauf: notes?.length ?? 0,
   }
 
@@ -504,24 +506,33 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
           </div>
         </div>
 
-        {/* ── TABS ── */}
-        <div style={{ display: 'flex', gap: 2, padding: 4, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 12, marginBottom: 16, overflowX: 'auto' }}>
-          {TABS.map(t => {
-            const cnt = tabCounts[t.key]
+        {/* ── GRUPPEN-TABS ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {GROUP_TABS.map(t => {
+            const cnt = groupCounts[t.key]
+            const active = tab === t.key
             return (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={cn('tab-item', tab === t.key && 'active')}
-                style={{ border: 'none', cursor: 'pointer', background: 'none' }}>
-                <t.icon style={{ width: 13, height: 13 }} />
-                {t.label}
-                {cnt !== undefined && cnt > 0 && <span className="tab-count">{cnt}</span>}
+                style={{
+                  flex: 1, minWidth: 130, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 4, padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                  border: active ? '2px solid var(--color-primary)' : '1.5px solid var(--border)',
+                  background: active ? 'var(--color-primary-light)' : 'var(--surface-card)',
+                  transition: 'all 0.12s',
+                }}>
+                <span style={{ fontSize: 20 }}>{t.emoji}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--color-primary)' : 'var(--text-primary)' }}>
+                  {t.label}
+                  {cnt > 0 && <span style={{ marginLeft: 5, fontSize: 11, background: active ? 'var(--color-primary)' : 'var(--surface-panel)', color: active ? '#fff' : 'var(--text-muted)', padding: '1px 6px', borderRadius: 20 }}>{cnt}</span>}
+                </span>
+                <span style={{ fontSize: 10, color: active ? 'var(--color-primary)' : 'var(--text-muted)', textAlign: 'center', opacity: 0.8, lineHeight: 1.4 }}>{t.sub}</span>
               </button>
             )
           })}
         </div>
 
-        {/* ── STAMMDATEN ── */}
-        {tab === 'stammdaten' && (
+        {/* ── ÜBERSICHT ── */}
+        {tab === 'uebersicht' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
@@ -696,222 +707,251 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── SESSIONS ── */}
-        {tab === 'sessions' && (
-          <SessionsBillingPanel patientId={patient.id} role={role} />
-        )}
-
-        {/* ── SCREENING ── */}
-        {tab === 'screening' && (
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid var(--border)' }}>
-              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>SCL-90-S Tests</h2>
-              <button onClick={() => setNewAssessment(true)} className="btn-primary"><Plus style={{ width: 13, height: 13 }} /> Neuer Test</button>
-            </div>
-            {!patient.assessments?.length ? (
-              <div className="empty-state"><Activity className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Noch keine Tests vorhanden.</p></div>
-            ) : (
-              <table className="data-table">
-                <thead><tr><th>Anlass</th><th>Status</th><th>Datum</th><th>GSI</th><th>T-Score</th><th></th></tr></thead>
-                <tbody>
-                  {patient.assessments?.map((a: any) => {
-                    const gsi = a.result?.scores?.GSI
-                    return (
-                      <tr key={a.id} onClick={() => router.push(a.status==='IN_PROGRESS'?'/assessment/'+a.id:'/assessment/'+a.id+'/results')}>
-                        <td className="primary">{a.session?.occasion||'—'}</td>
-                        <td><span className={a.status==='SCORED'?'badge badge-green':a.status==='IN_PROGRESS'?'badge badge-blue':'badge badge-gray'}>{a.status}</span></td>
-                        <td>{fmtDate(a.createdAt)}</td>
-                        <td>{gsi?gsi.raw?.toFixed(2):'—'}</td>
-                        <td>{gsi?'T='+gsi.tScore:'—'}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>›</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {/* ── THERAPIEPLAN ── */}
-        {tab === 'therapieplan' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Therapieziele</h2>
-              <button onClick={() => setShowGoalForm(true)} className="btn-primary"><Plus style={{ width: 13, height: 13 }} /> Neues Ziel</button>
-            </div>
-            {goalsLoading ? <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div> :
-            goals.length === 0 ? (
-              <div className="card" style={{ padding: 24 }}>
-                <div className="empty-state"><Target className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Noch keine Therapieziele definiert.</p></div>
+          {/* ── Vorschau: Diagnosen + Therapieziele ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Aktuelle Diagnosen</h3>
+                <button onClick={() => setTab('klinik')} className="btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}>Alle →</button>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {goals.map(g => (
-                  <div key={g.id} className="card" style={{ padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{g.title}</span>
-                          <span className={cn('badge', GOAL_STATUS_CLASS[g.status])}>{GOAL_STATUS_LABEL[g.status]}</span>
-                          <span className="badge badge-gray">P{g.priority}</span>
-                        </div>
-                        {g.description && <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>{g.description}</p>}
-                        {g.targetDate && <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Zieldatum: {fmtDate(g.targetDate)}</p>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        {g.status !== 'ACHIEVED' && (
-                          <button onClick={() => updateGoalStatus(g.id, 'ACHIEVED')} className="btn-secondary" style={{ padding: '4px 8px' }} title="Als erreicht markieren">
-                            <CheckCircle style={{ width: 13, height: 13, color: 'var(--green)' }} />
-                          </button>
-                        )}
-                        {g.status === 'OPEN' && (
-                          <button onClick={() => updateGoalStatus(g.id, 'IN_PROGRESS')} className="btn-secondary" style={{ padding: '4px 8px' }} title="In Bearbeitung">
-                            <Clock style={{ width: 13, height: 13, color: 'var(--amber)' }} />
-                          </button>
-                        )}
-                        <button onClick={() => deleteGoal(g.id)} className="btn-danger" style={{ padding: '4px 8px' }}>
-                          <Trash2 style={{ width: 13, height: 13 }} />
-                        </button>
-                      </div>
+              {diags.length === 0
+                ? <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>Noch keine Diagnosen erfasst</p>
+                : diags.slice(0, 3).map((d: any) => (
+                    <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--color-primary)' }}>{d.icdCode}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                      <span className={d.diagnosisType === 'PRIMARY' ? 'badge badge-indigo' : 'badge badge-gray'} style={{ fontSize: 10 }}>
+                        {d.diagnosisType === 'PRIMARY' ? 'Haupt' : d.diagnosisType === 'SECONDARY' ? 'Neben' : 'Ausschluss'}
+                      </span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── DIAGNOSEN ── */}
-        {tab === 'diagnosen' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>ICD-10 Diagnosen</h2>
-              <button onClick={() => setShowDiagForm(true)} className="btn-primary"><Plus style={{ width: 13, height: 13 }} /> Diagnose hinzufügen</button>
+                  ))
+              }
             </div>
-            {diagsLoading ? <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div> :
-            diags.length === 0 ? (
-              <div className="card" style={{ padding: 24 }}>
-                <div className="empty-state"><Stethoscope className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Noch keine Diagnosen erfasst.</p></div>
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Therapieziele</h3>
+                <button onClick={() => setTab('klinik')} className="btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}>Alle →</button>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {diags.map(d => (
-                  <div key={d.id} className="card" style={{ padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ padding: '6px 10px', background: 'var(--color-primary-light)', borderRadius: 8, flexShrink: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'monospace' }}>{d.icdCode}</span>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{d.icdLabel}</span>
-                          <span className="badge badge-indigo">{DIAG_TYPE_LABEL[d.diagnosisType]}</span>
-                          {d.certainty && <span className="badge badge-gray">{d.certainty}</span>}
-                        </div>
-                        {d.note && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>{d.note}</p>}
-                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>{fmtDate(d.diagnosedAt)}</p>
-                      </div>
-                      <button onClick={() => deleteDiag(d.id)} className="btn-danger" style={{ padding: '4px 8px' }}>
-                        <Trash2 style={{ width: 13, height: 13 }} />
-                      </button>
+              {goals.length === 0
+                ? <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>Noch keine Ziele definiert</p>
+                : goals.slice(0, 3).map((g: any) => (
+                    <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-primary)', flex: 1 }}>{g.title}</span>
+                      <span className={g.status === 'ACHIEVED' ? 'badge badge-green' : g.status === 'IN_PROGRESS' ? 'badge badge-blue' : 'badge badge-gray'} style={{ fontSize: 10 }}>
+                        {g.status === 'ACHIEVED' ? 'Erreicht' : g.status === 'IN_PROGRESS' ? 'Laufend' : 'Offen'}
+                      </span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))
+              }
+            </div>
           </div>
+        </div>
         )}
 
-        {/* ── DOKUMENTE ── */}
-        {tab === 'dokumente' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Meine Dokumente</h2>
-              <button onClick={() => setShowDocUpload(true)} className="btn-primary"><Upload style={{ width: 13, height: 13 }} /> Datei hinzufügen</button>
+        {/* ── KLINIK ── */}
+        {tab === 'klinik' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Anamnese */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details open>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>📝 Anamnese</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>aufklappen ▾</span>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  {anamnesis ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {Object.entries(anamnesis.sections ?? {}).map(([k, v]: any) => v ? (
+                        <div key={k}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{k}</div>
+                          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{v}</p>
+                        </div>
+                      ) : null)}
+                    </div>
+                  ) : (
+                    <div className="empty-state"><FileText className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Noch keine Anamnese erfasst.</p></div>
+                  )}
+                </div>
+              </details>
             </div>
 
-            {/* Drag-and-Drop Zone */}
-            <div
-              ref={dropRef}
-              onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
-              onDragLeave={() => setIsDragOver(false)}
-              onDrop={e => {
-                e.preventDefault(); setIsDragOver(false)
-                const file = e.dataTransfer.files[0]
-                if (file) handleFileDrop(file)
-              }}
-              style={{
-                border: `2px dashed ${isDragOver ? 'var(--color-primary)' : 'var(--border)'}`,
-                borderRadius: 10, padding: '20px 24px', marginBottom: 14,
-                background: isDragOver ? 'var(--color-primary-light)' : 'var(--surface-panel)',
-                transition: 'all 0.15s', textAlign: 'center',
-              }}
-            >
-              {uploadingDoc ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-                  <div className="spinner" style={{ width: 16, height: 16 }} /> Datei wird hochgeladen...
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 13, color: isDragOver ? 'var(--color-primary)' : 'var(--text-muted)' }}>
-                  Dateien und Ordner in den Dokumente-Bereich ziehen (Drag and Drop) — oder{' '}
-                  <button onClick={() => setShowDocUpload(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontWeight: 600, padding: 0, fontSize: 13 }}>
-                    Datei hinzufügen
-                  </button>
-                </p>
-              )}
-            </div>
-
-            {docsLoading ? <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div> :
-            docs.filter(d => !d.deletedAt).length === 0 ? (
-              <div className="card" style={{ padding: 24 }}>
-                <div className="empty-state">
-                  <FileText className="empty-state-icon" style={{ width: 36, height: 36 }} />
-                  <p className="empty-state-text">Anzahl an gespeicherten Dokumenten: Keine Dokumente gespeichert</p>
-                </div>
-              </div>
-            ) : (
-              <div className="card" style={{ overflow: 'hidden' }}>
-                <table className="data-table">
-                  <thead><tr><th>Name</th><th>Typ</th><th>Größe</th><th>Kategorie</th><th>Hochgeladen</th><th></th></tr></thead>
-                  <tbody>
-                    {docs.filter(d => !d.deletedAt).map(d => (
-                      <tr key={d.id}>
-                        <td className="primary">{d.name}</td>
-                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.mimeType?.split('/')[1]?.toUpperCase() ?? '—'}</td>
-                        <td>{fmtBytes(d.size)}</td>
-                        <td><span className="badge badge-indigo" style={{ fontSize: 10 }}>{DOC_CATEGORY_LABEL[d.category] ?? d.category}</span></td>
-                        <td style={{ fontSize: 12 }}>{fmtDate(d.uploadedAt)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button onClick={() => viewDoc(d.id)} className="btn-secondary" style={{ padding: '4px 8px' }}>
-                              <Eye style={{ width: 13, height: 13 }} />
-                            </button>
-                            <button onClick={() => deleteDoc(d.id)} className="btn-danger" style={{ padding: '4px 8px' }}>
-                              <Trash2 style={{ width: 13, height: 13 }} />
-                            </button>
+            {/* Diagnosen */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details open>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>🩺 Diagnosen {diags.length > 0 && <span className="tab-count" style={{ marginLeft: 6 }}>{diags.length}</span>}</span>
+                  <button onClick={e => { e.preventDefault(); setShowDiagForm(true) }} className="btn-primary" style={{ fontSize: 11, padding: '3px 10px' }}>+ Diagnose</button>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  {diagsLoading ? <div className="spinner" style={{ width: 20, height: 20 }} /> :
+                  diags.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '16px 0' }}><Stethoscope className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Noch keine Diagnosen erfasst.</p></div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {diags.map((d: any) => (
+                        <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: 'var(--surface-panel)', borderRadius: 8 }}>
+                          <div style={{ padding: '4px 8px', background: 'var(--color-primary-light)', borderRadius: 6, flexShrink: 0 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'monospace' }}>{d.icdCode}</span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{d.icdLabel}</span>
+                              <span className="badge badge-indigo" style={{ fontSize: 10 }}>{DIAG_TYPE_LABEL[d.diagnosisType]}</span>
+                              {d.certainty && <span className="badge badge-gray" style={{ fontSize: 10 }}>{d.certainty}</span>}
+                            </div>
+                            {d.note && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{d.note}</p>}
+                          </div>
+                          <button onClick={() => deleteDiag(d.id)} className="btn-danger" style={{ padding: '3px 6px' }}><Trash2 style={{ width: 12, height: 12 }} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
+
+            {/* Therapieplan */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>🎯 Therapieplan {goals.length > 0 && <span className="tab-count" style={{ marginLeft: 6 }}>{goals.length}</span>}</span>
+                  <button onClick={e => { e.preventDefault(); setShowGoalForm(true) }} className="btn-primary" style={{ fontSize: 11, padding: '3px 10px' }}>+ Ziel</button>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  {goals.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '16px 0' }}><Target className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Noch keine Therapieziele.</p></div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {goals.map((g: any) => (
+                        <div key={g.id} style={{ display: 'flex', gap: 10, padding: '8px 10px', background: 'var(--surface-panel)', borderRadius: 8, alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{g.title}</span>
+                              <span className={g.status==='ACHIEVED'?'badge badge-green':g.status==='IN_PROGRESS'?'badge badge-blue':'badge badge-gray'} style={{ fontSize: 10 }}>
+                                {g.status==='ACHIEVED'?'Erreicht':g.status==='IN_PROGRESS'?'Laufend':'Offen'}
+                              </span>
+                            </div>
+                            {g.description && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{g.description}</p>}
+                          </div>
+                          <button onClick={() => deleteGoal?.(g.id)} className="btn-danger" style={{ padding: '3px 6px' }}><Trash2 style={{ width: 12, height: 12 }} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
+
+            {/* Screening */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>📊 Screening {(patient.assessments?.length ?? 0) > 0 && <span className="tab-count" style={{ marginLeft: 6 }}>{patient.assessments?.length}</span>}</span>
+                  <button onClick={e => { e.preventDefault(); setNewAssessment(true) }} className="btn-primary" style={{ fontSize: 11, padding: '3px 10px' }}>+ Neuer Test</button>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)' }}>
+                  {!patient.assessments?.length ? (
+                    <div className="empty-state" style={{ padding: '16px 0' }}><Activity className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Noch keine Tests vorhanden.</p></div>
+                  ) : (
+                    <table className="data-table">
+                      <thead><tr><th>Anlass</th><th>Status</th><th>Datum</th><th>GSI</th><th>T-Score</th><th></th></tr></thead>
+                      <tbody>
+                        {patient.assessments?.map((a: any) => {
+                          const gsi = a.result?.scores?.GSI
+                          return (
+                            <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => router.push(a.status==='IN_PROGRESS'?'/assessment/'+a.id:'/assessment/'+a.id+'/results')}>
+                              <td className="primary">{a.session?.occasion||'—'}</td>
+                              <td><span className={a.status==='SCORED'?'badge badge-green':a.status==='IN_PROGRESS'?'badge badge-blue':'badge badge-gray'}>{a.status}</span></td>
+                              <td>{fmtDate(a.createdAt)}</td>
+                              <td>{gsi?gsi.raw?.toFixed(2):'—'}</td>
+                              <td>{gsi?'T='+gsi.tScore:'—'}</td>
+                              <td style={{ color: 'var(--text-muted)' }}>›</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </details>
+            </div>
+
+            {/* Medikamente */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>💊 Medikamente</span>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  <div className="empty-state" style={{ padding: '12px 0' }}><p className="empty-state-text">Keine Medikamente erfasst.</p></div>
+                </div>
+              </details>
+            </div>
+
           </div>
         )}
 
-        {/* ── STATISTIKEN ── */}
-        {tab === 'statistik' && (
-          <PatientStatsPanel patientId={patient.id} />
-        )}
 
-        {/* ── TERMINE ── */}
-        {tab === 'termine' && (
-          <div className="card" style={{ padding: 24 }}>
-            <div className="empty-state"><Calendar className="empty-state-icon" style={{ width: 36, height: 36 }} /><p className="empty-state-text">Termine werden hier angezeigt.</p></div>
+
+        {/* ── SITZUNGEN ── */}
+        {tab === 'sitzungen' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <SessionsBillingPanel patientId={patient.id} role={role} />
+
+            {/* Dokumente */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>📄 Dokumente {docs.filter((d:any)=>!d.deletedAt).length > 0 && <span className="tab-count" style={{ marginLeft: 6 }}>{docs.filter((d:any)=>!d.deletedAt).length}</span>}</span>
+                  <button onClick={e => { e.preventDefault(); setShowDocUpload(true) }} className="btn-primary" style={{ fontSize: 11, padding: '3px 10px' }}>+ Dokument</button>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  <div
+                    onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setIsDragOver(false); const file = e.dataTransfer.files[0]; if (file) handleFileDrop(file) }}
+                    style={{ border: `2px dashed ${isDragOver ? 'var(--color-primary)' : 'var(--border)'}`, borderRadius: 8, padding: '10px 16px', marginBottom: 12, background: isDragOver ? 'var(--color-primary-light)' : 'transparent', transition: 'all 0.15s', textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: 12, color: isDragOver ? 'var(--color-primary)' : 'var(--text-muted)' }}>
+                      {uploadingDoc ? 'Wird hochgeladen...' : 'Dateien hierher ziehen (Drag & Drop)'}
+                    </p>
+                  </div>
+                  {docsLoading ? <div className="spinner" style={{ width: 20, height: 20 }} /> :
+                   docs.filter((d:any)=>!d.deletedAt).length === 0
+                    ? <div className="empty-state" style={{ padding: '12px 0' }}><FileText className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Keine Dokumente gespeichert.</p></div>
+                    : <table className="data-table">
+                        <thead><tr><th>Name</th><th>Kategorie</th><th>Größe</th><th>Datum</th><th></th></tr></thead>
+                        <tbody>
+                          {docs.filter((d:any)=>!d.deletedAt).map((d:any) => (
+                            <tr key={d.id}>
+                              <td className="primary">{d.name}</td>
+                              <td><span className="badge badge-indigo" style={{ fontSize: 10 }}>{DOC_CATEGORY_LABEL[d.category]??d.category}</span></td>
+                              <td>{fmtBytes(d.size)}</td>
+                              <td>{fmtDate(d.uploadedAt)}</td>
+                              <td><div style={{ display: 'flex', gap: 4 }}>
+                                <button onClick={() => viewDoc(d.id)} className="btn-secondary" style={{ padding: '3px 6px' }}><Eye style={{ width: 12, height: 12 }} /></button>
+                                <button onClick={() => deleteDoc(d.id)} className="btn-danger" style={{ padding: '3px 6px' }}><Trash2 style={{ width: 12, height: 12 }} /></button>
+                              </div></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                  }
+                </div>
+              </details>
+            </div>
+
+            {/* Termine */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>📅 Termine</span>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  <div className="empty-state" style={{ padding: '12px 0' }}><Calendar className="empty-state-icon" style={{ width: 28, height: 28 }} /><p className="empty-state-text">Termine werden hier angezeigt.</p></div>
+                </div>
+              </details>
+            </div>
           </div>
         )}
 
