@@ -136,12 +136,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const bic      = guiFields?.bic      ?? ''
   const bankName = guiFields?.bankName ?? ''
   const paymentInfo = iban
-    ? \`IBAN: \${iban}\${bic ? \` · BIC: \${bic}\` : ''}\${bankName ? \` · \${bankName}\` : ''}\`
+    ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
     : ''
   const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
   const bgMode    = guiFields?.bgImageMode ?? 'behind'
   const qrPlaceholder = (guiFields?.showQrCode && iban)
-    ? \`<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: \${iban}]</em></div>\`
+    ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
     : ''
 
   const invoiceData = {
@@ -191,9 +191,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
   const body = renderInvoice(tmpl, invoiceData)
 
-  const printHtml = \`<!DOCTYPE html><html lang="de"><head>
+  const printHtml = `<!DOCTYPE html><html lang="de"><head>
 <meta charset="UTF-8">
-<title>Honorarnote \${tx.referenceNumber}</title>
+<title>Honorarnote ${tx.referenceNumber}</title>
 <style>
   @media print { @page { margin: 0; size: A4; } .no-print { display: none !important; } }
   body { margin: 0; }
@@ -207,8 +207,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     ✕ Schließen
   </button>
 </div>
-\${body}
-</body></html>\`
+${body}
+</body></html>`
 
   return new NextResponse(printHtml, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
