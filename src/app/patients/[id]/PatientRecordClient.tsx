@@ -514,6 +514,14 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
         </div>
 
         {/* ── GRUPPEN-TABS ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => router.push(`/patients/${patient.id}/bericht`)}
+            className="btn-secondary"
+            style={{ fontSize: 12, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+            📄 Bericht erstellen
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {GROUP_TABS.map(t => {
             const cnt = groupCounts[t.key]
