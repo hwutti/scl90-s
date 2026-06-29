@@ -119,7 +119,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
   // ── Faktenbox Daten ──
   const [faktenbookData, setFaktenbookData] = useState<any>(null)
   useEffect(() => {
-    if (tab !== 'stammdaten') return
+    if (tab !== 'uebersicht') return
     Promise.all([
       fetch(`/api/patients/${patient.id}/sessions`).then(r=>r.json()).catch(()=>[]),
       fetch(`/api/patients/${patient.id}/diagnoses`).then(r=>r.json()).catch(()=>[]),
@@ -161,7 +161,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     setDocsLoading(true)
     fetch(`/api/patients/${patient.id}/documents`).then(r=>r.json()).then(d=>{setDocs(d);setDocsLoading(false)}).catch(()=>setDocsLoading(false))
   }, [patient.id])
-  useEffect(() => { if (tab==='dokumente') loadDocs() }, [tab, loadDocs])
+  useEffect(() => { if (tab==='klinik') loadDocs() }, [tab, loadDocs])
 
   // Drag-and-Drop für Dokumente
   async function handleFileDrop(file: File) {
@@ -211,7 +211,7 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     setDiagsLoading(true)
     fetch(`/api/patients/${patient.id}/diagnoses`).then(r=>r.json()).then(d=>{setDiags(d);setDiagsLoading(false)}).catch(()=>setDiagsLoading(false))
   }, [patient.id])
-  useEffect(() => { if (tab==='diagnosen') loadDiags() }, [tab, loadDiags])
+  useEffect(() => { if (tab==='klinik') loadDiags() }, [tab, loadDiags])
 
   // Notes
   const [noteForm, setNoteForm] = useState({ date: new Date().toISOString().slice(0,10), noteType: 'PROGRESS', content: '' })
