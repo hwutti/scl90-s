@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CheckCircle, AlertCircle, Calendar, FileText, Tag, ExternalLink,
   Trash2, Plus, X, ChevronDown, ChevronRight, User, Euro,
@@ -71,6 +71,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
   const searchParams = useSearchParams()
   const googleStatus = searchParams?.get('google')
   const [saving, setSaving] = useState(false)
+  const router = useRouter()
   const [saved, setSaved]   = useState(false)
 
   // ── Therapeutin-Daten ──
@@ -143,6 +144,16 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
         classicMode: d.classicMode ?? false,
       })
     }).catch(() => {})
+    fetch('/api/settings/session-settings').then(r => r.json()).then(d => {
+      setSessionSettings({
+        formatableProtocols: d.formatableProtocols ?? true,
+        changeLog:           d.changeLog           ?? false,
+        showChanges:         d.showChanges          ?? false,
+        lazyLoading:         d.lazyLoading          ?? true,
+        spellCheck:          d.spellCheck           ?? false,
+        extraServices:       d.extraServices        ?? false,
+      })
+    }).catch(() => {})
     fetch('/api/settings/telemetry').then(r => r.json()).then(d => {
       if (d && !d.error) setTelemetry(d.enabled ?? false)
     }).catch(() => {})
@@ -179,6 +190,39 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
       }),
     })
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function saveSessionSettings() {
+    setSaving(true)
+    await fetch('/api/settings/session-settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sessionSettings),
+    })
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function saveVisual() {
+    setSaving(true)
+    await fetch('/api/settings/visual', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        theme:           visual.theme,
+        fontSize:        visual.fontSize,
+        accentColor:     visual.accentColor,
+        fontFamily:      visual.fontFamily,
+        helpToolEnabled: visual.helpTool,
+        classicMode:     visual.classicMode,
+      }),
+    })
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function saveTelemetry(enabled: boolean) {
+    await fetch('/api/settings/telemetry', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    })
+    setTelemetry(enabled)
   }
 
   async function saveTemplate() {
@@ -433,6 +477,12 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
             <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 
+            <button onClick={saveSessionSettings} disabled={saving} className="btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }}>
+              <Save style={{ width: 12, height: 12 }} /> Sitzungs-Einstellungen speichern
+            </button>
+
+            <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
+
             {/* Sitzungsvorlagen */}
             <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>Sitzungsvorlagen</h4>
             {sessionTemplates.map((t: any) => (
@@ -500,9 +550,14 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
               </div>
             ))}
             {!showNewTemplate ? (
-              <button onClick={() => setShowNewTemplate(true)} className="btn-secondary" style={{ fontSize: 12, marginTop: 10, alignSelf: 'flex-start' }}>
-                <Plus style={{ width: 12, height: 12 }} /> Neue Vorlage
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button onClick={() => setShowNewTemplate(true)} className="btn-secondary" style={{ fontSize: 12 }}>
+                  <Plus style={{ width: 12, height: 12 }} /> Neue Vorlage
+                </button>
+                <button onClick={() => router.push('/admin/rechnungsvorlage')} className="btn-secondary" style={{ fontSize: 12 }}>
+                  🎨 Vollständig verwalten
+                </button>
+              </div>
             ) : (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, padding: 14, background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
                 <div><label className="label">Name *</label>
