@@ -46,6 +46,11 @@ export default async function PatientPage({ params }: { params: { id: string } }
   })
 
   const instruments = await prisma.instrument.findMany({ where: { isActive: true } })
+  const invoiceTemplates = await prisma.invoiceTemplate.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, isDefault: true },
+    orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+  })
 
   await prisma.auditLog.create({
     data: { userId, patientId: params.id, action: 'PATIENT_VIEWED' },
@@ -58,6 +63,7 @@ export default async function PatientPage({ params }: { params: { id: string } }
           patient={patient as any}
           notes={notes as any}
           instruments={instruments}
+          invoiceTemplates={invoiceTemplates as any}
           currentUserId={userId}
           role={role}
         />

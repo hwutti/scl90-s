@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { SammelabrechungPanel } from './SammelabrechungPanel'
 import {
   Plus, X, Trash2, Download, TrendingUp, TrendingDown, DollarSign,
   Car, RefreshCw, FileText, Check, RotateCcw, Ban, Search,
@@ -43,7 +44,7 @@ function fmtDate(s: string | Date) {
   return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(s))
 }
 
-type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn'
+type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'sammelabrechnung'
 
 // ── Haupt-Komponente ─────────────────────────────────────────────────────────
 
@@ -304,6 +305,7 @@ export function FinanceClient() {
             ['expenses', 'Ausgaben'],
             ['mileage',  'Fahrtenbuch'],
             ['gewinn',   'Gewinnermittlung'],
+            ['sammelabrechnung', 'Sammelabrechnung'],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{
@@ -769,6 +771,10 @@ export function FinanceClient() {
               </div>
             </div>
           </div>
+        )}
+
+        {tab === 'sammelabrechnung' && (
+          <SammelabrechungPanel year={year} />
         )}
       </div>
 

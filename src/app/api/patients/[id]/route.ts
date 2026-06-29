@@ -100,6 +100,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.defaultUnitPriceNet  !== undefined && { defaultUnitPriceNet: parseFloat(body.defaultUnitPriceNet) }),
       ...(body.defaultHourlyRateNet !== undefined && { defaultHourlyRateNet: parseFloat(body.defaultHourlyRateNet) }),
       ...(body.sessionStartNumber   !== undefined && { sessionStartNumber: parseInt(body.sessionStartNumber) }),
+      ...(body.defaultVatRate       !== undefined && { defaultVatRate: parseFloat(body.defaultVatRate) }),
+      ...(body.defaultPaymentMethod !== undefined && { defaultPaymentMethod: body.defaultPaymentMethod }),
+      ...(body.defaultMarkAsPaid    !== undefined && { defaultMarkAsPaid: Boolean(body.defaultMarkAsPaid) }),
+      ...(body.defaultInvoiceTemplateId !== undefined && { defaultInvoiceTemplateId: body.defaultInvoiceTemplateId || null }),
     },
   })
 

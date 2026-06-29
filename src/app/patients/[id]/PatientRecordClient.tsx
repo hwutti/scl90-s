@@ -58,7 +58,7 @@ const GROUP_TABS: { key: Tab; label: string; emoji: string; sub: string }[] = [
   { key: 'verlauf',    label: 'Verlauf',    emoji: '📈', sub: 'Profilverlauf · Notizen · Statistik' },
 ]
 
-export function PatientRecordClient({ patient, notes, instruments, currentUserId, role }: any) {
+export function PatientRecordClient({ patient, notes, instruments, invoiceTemplates = [], currentUserId, role }: any) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -88,6 +88,10 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
     billRecipientAddress: (patient as any).billRecipientAddress ?? '',
     billRecipientCity: (patient as any).billRecipientCity ?? '',
     defaultBillingMode: (patient as any).defaultBillingMode ?? 'time',
+    defaultVatRate: String((patient as any).defaultVatRate ?? '0'),
+    defaultPaymentMethod: (patient as any).defaultPaymentMethod ?? 'UNBAR_BANK_TRANSFER',
+    defaultMarkAsPaid: Boolean((patient as any).defaultMarkAsPaid ?? false),
+    defaultInvoiceTemplateId: (patient as any).defaultInvoiceTemplateId ?? '',
     defaultUnitDuration: (patient as any).defaultUnitDuration ?? 50,
     defaultUnitPriceNet: (patient as any).defaultUnitPriceNet ?? '',
     defaultHourlyRateNet: (patient as any).defaultHourlyRateNet ?? '',
@@ -626,6 +630,9 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Abrechnung</div>
                       <div className="field-row"><span className="field-label">Modus</span><span className="field-value">{(patient as any).defaultBillingMode === 'unit' ? 'Einheitenmodus' : 'Zeitmodus'}</span></div>
+                      {(patient as any).defaultPaymentMethod && <div className="field-row"><span className="field-label">Zahlungsart</span><span className="field-value">{{ UNBAR_BANK_TRANSFER: 'Überweisung', CASH: 'Bar', CARD_BANKOMAT: 'Karte/Bankomat' }[(patient as any).defaultPaymentMethod] ?? (patient as any).defaultPaymentMethod}</span></div>}
+                      <div className="field-row"><span className="field-label">MwSt.</span><span className="field-value">{Math.round(parseFloat((patient as any).defaultVatRate ?? 0) * 100)} %</span></div>
+                      {(patient as any).defaultMarkAsPaid && <div className="field-row"><span className="field-label">Zahlung</span><span className="field-value">Sofort als bezahlt</span></div>}
                       {(patient as any).defaultUnitDuration ? <div className="field-row"><span className="field-label">Einheitendauer</span><span className="field-value">{(patient as any).defaultUnitDuration} min</span></div> : null}
                       {(patient as any).defaultUnitPriceNet ? <div className="field-row"><span className="field-label">Kosten/Einheit</span><span className="field-value">{'EUR ' + Number((patient as any).defaultUnitPriceNet).toFixed(2)}</span></div> : null}
                       <div className="field-row"><span className="field-label">Session-Startzahl</span><span className="field-value">{(patient as any).sessionStartNumber ?? 0}</span></div>
@@ -664,6 +671,36 @@ export function PatientRecordClient({ patient, notes, instruments, currentUserId
                         <input type="number" step="0.01" className="input" value={stammForm.defaultUnitPriceNet} onChange={e => setStammForm(f => ({ ...f, defaultUnitPriceNet: e.target.value }))} /></div>
                       <div><label className="label">Startzahl Sessionzähler</label>
                         <input type="number" min="0" className="input" value={stammForm.sessionStartNumber} onChange={e => setStammForm(f => ({ ...f, sessionStartNumber: +e.target.value }))} /></div>
+                    </div>
+                    <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Honorarnoten-Defaults</div>
+                    <div className="form-grid-2">
+                      <div><label className="label">Standard-MwSt.</label>
+                        <select className="input" value={stammForm.defaultVatRate} onChange={e => setStammForm(f => ({ ...f, defaultVatRate: e.target.value }))}>
+                          <option value="0">0 % (keine MwSt.)</option>
+                          <option value="0.1">10 %</option>
+                          <option value="0.2">20 %</option>
+                        </select>
+                      </div>
+                      <div><label className="label">Standard-Zahlungsart</label>
+                        <select className="input" value={stammForm.defaultPaymentMethod} onChange={e => setStammForm(f => ({ ...f, defaultPaymentMethod: e.target.value }))}>
+                          <option value="UNBAR_BANK_TRANSFER">Überweisung</option>
+                          <option value="CASH">Bar</option>
+                          <option value="CARD_BANKOMAT">Karte / Bankomat</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface-panel)', borderRadius: 7 }}>
+                      <input type="checkbox" id="markAsPaidChk" checked={stammForm.defaultMarkAsPaid} onChange={e => setStammForm(f => ({ ...f, defaultMarkAsPaid: e.target.checked }))} />
+                      <label htmlFor="markAsPaidChk" style={{ fontSize: 13, cursor: 'pointer', color: 'var(--text-primary)' }}>Sofort als bezahlt markieren</label>
+                    </div>
+                    <div><label className="label">Standard-Rechnungsvorlage</label>
+                      <select className="input" value={stammForm.defaultInvoiceTemplateId} onChange={e => setStammForm(f => ({ ...f, defaultInvoiceTemplateId: e.target.value }))}>
+                        <option value="">Standard (automatisch)</option>
+                        {invoiceTemplates.map((t: any) => (
+                          <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' ★' : ''}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}

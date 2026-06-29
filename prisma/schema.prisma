@@ -285,6 +285,9 @@ model Patient {
   defaultHourlyRateNet   Decimal?  @db.Decimal(10,2)  // Stundensatz
   defaultInvoiceTemplateId String?
   defaultInvoiceTemplate   InvoiceTemplate? @relation("PatientInvoiceTemplate", fields: [defaultInvoiceTemplateId], references: [id])
+  defaultVatRate         Decimal?  @db.Decimal(5,4) @default(0)    // Standard-MwSt. 0=0%, 0.1=10%, 0.2=20%
+  defaultPaymentMethod   String?   @default("UNBAR_BANK_TRANSFER")  // CASH | CARD_BANKOMAT | UNBAR_BANK_TRANSFER
+  defaultMarkAsPaid      Boolean   @default(false)                   // sofort als bezahlt markieren?
   sessionStartNumber     Int       @default(0)        // Startzahl für Sessionzähler
 
   // Beziehungen zu Users
