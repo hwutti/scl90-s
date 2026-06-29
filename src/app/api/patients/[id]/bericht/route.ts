@@ -28,8 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { id: params.id, deletedAt: null },
     include: {
       diagnoses: { orderBy: [{ diagnosisType: 'asc' }, { diagnosedAt: 'asc' }] },
-      anamnesis: { include: { sections: { orderBy: { sortOrder: 'asc' } } } },
-      sessions: {
+      anamnesis: { include: { sections: true } },
+      therapySessions: {
         where: {
           ...(zeitraumVon && { sessionDate: { gte: new Date(zeitraumVon) } }),
           ...(zeitraumBis && { sessionDate: { lte: new Date(zeitraumBis) } }),
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         orderBy: { sessionDate: 'asc' },
         include: {
           protocols: {
-            include: { sections: { orderBy: { sortOrder: 'asc' } } }
+            include: { sections: true }
           }
         }
       },
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const branding = await getBranding()
   const html = generateReportHtml({
-    reportType, patient, sessions: patient.sessions, assessments, goals,
+    reportType, patient, sessions: patient.therapySessions, assessments, goals,
     adressat, adressatTitel, adressatAdresse,
     zeitraumVon, zeitraumBis, freitext, anonymize,
     includeSessions, includeAssessments, includeGoals, includeAnamnese,
