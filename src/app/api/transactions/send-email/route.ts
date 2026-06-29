@@ -36,16 +36,7 @@ export async function POST(req: NextRequest) {
     praxisName,
   })
 
-  // Honorarnote als Anhang laden (falls vorhanden)
   const attachments: any[] = []
-  const invoiceDoc = await prisma.patientDocument.findFirst({
-    where: {
-      patientId: tx.patientId ?? undefined,
-      documentType: 'INVOICE',
-      deletedAt: null,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
 
   // Benutzerdefinierte Nachricht hinzufügen
   const finalHtml = message
