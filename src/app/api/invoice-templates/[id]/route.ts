@@ -3,8 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export const config = { api: { bodyParser: { sizeLimit: '20mb' } } }
-
 const ALLOWED_FIELDS = new Set([
   'name','description','htmlContent','cssContent','isDefault','isActive',
   'invoiceTitle','primaryColor','paymentDays',
