@@ -8,7 +8,8 @@ import { SettingsClient } from './SettingsClient'
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
-  if ((session.user as any).role !== 'ADMIN') redirect('/patients')
+  const role = (session.user as any).role
+  if (!['ADMIN', 'THERAPIST'].includes(role)) redirect('/dashboard')
 
   const userId = (session.user as any).id
   const googleCal = await prisma.googleCalendarConnection.findUnique({ where: { userId } })

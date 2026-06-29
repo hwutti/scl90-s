@@ -230,7 +230,10 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <div className="topbar">
-        <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Einstellungen</h1>
+        <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Persönliche Einstellungen</h1>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          Diese Einstellungen gelten nur für Ihren Account — jeder Therapeut hat eigene Daten.
+        </div>
       </div>
 
       <div style={{ padding: 20, flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>

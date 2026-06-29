@@ -3,7 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro, Video, ClipboardList, GraduationCap } from 'lucide-react'
+import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro, Video, ClipboardList, GraduationCap , Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/providers'
 import type { BrandingConfig } from '@/lib/branding'
@@ -147,6 +147,10 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
         <Link href="/profile" className={cn('nav-link', pathname.startsWith('/profile') && 'active')}>
           <User style={{ width: 15, height: 15, flexShrink: 0 }} />
           <span style={{ fontSize: 13 }}>Mein Profil</span>
+        </Link>
+        <Link href="/admin/settings" className={cn('nav-link', pathname.startsWith('/admin/settings') && 'active')}>
+          <Settings2 style={{ width: 15, height: 15, flexShrink: 0 }} />
+          <span style={{ fontSize: 13 }}>Einstellungen</span>
         </Link>
         <Link href="/impressum" className={cn('nav-link', pathname.startsWith('/impressum') && 'active')}>
           <Info style={{ width: 15, height: 15, flexShrink: 0 }} />
