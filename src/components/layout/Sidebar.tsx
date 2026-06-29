@@ -67,6 +67,12 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
   const name = session?.user?.name ?? ''
   const userId = (session?.user as any)?.id ?? ''
   const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/profile').then(r => r.json()).then(d => {
+      if (d?.avatarBase64) setAvatarUrl(`data:${d.avatarMime ?? 'image/jpeg'};base64,${d.avatarBase64}`)
+    }).catch(() => {})
+  }, [])
   const roleLabel = role === 'ADMIN' ? 'Administrator' : role === 'THERAPIST' ? 'Therapeut/in' : 'Patient/in'
   const logoSrc = branding.logoBase64 ? `data:${branding.logoMimeType};base64,${branding.logoBase64}` : null
   const visibleNav = NAV_ITEMS.filter(i => i.roles.includes(role))
@@ -173,8 +179,10 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-panel)', marginBottom: 4 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-            {initials}
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
+            {avatarUrl
+              ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sb-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>

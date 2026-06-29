@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User, Mail, Lock, Shield, Calendar, BarChart2,
-  Save, Check, AlertCircle, Eye, EyeOff, Edit2, X,
+  Save, Check, AlertCircle, Eye, EyeOff, Edit2, X, Camera, Trash2,
 } from 'lucide-react'
 
 const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -28,6 +28,10 @@ export function ProfileClient({ user }: { user: any }) {
   const [newPw2,   setNewPw2]   = useState('')
   const [showPw,   setShowPw]   = useState(false)
 
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    user.avatarBase64 ? `data:${user.avatarMime ?? 'image/jpeg'};base64,${user.avatarBase64}` : null
+  )
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [success, setSuccess] = useState('')
   const [error,   setError]   = useState('')
@@ -79,6 +83,51 @@ export function ProfileClient({ user }: { user: any }) {
     setSaving(false)
   }
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)) {
+      alert('Nur JPG, PNG, WebP oder GIF erlaubt.'); return
+    }
+    // Komprimieren via Canvas
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = async () => {
+      URL.revokeObjectURL(url)
+      const size = 200
+      const canvas = document.createElement('canvas')
+      canvas.width = size; canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      // Zentriert zuschneiden
+      const min = Math.min(img.width, img.height)
+      const sx = (img.width - min) / 2
+      const sy = (img.height - min) / 2
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      const base64 = dataUrl.split(',')[1]
+      setAvatarPreview(dataUrl)
+      setSavingAvatar(true)
+      await fetch('/api/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarBase64: base64, avatarMime: 'image/jpeg' }),
+      })
+      setSavingAvatar(false)
+      setSuccess('Profilbild gespeichert.')
+      setTimeout(() => setSuccess(''), 3000)
+    }
+    img.src = url
+  }
+
+  async function removeAvatar() {
+    setSavingAvatar(true)
+    await fetch('/api/profile', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ removeAvatar: true }),
+    })
+    setAvatarPreview(null)
+    setSavingAvatar(false)
+  }
+
   const inp = {
     style: {
       padding: '8px 10px', fontSize: 13, borderRadius: 7,
@@ -108,13 +157,45 @@ export function ProfileClient({ user }: { user: any }) {
 
       {/* Avatar + Rolle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px', background: 'var(--surface-card)', borderRadius: 12, border: '0.5px solid var(--border)', marginBottom: 16 }}>
-        <div style={{
-          width: 72, height: 72, borderRadius: '50%', flexShrink: 0,
-          background: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-primary)' }}>
-            {(user.name ?? user.email ?? '?').charAt(0).toUpperCase()}
-          </span>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%', overflow: 'hidden',
+            background: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '2px solid var(--border)',
+          }}>
+            {avatarPreview
+              ? <img src={avatarPreview} alt="Profilbild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {(user.name ?? user.email ?? '?').charAt(0).toUpperCase()}
+                </span>
+            }
+          </div>
+          {/* Upload-Button */}
+          <label style={{
+            position: 'absolute', bottom: 0, right: 0,
+            width: 24, height: 24, borderRadius: '50%',
+            background: 'var(--color-primary)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', border: '2px solid var(--surface-card)',
+          }} title="Profilbild ändern">
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }}
+              onChange={handleAvatarUpload} />
+            {savingAvatar
+              ? <div style={{ width: 10, height: 10, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              : <Camera style={{ width: 12, height: 12 }} />}
+          </label>
+          {/* Entfernen-Button */}
+          {avatarPreview && (
+            <button onClick={removeAvatar} style={{
+              position: 'absolute', top: 0, right: -4,
+              width: 20, height: 20, borderRadius: '50%',
+              background: 'var(--red)', color: '#fff', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }} title="Profilbild entfernen">
+              <X style={{ width: 10, height: 10 }} />
+            </button>
+          )}
         </div>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{user.name ?? '—'}</div>

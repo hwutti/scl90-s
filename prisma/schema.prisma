@@ -188,6 +188,8 @@ model User {
   role         Role      @default(PATIENT)
   passwordHash String?
   pin          String?   @unique
+  avatarBase64 String?   // Profilbild als Base64
+  avatarMime   String?   // MIME-Typ des Profilbilds
   active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

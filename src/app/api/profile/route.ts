@@ -12,7 +12,7 @@ export async function GET() {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      id: true, name: true, email: true, role: true, active: true,
+      id: true, name: true, email: true, role: true, active: true, avatarBase64: true, avatarMime: true,
       createdAt: true, updatedAt: true,
       _count: {
         select: {
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest) {
   const userId = (session.user as any).id
 
   const body = await req.json()
-  const { name, email, currentPassword, newPassword } = body
+  const { name, email, currentPassword, newPassword, avatarBase64, avatarMime, removeAvatar } = body
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 })
@@ -45,6 +45,14 @@ export async function PATCH(req: NextRequest) {
     const exists = await prisma.user.findUnique({ where: { email: email.trim() } })
     if (exists) return NextResponse.json({ error: 'Diese E-Mail-Adresse wird bereits verwendet.' }, { status: 400 })
     data.email = email.trim()
+  }
+
+  if (removeAvatar) {
+    data.avatarBase64 = null
+    data.avatarMime   = null
+  } else if (avatarBase64) {
+    data.avatarBase64 = avatarBase64
+    data.avatarMime   = avatarMime ?? 'image/jpeg'
   }
 
   if (newPassword) {
