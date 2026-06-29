@@ -29,13 +29,10 @@ export async function POST(req: NextRequest) {
 
   const fmtEUR = (n: any) => new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(parseFloat(n ?? 0))
   const patientName = tx.payerName || `${tx.patient?.firstName ?? ''} ${tx.patient?.lastName ?? ''}`.trim()
-  const dueDate = tx.dueDate ? new Date(tx.dueDate).toLocaleDateString('de-AT') : undefined
-
   const { subject, html, text } = buildInvoiceEmail({
     patientName,
     referenceNumber: tx.referenceNumber,
     amount: fmtEUR(tx.amountGross),
-    dueDate,
     praxisName,
   })
 
