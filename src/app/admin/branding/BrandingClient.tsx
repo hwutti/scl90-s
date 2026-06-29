@@ -18,6 +18,11 @@ const DEFAULT_VALUES = {
   colorPrimaryLight: '#eef2ff',
   colorAccent: '#4338ca',
   colorSidebarText: '#475569',
+  iban: '',
+  bic: '',
+  bankName: '',
+  taxNumber: '',
+  vatId: '',
 }
 
 export function BrandingClient({ initial }: { initial: BrandingConfig }) {
@@ -250,6 +255,48 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                   <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Bankverbindung */}
+          <div className="card p-6">
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              🏦 Bankverbindung &amp; Steuerdaten
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+              Wird automatisch in Honorarnoten, Berichten und E-Mails verwendet.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="label">IBAN</label>
+                <input className="input" value={form.iban ?? ''}
+                  onChange={e => set('iban', e.target.value)}
+                  placeholder="AT12 3456 7890 1234 5678" />
+              </div>
+              <div>
+                <label className="label">BIC</label>
+                <input className="input" value={form.bic ?? ''}
+                  onChange={e => set('bic', e.target.value)}
+                  placeholder="MUSTBICXX" />
+              </div>
+              <div>
+                <label className="label">Bank</label>
+                <input className="input" value={form.bankName ?? ''}
+                  onChange={e => set('bankName', e.target.value)}
+                  placeholder="Musterbank AG" />
+              </div>
+              <div>
+                <label className="label">Steuernummer</label>
+                <input className="input" value={form.taxNumber ?? ''}
+                  onChange={e => set('taxNumber', e.target.value)}
+                  placeholder="123/4567" />
+              </div>
+              <div>
+                <label className="label">UID-Nummer</label>
+                <input className="input" value={form.vatId ?? ''}
+                  onChange={e => set('vatId', e.target.value)}
+                  placeholder="ATU12345678" />
+              </div>
             </div>
           </div>
 

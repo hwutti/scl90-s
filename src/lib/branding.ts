@@ -10,7 +10,12 @@ export interface BrandingConfig {
   colorAccent: string
   colorSidebarText: string
   imprintHtml: string | null
-  contactEmail: string | null
+  contactEmail: string
+  iban: string
+  bic: string
+  bankName: string
+  taxNumber: string
+  vatId: string | null
   contactPhone: string | null
   address: string | null
   bundesland: string
@@ -25,6 +30,11 @@ export const DEFAULT_BRANDING: BrandingConfig = {
   colorPrimaryLight: '#eef2ff',
   colorAccent: '#4338ca',
   colorSidebarText: '#475569',
+  iban: '',
+  bic: '',
+  bankName: '',
+  taxNumber: '',
+  vatId: '',
   imprintHtml: null,
   contactEmail: null,
   contactPhone: null,

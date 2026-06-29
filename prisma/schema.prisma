@@ -556,6 +556,13 @@ model PraxisConfig {
   contactPhone    String?
   address         String?
 
+  // Bankverbindung (für Rechnungen, Honorarnoten)
+  iban            String?
+  bic             String?
+  bankName        String?
+  taxNumber       String?   // Steuernummer
+  vatId           String?   // UID-Nummer
+
   bundesland      String   @default("Kärnten")  // für Schulferien
   anamnesisTemplate String? // JSON: [{title, prefilledText}]
   updatedAt       DateTime @updatedAt

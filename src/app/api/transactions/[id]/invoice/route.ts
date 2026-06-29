@@ -129,9 +129,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
   const paymentDays = guiFields?.paymentDays ?? 14
-  const iban     = guiFields?.iban     ?? ''
-  const bic      = guiFields?.bic      ?? ''
-  const bankName = guiFields?.bankName ?? ''
+  const iban     = guiFields?.iban     || branding.iban     || ''
+  const bic      = guiFields?.bic      || branding.bic      || ''
+  const bankName = guiFields?.bankName || branding.bankName || ''
   const paymentInfo = iban
     ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
     : ''
