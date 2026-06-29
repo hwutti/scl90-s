@@ -64,27 +64,38 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   .footer { border-top: 0.5px solid #e5e7eb; padding-top: 5mm; display: flex; justify-content: space-between; font-size: 8.5pt; color: #888; }
   .footer a { color: {{primary_color}}; text-decoration: none; }
 
-  /* Hintergrundbild */
+  /* Hintergrundbild — nur im Inhaltsbereich zwischen Header und Footer */
   {{#if bg_image_base64}}
   .bg-layer {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    position: absolute;
+    left: 0; right: 0;
+    top: 0; bottom: 0;
     background-image: url(data:{{bg_image_mime}};base64,{{bg_image_base64}});
     background-size: cover; background-position: center;
     opacity: {{bg_image_opacity}};
-    {{#if bg_is_watermark}}z-index: 999; pointer-events: none;{{else}}z-index: -1;{{/if}}
+    {{#if bg_is_watermark}}z-index: 100; pointer-events: none;{{else}}z-index: 0;{{/if}}
+  }
+  .page {
+    position: relative;
+  }
+  .page-content {
+    position: relative;
+    z-index: 1;
   }
   {{/if}}
 </style>
 </head>
 <body>
 <div class="page">
-  {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
-
   {{#if header_image_base64}}
   <div style="margin: -20mm -20mm 8mm -20mm; line-height: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}" style="width: 100%; display: block; max-height: 50mm; object-fit: cover;" alt="">
   </div>
   {{/if}}
+
+  <div class="bg-layer-wrapper" style="position:relative;">
+  {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
+  <div class="page-content">
 
   <div class="header" {{#if header_image_base64}}style="border-top: none;"{{/if}}>
     <div class="logo-area">
@@ -180,6 +191,9 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
     <strong>Anmerkungen:</strong> {{notes}}
   </div>
   {{/if}}
+
+  </div><!-- /page-content -->
+  </div><!-- /bg-layer-wrapper -->
 
   {{#if footer_image_base64}}
   <div style="margin: 8mm -20mm -15mm -20mm; line-height: 0;">

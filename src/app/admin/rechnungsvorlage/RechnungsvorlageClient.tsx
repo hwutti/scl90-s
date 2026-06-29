@@ -163,7 +163,9 @@ export function RechnungsvorlageClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          htmlContent,
+          // htmlContent nur im HTML-Modus mitschicken (vermeidet 413)
+          htmlContent: editorMode === 'html' ? htmlContent : undefined,
+          templateId: activeId,
           guiFields: gui,
           useReal: previewMode === 'real',
           transactionId: lastTransaction?.id,
@@ -173,7 +175,7 @@ export function RechnungsvorlageClient({
       setPreviewHtml(data.html ?? '')
     } catch { /* ignore */ }
     setPreviewLoading(false)
-  }, [htmlContent, gui, previewMode, lastTransaction])
+  }, [htmlContent, gui, previewMode, lastTransaction, editorMode, activeId])
 
   useEffect(() => {
     clearTimeout(debounceRef.current)

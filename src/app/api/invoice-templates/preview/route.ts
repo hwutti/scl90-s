@@ -40,7 +40,15 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { htmlContent, guiFields, useReal, transactionId } = body
+  const { htmlContent, guiFields, useReal, transactionId, templateId } = body
+
+  // Wenn kein htmlContent mitgeliefert: aus DB laden
+  let resolvedHtml = htmlContent
+  if (!resolvedHtml && templateId) {
+    const tmpl = await prisma.invoiceTemplate.findUnique({ where: { id: templateId } })
+    if (tmpl) resolvedHtml = tmpl.htmlContent
+  }
+  if (!resolvedHtml) resolvedHtml = DEFAULT_INVOICE_HTML
 
   const branding = await getBranding()
 
@@ -134,7 +142,7 @@ export async function POST(req: NextRequest) {
     : ''
 
   // Template zusammenbauen
-  let template = htmlContent || DEFAULT_INVOICE_HTML
+  let template = resolvedHtml
 
   // GUI-Felder in Template injizieren (zusätzliche Platzhalter)
   template = template
