@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     show_data_protection: guiFields?.showDataProtection !== false,
     report_title:         'Therapiebericht – Vorschau',
     today:                new Date().toLocaleDateString('de-AT', { dateStyle: 'long' }),
-    therapist_name:       branding.contactName || session.user?.name || '',
+    therapist_name:       session.user?.name || '',
     patient_name:         'Max Mustermann',
     patient_dob:          '15.03.1985',
     header_image_base64:  guiFields?.headerImageBase64 || '',
