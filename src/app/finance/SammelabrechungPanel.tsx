@@ -74,7 +74,7 @@ export function SammelabrechungPanel({ year }: { year: number }) {
     const items = data.patients
       .filter(e => selected.has(e.patient.id))
       .map(e => {
-        const ov = overrides[e.patient.id] ?? {}
+        const ov: Override = overrides[e.patient.id] ?? { vatRate: 0, paymentMethod: 'UNBAR_BANK_TRANSFER', markAsPaid: false, generateInvoice: true }
         const payerName = e.patient.billRecipientName
           || `${e.patient.firstName} ${e.patient.lastName}`
         const payerAddr = [e.patient.billRecipientAddress, e.patient.billRecipientCity].filter(Boolean).join(', ')
