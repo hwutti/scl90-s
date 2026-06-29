@@ -17,7 +17,7 @@ export default async function BerichtPage({ params }: { params: { id: string } }
       id: true, firstName: true, lastName: true, gender: true,
       dateOfBirth: true,
       diagnoses: { orderBy: [{ diagnosisType: 'asc' }, { diagnosedAt: 'asc' }] },
-      _count: { select: { sessions: true } },
+      _count: { select: { therapySessions: true } },
     }
   })
   if (!patient) notFound()
@@ -40,7 +40,7 @@ export default async function BerichtPage({ params }: { params: { id: string } }
         therapistName={session.user?.name ?? ''}
         firstSessionDate={firstSession?.sessionDate?.toISOString() ?? null}
         lastSessionDate={lastSession?.sessionDate?.toISOString() ?? null}
-        totalSessions={patient._count.sessions}
+        totalSessions={patient._count.therapySessions}
       />
     </PageShell>
   )
