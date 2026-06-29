@@ -408,7 +408,7 @@ export function SessionDetailPanel({
                 borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Normale Session-Kosten</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Normale Sitzungs-Kosten</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                     {session.billingMode === 'time'
                       ? `${session.durationMinutes} min × ${fmtEUR((parseFloat(session.hourlyRateNet ?? 0) / 60).toFixed(4))}/min`
