@@ -160,6 +160,12 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
     load()
   }
 
+  async function resetInvoiceDocument(txId: string, docId: string) {
+    if (!confirm('Eingefrorenes Rechnungs-Dokument verwerfen? Beim nächsten Anzeigen/Drucken wird die Rechnung neu aus den aktuellen Branding-/Vorlagen-Daten erzeugt und erneut eingefroren.')) return
+    await fetch(`/api/transactions/${txId}/invoice?docId=${docId}`, { method: 'DELETE' })
+    load()
+  }
+
   async function generateInvoice(txId: string) {
     const res = await fetch(`/api/transactions/${txId}/invoice`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -334,11 +340,16 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                   </div>
                   {/* Invoice Docs */}
                   {tx.invoiceDocuments?.length > 0 && (
-                    <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
+                    <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems: 'center' }}>
                       {tx.invoiceDocuments.map((doc: any) => (
-                        <button key={doc.id} onClick={() => window.open(`/api/transactions/${tx.id}/invoice`, '_blank')} className="btn-secondary" style={{fontSize:11,padding:'2px 8px'}}>
-                          <FileText style={{width:11,height:11}} /> Rechnung {new Date(doc.createdAt).toLocaleDateString('de-AT')}
-                        </button>
+                        <div key={doc.id} style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                          <button onClick={() => window.open(`/api/transactions/${tx.id}/invoice`, '_blank')} className="btn-secondary" style={{fontSize:11,padding:'2px 8px'}}>
+                            <FileText style={{width:11,height:11}} /> Rechnung {new Date(doc.createdAt).toLocaleDateString('de-AT')}
+                          </button>
+                          <button onClick={() => resetInvoiceDocument(tx.id, doc.id)} className="btn-ghost" style={{ padding: '2px 6px', fontSize: 11, color: 'var(--text-muted)' }} title="Eingefrorenes Dokument verwerfen und neu erzeugen (z.B. nach Vorlagen-/Branding-Änderung)">
+                            <RotateCcw style={{ width: 11, height: 11 }} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
