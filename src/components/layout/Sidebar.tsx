@@ -31,8 +31,12 @@ const NAV_ITEMS = [
       { href: '/admin/norm-tables', label: 'Normwerte' },
       { href: '/admin/branding', label: 'Branding & Praxis' },
       { href: '/admin/praxis-modus', label: 'Praxis-Modus' },
-      { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlage' },
-      { href: '/admin/berichtsvorlage', label: 'Berichtsvorlage' },
+      { href: '/admin/rechnungsvorlage', label: 'Vorlagen', sub: [
+          { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlagen' },
+          { href: '/admin/berichtsvorlage', label: 'Berichtsvorlagen' },
+          { href: '/admin/bestaetigungsvorlage', label: 'Bestätigungsvorlagen' },
+        ]
+      },
       { href: '/admin/smtp', label: 'E-Mail / SMTP' },
     ]
   },
@@ -113,7 +117,7 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
       <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
         {visibleNav.map(item => {
           const isActive = pathname.startsWith(item.href)
-          const subActive = item.sub?.some(s => pathname.startsWith(s.href))
+          const subActive = item.sub?.some((s: any) => s.sub ? s.sub.some((c: any) => pathname.startsWith(c.href)) : pathname.startsWith(s.href))
           const isOpen = isActive || subActive
           return (
             <div key={item.href}>
@@ -126,7 +130,38 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
               </Link>
               {item.sub && isOpen && (
                 <div style={{ paddingLeft: 24, marginBottom: 4 }}>
-                  {item.sub.map(s => {
+                  {item.sub.map((s: any) => {
+                    if (s.sub) {
+                      return (
+                        <div key={s.label}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 7,
+                            padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                            color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}>
+                            {s.label}
+                          </div>
+                          <div style={{ paddingLeft: 11 }}>
+                            {s.sub.map((c: any) => {
+                              const ca = pathname === c.href || pathname.startsWith(c.href)
+                              return (
+                                <Link key={c.href} href={c.href} style={{
+                                  display: 'flex', alignItems: 'center', gap: 7,
+                                  padding: '5px 10px', borderRadius: 7,
+                                  fontSize: 12, fontWeight: ca ? 600 : 400,
+                                  color: ca ? 'var(--sb-active-text)' : 'var(--sb-text)',
+                                  textDecoration: 'none',
+                                  transition: 'all 0.15s',
+                                }}>
+                                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: ca ? 'var(--sb-active-text)' : 'var(--border-strong)', flexShrink: 0 }} />
+                                  {c.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    }
                     const sa = pathname === s.href || (s.href !== item.href && pathname.startsWith(s.href))
                     return (
                       <Link key={s.href} href={s.href} style={{

@@ -339,6 +339,7 @@ model Patient {
   videoCalls            VideoCall[]             @relation("PatientVideoCalls")
   ratings               SessionRating[]         @relation("PatientRatings")
   reportDocuments       PatientReportDocument[]
+  confirmations         Confirmation[]
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -1827,6 +1828,95 @@ model ReportTemplate {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Bestätigungsvorlage ────────────────────────────────────────────────────
+// Eigenständiges, paralleles Vorlagensystem (gleiche Architektur wie
+// InvoiceTemplate/ReportTemplate) für Patientenbestätigungen
+// (Terminbestätigung, Anwesenheitsbestätigung, etc.)
+
+model ConfirmationTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  templateKey     String?  // Kennung für mitgelieferte Standard-Vorlagen, z.B. "terminbestaetigung"
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  htmlContent     String   // Seiten-Layout mit {{platzhalter}}, enthält {{freitext}} als Inhalts-Slot
+  bodyText        String   @default("") // Vorgabetext mit Platzhaltern, wird beim Erstellen ins Freitext-Feld kopiert
+
+  // GUI-Felder (Branding) - identisch zu Rechnungs-/Berichtsvorlage
+  primaryColor    String?  @default("#4f46e5")
+  fontFamily      String?  @default("Helvetica Neue, Arial, sans-serif")
+  fontSize        String?  @default("11pt")
+  praxisName      String?
+  praxisAddress   String?
+  praxisPhone     String?
+  praxisEmail     String?
+  taxNumber       String?
+  vatId           String?
+  footerText      String?
+
+  // Design-Elemente (Base64)
+  headerImageBase64  String?
+  headerImageMime    String?
+  footerImageBase64  String?
+  footerImageMime    String?
+  bgImageBase64      String?
+  bgImageMime        String?
+  bgImageOpacity     Float    @default(0.06)
+  bgImageMode        String   @default("behind")
+
+  // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_CONFIRMATION_HTML)
+  customHtml      Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  confirmations   Confirmation[]
+}
+
+enum ConfirmationStatus {
+  ENTWURF
+  AUSGESTELLT
+}
+
+model Confirmation {
+  id              String               @id @default(cuid())
+  patientId       String
+  patient         Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sessionId       String?              // optional: verknüpft mit TherapySession (lose Referenz, keine FK)
+  templateId      String?
+  template        ConfirmationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  titel           String
+  inhalt          String               // Freitext (kann noch unaufgelöste {{platzhalter}} enthalten)
+  bemerkungen     String?
+  datum           DateTime             @default(now())
+  status          ConfirmationStatus   @default(ENTWURF)
+  createdByUserId String
+  deletedAt       DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  documents       ConfirmationDocument[]
+
+  @@index([patientId])
+}
+
+// Unveränderliches Archiv für ausgestellte Bestätigungen - gleiches Prinzip
+// wie InvoiceDocument/PatientReportDocument: einmal als PDF/Druck erzeugt,
+// bleibt der Inhalt für immer eingefroren, unabhängig von späteren
+// Branding-/Vorlagen-Änderungen.
+model ConfirmationDocument {
+  id              String       @id @default(cuid())
+  confirmationId  String
+  confirmation    Confirmation @relation(fields: [confirmationId], references: [id], onDelete: Cascade)
+  data            Bytes
+  mimeType        String       @default("text/html")
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([confirmationId])
 }
 
 model PatientShare {

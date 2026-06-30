@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, Edit3, 
-         FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban } from 'lucide-react'
+         FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban, ClipboardCheck } from 'lucide-react'
+import { ConfirmationsPanel } from './ConfirmationsPanel'
 
 const BILLING_STATUS_LABEL: Record<string,string> = {
   UNBILLED: 'Nicht verrechnet', BILLED_UNPAID: 'Verrechnet (offen)',
@@ -33,7 +34,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   const [sessions, setSessions] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTab, setSelectedTab] = useState<'sessions'|'transactions'>('sessions')
+  const [selectedTab, setSelectedTab] = useState<'sessions'|'transactions'|'confirmations'>('sessions')
   const [showNewSession, setShowNewSession] = useState(false)
   const [selectedSessions, setSelectedSessions] = useState<string[]>([])
   const [showInvoice, setShowInvoice] = useState<any>(null)
@@ -195,7 +196,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
 
       {/* Sub-Tabs */}
       <div style={{ display: 'flex', gap: 0 }}>
-        {[['sessions','Sitzungen'],['transactions','Rechnungen']].map(([key,label]) => (
+        {[['sessions','Sitzungen'],['transactions','Rechnungen'],['confirmations','Bestätigungen']].map(([key,label]) => (
           <button key={key} onClick={() => setSelectedTab(key as any)}
             style={{ padding: '7px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13,
               fontWeight: selectedTab===key ? 600 : 400,
@@ -346,6 +347,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
             </div>
           )}
         </div>
+      )}
+
+      {/* ── BESTÄTIGUNGEN ── */}
+      {selectedTab === 'confirmations' && (
+        <ConfirmationsPanel patientId={patientId} />
       )}
 
       {/* ══ MODALS ══ */}

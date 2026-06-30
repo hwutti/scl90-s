@@ -1,5 +1,6 @@
 import { PrismaClient, Gender, AssessmentStatus, NoteType } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { DEFAULT_CONFIRMATION_TEMPLATES } from './confirmationTemplateDefaults'
 
 const prisma = new PrismaClient()
 
@@ -192,6 +193,24 @@ async function main() {
     create: { userId: patientUser.id, emailEnabled: true, smsEnabled: false, inAppEnabled: true, reminderHours: [24] }
   })
   console.log('✓ Notification-Einstellungen angelegt')
+
+  // ─── Standard-Bestätigungsvorlagen (idempotent) ────────────────────────────
+  for (const [i, t] of DEFAULT_CONFIRMATION_TEMPLATES.entries()) {
+    const exists = await prisma.confirmationTemplate.findFirst({ where: { templateKey: t.templateKey } })
+    if (!exists) {
+      await prisma.confirmationTemplate.create({
+        data: {
+          templateKey: t.templateKey,
+          name: t.name,
+          description: t.description,
+          bodyText: t.bodyText,
+          htmlContent: '',
+          isDefault: i === 0,
+        }
+      })
+    }
+  }
+  console.log('✓ Bestätigungsvorlagen angelegt')
 
   console.log('\n✓ Seed abgeschlossen')
   console.log('  Admin:      admin@kds.local     / Admin1234!')
