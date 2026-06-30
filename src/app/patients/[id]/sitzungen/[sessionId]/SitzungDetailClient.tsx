@@ -494,7 +494,7 @@ export function SitzungDetailClient({
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Sitzungskosten</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                     {session.billingMode === 'time'
-                      ? `${session.durationMinutes} min × ${fmtEUR((parseFloat(session.hourlyRateNet ?? 0) / 60).toFixed(4))}/min`
+                      ? `Pauschalpreis pro Sitzung (${session.durationMinutes} min, keine Dauer-Skalierung)`
                       : `${session.unitCount} Einheiten × ${fmtEUR(session.unitPriceNet)}`
                     }
                   </div>

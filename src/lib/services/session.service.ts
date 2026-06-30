@@ -14,8 +14,11 @@ export function calculateSessionPrice(params: {
   const { billingMode, durationMinutes, unitCount, unitPriceNet, hourlyRateNet } = params
 
   if (billingMode === 'time') {
-    if (!durationMinutes || !hourlyRateNet) return null
-    return (durationMinutes / 60) * hourlyRateNet
+    // Der eingegebene Betrag IST der Sitzungspreis - keine Skalierung nach
+    // tatsächlicher Dauer. "Dauer" dient hier nur der Dokumentation
+    // (Sitzungsprotokoll), nicht der Preisberechnung.
+    if (!hourlyRateNet) return null
+    return hourlyRateNet
   } else {
     if (!unitCount || !unitPriceNet) return null
     return unitCount * unitPriceNet

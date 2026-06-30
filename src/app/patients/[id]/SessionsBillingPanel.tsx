@@ -402,11 +402,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                 </div>
               </div>
               {newSession.billingMode === 'time' ? (
-                <div><label className="label">Stundensatz (€/h)</label>
+                <div><label className="label">Preis pro Sitzung (€)</label>
                   <input type="number" step="0.01" className="input" value={newSession.hourlyRateNet}
                     onChange={e=>setNewSession(s=>({...s,hourlyRateNet:+e.target.value}))} />
                   <p style={{fontSize:11,color:'var(--text-muted)',marginTop:3}}>
-                    Preis: € {((newSession.durationMinutes/60)*newSession.hourlyRateNet).toFixed(2)}
+                    Wird unverändert als Sitzungspreis übernommen, unabhängig von der Dauer.
                   </p>
                 </div>
               ) : (
