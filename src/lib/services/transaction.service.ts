@@ -119,7 +119,9 @@ export async function createTransactionFromSessions(params: {
         data: {
           transactionId: transaction.id,
           sessionId: s.id,
-          description: s.name,
+          // "Sitzung-N" statt vollem Session-Namen (der bereits das Datum enthält,
+          // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
+          description: `Sitzung-${s.sessionNumber}`,
           serviceLabel: s.serviceLabel ?? params.serviceLabel,
           quantity: 1,
           unitPriceNet: lineAmountNet,

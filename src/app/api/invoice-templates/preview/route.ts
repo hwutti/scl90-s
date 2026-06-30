@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { renderInvoice, DEFAULT_INVOICE_HTML, InvoiceData } from '@/lib/invoice/template'
+import { generateEpcQrDataUrl, qrImageHtml } from '@/lib/invoice/qr'
 import { getBranding } from '@/lib/branding'
 
 const MOCK_DATA: InvoiceData = {
@@ -133,13 +134,15 @@ export async function POST(req: NextRequest) {
     data.due_date = new Date(Date.now() + paymentDays * 24 * 3600000).toLocaleDateString('de-AT')
   }
 
-  // QR-Code: EPC-QR für SEPA (als Data-URL, simpel als Text-Platzhalter)
-  const qrPlaceholder = guiFields?.showQrCode && iban
-    ? `<div style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:6px;display:inline-block;font-size:9pt;color:#666;text-align:center">
-        <div style="width:80px;height:80px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;font-size:8pt;color:#999">QR-Code<br>SEPA</div>
-        IBAN: ${iban}
-       </div>`
-    : ''
+  // QR-Code: echter scanbarer SEPA-QR-Code (EPC069-12 / GiroCode), gleiche Logik wie bei der echten Rechnung
+  let qrPlaceholder = ''
+  if (guiFields?.showQrCode && iban) {
+    const dataUrl = await generateEpcQrDataUrl({
+      iban, bic, beneficiaryName: data.praxis_name,
+      amount: parseFloat(data.amount_gross.replace(',', '.')), reference: data.reference_number,
+    })
+    if (dataUrl) qrPlaceholder = qrImageHtml(dataUrl)
+  }
 
   // Template zusammenbauen
   let template = resolvedHtml

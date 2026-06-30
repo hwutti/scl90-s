@@ -140,7 +140,7 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
 
 <div class="page">
   {{#if header_image_base64}}
-  <div style="margin: -20mm -20mm 6mm -20mm; line-height: 0;">
+  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}"
       style="width:100%;display:block;max-height:45mm;object-fit:cover;" alt="">
   </div>
@@ -148,7 +148,7 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
 
   <div class="bg-layer-wrapper">
   {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
-  <div class="page-content">
+  <div class="page-content" style="{{#if header_image_base64}}padding-top:6mm;{{/if}}{{#if footer_image_base64}}padding-bottom:8mm;{{/if}}">
 
   <div class="letterhead" {{#if header_image_base64}}style="border-top:none;"{{/if}}>
     <div class="letterhead-left">
@@ -184,7 +184,7 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
   </div><!-- /bg-layer-wrapper -->
 
   {{#if footer_image_base64}}
-  <div style="margin: 8mm -20mm -25mm -20mm; line-height: 0;">
+  <div style="margin: 0 -20mm -25mm -20mm; line-height: 0;">
     <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}"
       style="width:100%;display:block;max-height:35mm;object-fit:cover;" alt="">
   </div>

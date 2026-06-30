@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { renderInvoice, getDefaultTemplate } from '@/lib/invoice/template'
+import { generateEpcQrDataUrl, qrImageHtml } from '@/lib/invoice/qr'
 import { getBranding } from '@/lib/branding'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -30,9 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
   const paymentDays = guiFields?.paymentDays ?? 14
-  const iban = guiFields?.iban ?? ''
-  const bic  = guiFields?.bic  ?? ''
-  const bankName = guiFields?.bankName ?? ''
+  const iban = guiFields?.iban || branding.iban || ''
+  const bic  = guiFields?.bic  || branding.bic  || ''
+  const bankName = guiFields?.bankName || branding.bankName || ''
   const paymentInfo = iban
     ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
     : (body.paymentInfo ?? '')
@@ -84,10 +85,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })),
   }
 
-  // QR-Code Platzhalter
-  const qrPlaceholder = (guiFields?.showQrCode && iban)
-    ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
-    : ''
+  // QR-Code: echter scanbarer SEPA-QR-Code (EPC069-12 / GiroCode)
+  let qrPlaceholder = ''
+  if (guiFields?.showQrCode && iban) {
+    const dataUrl = await generateEpcQrDataUrl({
+      iban, bic, beneficiaryName: invoiceData.praxis_name,
+      amount: parseFloat(tx.amountGross.toString()), reference: tx.referenceNumber,
+    })
+    if (dataUrl) qrPlaceholder = qrImageHtml(dataUrl)
+  }
   let tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
   const html = renderInvoice(tmpl, invoiceData)
 
@@ -145,9 +151,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     : ''
   const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
   const bgMode    = guiFields?.bgImageMode ?? 'behind'
-  const qrPlaceholder = (guiFields?.showQrCode && iban)
-    ? `<div style="margin-top:8px"><em style="font-size:9pt;color:#888">[SEPA QR: ${iban}]</em></div>`
-    : ''
+  const praxisNameForQr = guiFields?.praxisName || branding.praxisName
+  let qrPlaceholder = ''
+  if (guiFields?.showQrCode && iban) {
+    const dataUrl = await generateEpcQrDataUrl({
+      iban, bic, beneficiaryName: praxisNameForQr,
+      amount: parseFloat(tx.amountGross.toString()), reference: tx.referenceNumber,
+    })
+    if (dataUrl) qrPlaceholder = qrImageHtml(dataUrl)
+  }
 
   const invoiceData = {
     praxis_name:         guiFields?.praxisName         || branding.praxisName,

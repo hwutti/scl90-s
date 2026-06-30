@@ -87,14 +87,14 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
 <body>
 <div class="page">
   {{#if header_image_base64}}
-  <div style="margin: -20mm -20mm 8mm -20mm; line-height: 0;">
+  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}" style="width: 100%; display: block; max-height: 50mm; object-fit: cover;" alt="">
   </div>
   {{/if}}
 
   <div class="bg-layer-wrapper" style="position:relative;">
   {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
-  <div class="page-content">
+  <div class="page-content" style="{{#if header_image_base64}}padding-top:8mm;{{/if}}{{#if footer_image_base64}}padding-bottom:8mm;{{/if}}">
 
   <div class="header" {{#if header_image_base64}}style="border-top: none;"{{/if}}>
     <div class="logo-area">
@@ -176,10 +176,13 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div>
 
   {{#if payment_info}}
-  <div class="payment-box">
-    <strong>Zahlungshinweis:</strong><br>
-    Bitte überweisen Sie den Betrag von <strong>€ {{amount_gross}}</strong> unter Angabe der Rechnungsnummer <strong>{{reference_number}}</strong> auf folgendes Konto:<br>
-    {{payment_info}}
+  <div class="payment-box" style="display:flex; align-items:center; gap:14px; justify-content:space-between;">
+    <div style="flex:1;">
+      <strong>Zahlungshinweis:</strong><br>
+      Bitte überweisen Sie den Betrag von <strong>€ {{amount_gross}}</strong> unter Angabe der Rechnungsnummer <strong>{{reference_number}}</strong> auf folgendes Konto:<br>
+      {{payment_info}}
+    </div>
+    {{qr_code}}
   </div>
   {{/if}}
 
@@ -193,7 +196,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div><!-- /bg-layer-wrapper -->
 
   {{#if footer_image_base64}}
-  <div style="margin: 8mm -20mm -15mm -20mm; line-height: 0;">
+  <div style="margin: 0 -20mm -15mm -20mm; line-height: 0;">
     <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}" style="width: 100%; display: block; max-height: 40mm; object-fit: cover;" alt="">
   </div>
   {{else}}
