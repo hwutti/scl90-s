@@ -25,7 +25,7 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <title>{{report_title}}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body {
     font-family: {{font_family}};
     font-size: {{font_size}};

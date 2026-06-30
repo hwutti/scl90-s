@@ -6,7 +6,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #1a1a2e; background: #fff; }
   .page { max-width: 210mm; margin: 0 auto; padding: 20mm 20mm 15mm 20mm; min-height: 289mm; display: flex; flex-direction: column; }
 
