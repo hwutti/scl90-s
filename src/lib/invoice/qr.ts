@@ -64,6 +64,6 @@ export async function generateEpcQrDataUrl(params: EpcQrParams): Promise<string 
 export function qrImageHtml(dataUrl: string): string {
   return `<div style="flex-shrink:0; text-align:center;">
       <img src="${dataUrl}" style="width:90px;height:90px;display:block;" alt="QR-Code für SEPA-Überweisung">
-      <div style="font-size:7.5pt;color:#888;margin-top:2px;">Scan to Pay</div>
+      <div style="font-size:7.5pt;color:#888;margin-top:2px;">Zum Bezahlen scannen</div>
     </div>`
 }
