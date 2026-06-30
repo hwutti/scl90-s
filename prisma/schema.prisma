@@ -69,6 +69,8 @@ enum AuditAction {
   BACKUP_CREATED
   FINANCE_DATA_EXPORTED
   DUNNING_SENT
+  MIGRATION_IMPORT
+  MIGRATION_IMPORTED
   APPOINTMENT_CREATED
   APPOINTMENT_CONFIRMED
   APPOINTMENT_CANCELLED
@@ -1326,6 +1328,19 @@ model Dunning {
   createdAt     DateTime     @default(now())
 
   @@index([transactionId])
+}
+
+// ─── TheraPsy-Migration ───────────────────────────────────────────────────────
+// Protokolliert jeden ausgefuehrten Import-Lauf. Das source_hash-Feld
+// verhindert, dass dieselbe Datei zweimal eingespielt wird.
+model MigrationRun {
+  id           String   @id @default(cuid())
+  sourceApp    String   @default("TheraPsy")
+  sourceHash   String   @unique  // SHA256 des hochgeladenen Exports
+  runBy        String            // userId
+  ranAt        DateTime @default(now())
+  stats        String            // JSON: { patients, sessions, transactions, diagnoses, ... }
+  warnings     String?           // JSON: array of warning strings
 }
 
 // ─── Rechnungsvorlage ─────────────────────────────────────────────────────────

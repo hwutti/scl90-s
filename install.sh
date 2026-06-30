@@ -78,7 +78,7 @@ apt-get update -qq
 apt-get install -y -qq curl wget gnupg2 lsb-release ca-certificates \
   software-properties-common apt-transport-https \
   nginx postgresql postgresql-contrib \
-  python3 python3-pip openssl git unzip
+  python3 python3-pip openssl git unzip unrar
 
 # =============================================================================
 step "Node.js 22 installieren"

@@ -109,10 +109,20 @@ sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"htmlContent\" 
 sudo -u postgres psql kds_db -c "DELETE FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL AND id NOT IN (SELECT DISTINCT ON (\"transactionId\") id FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL ORDER BY \"transactionId\", \"createdAt\" DESC);" 2>/dev/null || true
 sudo -u postgres psql kds_db -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
 
-# ─── 5b. Backup-Verzeichnis ────────────────────────────────────────────────────
+# ─── 5b. System-Pakete (idempotent) ───────────────────────────────────────────
+# unrar wird für den TheraPsy-Migrationsbereich benötigt (RAR-Export-Dateien)
+step "System-Pakete sicherstellen (unrar)"
+apt-get install -y -qq unrar 2>/dev/null && success "unrar verfügbar" || warn "unrar konnte nicht installiert werden"
+
+# ─── 5c. Backup-Verzeichnis ────────────────────────────────────────────────────
 # Idempotent (sicher bei jedem Update erneut auszuführen). Notwendig, weil der
 # Cron-Job als postgres läuft, der manuelle "Backup erstellen"-Button in der
 # Web-UI aber als $APP_USER - ohne gemeinsame Gruppe: EACCES beim manuellen Backup.
+# ─── 5a. System-Pakete prüfen ──────────────────────────────────────────────────
+step "System-Pakete: unrar sicherstellen (benötigt für TheraPsy-Migration)"
+dpkg -s unrar &>/dev/null || apt-get install -y -qq unrar 2>/dev/null || true
+success "unrar verfügbar"
+
 step "Backup-Verzeichnis: Berechtigungen sicherstellen"
 BACKUP_DIR="/var/backups/kds"
 mkdir -p "$BACKUP_DIR"

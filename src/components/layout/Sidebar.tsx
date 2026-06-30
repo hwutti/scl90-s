@@ -38,6 +38,7 @@ const NAV_ITEMS = [
         ]
       },
       { href: '/admin/smtp', label: 'E-Mail / SMTP' },
+      { href: '/admin/migration', label: 'TheraPsy-Migration' },
     ]
   },
 ]
