@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     })
 
     await prisma.auditLog.create({
-      data: { userId, action: 'MIGRATION_IMPORT', details: { sourceApp: 'TheraPsy', result } },
+      data: { userId, action: 'MIGRATION_IMPORT', details: { sourceApp: 'TheraPsy', result } as any },
     }).catch(() => {})
 
     return NextResponse.json({ ok: true, result })
