@@ -31,6 +31,19 @@ const S = StyleSheet.create({
 
   footer:        { position: 'absolute', bottom: 18, left: 34, right: 34, borderTopWidth: 0.5, borderTopColor: '#e2e8f0', paddingTop: 4, flexDirection: 'row', justifyContent: 'space-between' },
   footerText:    { fontSize: 7, color: '#94a3b8' },
+
+  journalHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', paddingVertical: 4, paddingHorizontal: 4 },
+  journalRow:    { flexDirection: 'row', paddingVertical: 3, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f1f5f9' },
+  journalRowExp: { flexDirection: 'row', paddingVertical: 3, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f1f5f9', backgroundColor: '#fef2f2' },
+  jTh:           { fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: '#64748b' },
+  jTd:           { fontSize: 7.5 },
+  jTdMuted:      { fontSize: 6.5, color: '#94a3b8' },
+  jColDate:      { width: 40 },
+  jColBeleg:     { width: 58 },
+  jColPatient:   { width: 55 },
+  jColDesc:      { flex: 1 },
+  jColAmt:       { width: 50, textAlign: 'right' },
+  anonBadge:     { fontSize: 8, color: '#64748b', marginBottom: 10 },
 })
 
 export interface ProfitStatementPdfProps {
@@ -49,6 +62,8 @@ export interface ProfitStatementPdfProps {
   einkuenfte: number
   incomeLabels: Record<string, string>
   expenseLabels: Record<string, string>
+  anonymized: boolean
+  journal: { date: string; belegnummer: string; patientLabel: string; description: string; bezug: string | null; direction: 'INCOME' | 'EXPENSE'; netto: number; ustSatz: number; brutto: number; paymentStatus: string }[]
 }
 
 const fmt = (n: number) => n.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -162,6 +177,34 @@ export function ProfitStatementPdf(p: ProfitStatementPdfProps) {
           <Text style={[S.tdBold, S.colLabel]}>Einkünfte aus selbständiger Arbeit</Text>
           <Text style={[S.tdBold, S.colVal]}>{fmt(p.einkuenfte)}</Text>
         </View>
+
+        <Text style={S.sectionTitle} break>Rechnungsjournal (Einnahmen &amp; Ausgaben im Detail)</Text>
+        <Text style={S.anonBadge}>
+          {p.anonymized
+            ? 'Patientendaten anonymisiert (Codename statt Name) — Belegnummer ermöglicht die eindeutige Zuordnung im System.'
+            : 'Patientendaten nicht anonymisiert — enthält echte Namen.'}
+        </Text>
+        <View style={S.journalHeader}>
+          <Text style={[S.jTh, S.jColDate]}>Datum</Text>
+          <Text style={[S.jTh, S.jColBeleg]}>Beleg-Nr.</Text>
+          <Text style={[S.jTh, S.jColPatient]}>Patient</Text>
+          <Text style={[S.jTh, S.jColDesc]}>Bezeichnung</Text>
+          <Text style={[S.jTh, S.jColAmt]}>Netto</Text>
+          <Text style={[S.jTh, S.jColAmt]}>Brutto</Text>
+        </View>
+        {p.journal.map((e, i) => (
+          <View style={e.direction === 'EXPENSE' ? S.journalRowExp : S.journalRow} key={i} wrap={false}>
+            <Text style={[S.jTd, S.jColDate]}>{e.date}</Text>
+            <Text style={[S.jTd, S.jColBeleg]}>{e.belegnummer}</Text>
+            <Text style={[S.jTd, S.jColPatient]}>{e.patientLabel}</Text>
+            <View style={S.jColDesc}>
+              <Text style={S.jTd}>{e.description}</Text>
+              {e.bezug && <Text style={S.jTdMuted}>{e.bezug}</Text>}
+            </View>
+            <Text style={[S.jTd, S.jColAmt]}>{fmt(e.netto)}</Text>
+            <Text style={[S.jTd, S.jColAmt]}>{e.direction === 'EXPENSE' ? '−' : ''}{fmt(e.brutto)}</Text>
+          </View>
+        ))}
 
         <View style={S.footer} fixed>
           <Text style={S.footerText}>{p.praxisName} · Einnahmen-Ausgaben-Aufstellung {p.year}</Text>

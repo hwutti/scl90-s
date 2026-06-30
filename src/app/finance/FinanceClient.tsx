@@ -51,6 +51,7 @@ type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'samm
 
 export function FinanceClient() {
   const [tab, setTab]   = useState<MainTab>('overview')
+  const [anonymizeExport, setAnonymizeExport] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
 
   // Daten
@@ -686,8 +687,12 @@ export function FinanceClient() {
         {/* ── GEWINNERMITTLUNG ── */}
         {tab === 'gewinn' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => window.open(`/api/finance/profit-statement/export?year=${year}`, '_blank')}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={anonymizeExport} onChange={e => setAnonymizeExport(e.target.checked)} />
+                Patientennamen anonymisieren (Codename statt Name)
+              </label>
+              <button onClick={() => window.open(`/api/finance/profit-statement/export?year=${year}&anonymize=${anonymizeExport}`, '_blank')}
                 className="btn-secondary" style={{ fontSize: 12 }}>
                 <Download style={{ width: 13, height: 13 }} /> Aufstellung als PDF (für Steuerberater/Finanzamt)
               </button>

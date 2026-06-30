@@ -28,6 +28,7 @@ export function BmdExportPanel({ year }: { year: number }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showAccounts, setShowAccounts] = useState(false)
+  const [anonymize, setAnonymize] = useState(true)
 
   useEffect(() => {
     fetch('/api/finance/bmd-settings').then(r => r.json()).then(d => { setSettings(d); setLoading(false) }).catch(() => setLoading(false))
@@ -76,10 +77,15 @@ export function BmdExportPanel({ year }: { year: number }) {
         </h2>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
           Enthält alle Einnahmen und Ausgaben des Jahres als eine gemeinsame Buchungsliste
-          (Datum, Belegnummer, Konto, Text, Netto, USt-Satz, USt-Betrag, Brutto). Aus Gründen der
-          therapeutischen Verschwiegenheit werden keine Patientennamen exportiert, nur Belegnummern.
+          (Datum, Belegnummer, Konto, Patient, Bezeichnung, Netto, USt-Satz, USt-Betrag, Brutto).
+          Die Belegnummer entspricht exakt der Nummer auf der jeweiligen Honorarnote — der
+          Rechnungsfluss bleibt damit in jedem Fall eindeutig nachvollziehbar, auch anonymisiert.
         </p>
-        <button onClick={() => window.open(`/api/finance/bmd-export?year=${year}`, '_blank')}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', marginBottom: 14 }}>
+          <input type="checkbox" checked={anonymize} onChange={e => setAnonymize(e.target.checked)} />
+          Patientennamen anonymisieren (Codename KL-XXX statt echtem Namen)
+        </label>
+        <button onClick={() => window.open(`/api/finance/bmd-export?year=${year}&anonymize=${anonymize}`, '_blank')}
           className="btn-primary" style={{ fontSize: 13 }}>
           <Download style={{ width: 14, height: 14 }} /> BMD-Export herunterladen (CSV)
         </button>
