@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
     } else {
       execSync(`unzip -o "${archivePath}" -d "${tmpDir}/" 2>&1`, { timeout: 60000 })
     }
+    execSync(`chmod -R u+rX "${tmpDir}/" 2>&1`, { timeout: 10000 })
 
     const entries = fs.readdirSync(tmpDir).filter(e => e !== `export.${ext}`)
     const exportSubDir = entries.find(e => fs.statSync(path.join(tmpDir!, e)).isDirectory())
@@ -158,6 +159,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'ZIP-Extraktion fehlgeschlagen.' }, { status: 422 })
       }
     }
+    // Extrahierte Dateien lesbar machen (unrar/unzip übernimmt manchmal
+    // originale Windows-Rechte die für den kds-Prozess nicht lesbar sind)
+    execSync(`chmod -R u+rX "${tmpDir}/" 2>&1`, { timeout: 10000 })
 
     // Export-Unterverzeichnis finden
     const entries = fs.readdirSync(tmpDir).filter(e => e !== `export.${ext}`)
