@@ -135,8 +135,8 @@ export async function POST(req: NextRequest) {
           billingMode: 'unit',
           unitCount: 1,
           unitLengthMinutes: ts.durationMinutes,
-          billingStatus: 'BILLED',   // bereits abgerechnet in TheraPsy
-          excludedFromFinances: true, // wird über FinanceTransaction abgebildet
+          billingStatus: 'EXCLUDED',  // bereits in TheraPsy abgerechnet, wird über FinanceTransaction abgebildet
+          excludedFromFinances: true,
         },
       })
       result.sessions.created++
