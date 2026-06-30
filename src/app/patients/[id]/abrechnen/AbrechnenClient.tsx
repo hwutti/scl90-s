@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ChevronRight, Euro, Calendar, Clock,
-  Check, AlertCircle, FileText, Loader, Printer, Mail, X,
+  Check, AlertCircle, FileText, Loader, Printer, Mail, X, Eye, RefreshCw,
 } from 'lucide-react'
 
 function fmtEUR(n: any) {
@@ -63,6 +63,37 @@ export function AbrechnenClient({
 
   const vatAmount  = totalNet * form.vatRate
   const totalGross = totalNet + vatAmount
+
+  // Live-Vorschau VOR dem Erstellen - rein lesend, speichert nichts
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const previewDebounce = useRef<NodeJS.Timeout>()
+
+  useEffect(() => {
+    clearTimeout(previewDebounce.current)
+    if (selectedIds.size === 0) { setPreviewHtml(''); return }
+    previewDebounce.current = setTimeout(async () => {
+      setPreviewLoading(true)
+      try {
+        const res = await fetch(`/api/patients/${patient.id}/abrechnen/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionIds:        [...selectedIds],
+            payerName:         form.payerName,
+            payerAddress:      form.payerAddress,
+            vatRate:           form.vatRate,
+            invoiceTemplateId: form.invoiceTemplateId || null,
+            notes:             form.notes,
+          }),
+        })
+        const data = await res.json()
+        if (res.ok) setPreviewHtml(data.html ?? '')
+      } catch { /* Vorschau ist nicht kritisch */ }
+      setPreviewLoading(false)
+    }, 500)
+    return () => clearTimeout(previewDebounce.current)
+  }, [selectedIds, form.payerName, form.payerAddress, form.vatRate, form.invoiceTemplateId, form.notes, patient.id])
 
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
@@ -312,6 +343,28 @@ export function AbrechnenClient({
                 {form.vatRate > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>MwSt. {Math.round(form.vatRate * 100)}%: {fmtEUR(vatAmount)}</div>}
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>Gesamt: {fmtEUR(totalGross)}</div>
               </div>
+            </div>
+          )}
+
+          {/* Live-Vorschau */}
+          {selected.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Eye style={{ width: 14, height: 14, color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Vorschau</span>
+                {previewLoading && <RefreshCw style={{ width: 12, height: 12, color: 'var(--text-muted)' }} />}
+              </div>
+              {previewHtml ? (
+                <iframe
+                  srcDoc={previewHtml}
+                  title="Honorarnote-Vorschau"
+                  style={{ width: '100%', height: 600, border: '0.5px solid var(--border)', borderRadius: 10, background: '#fff' }}
+                />
+              ) : (
+                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                  {previewLoading ? 'Lade Vorschau…' : 'Vorschau erscheint hier'}
+                </div>
+              )}
             </div>
           )}
         </div>

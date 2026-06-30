@@ -404,36 +404,43 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
   }
 }
 
-// ── Rechnung für eine konkrete Transaktion live rendern ─────────────────────────
-// Wird nur einmalig beim allerersten Anzeigen/Erstellen aufgerufen - das Ergebnis
-// wird danach als unveränderliches Snapshot gespeichert. Zentral hier statt in
-// einzelnen Routen, damit sowohl die API-Routen (Anzeigen/Drucken) als auch der
-// Erstellungs-Service (sofortige Generierung) dieselbe Logik verwenden - keine
-// doppelte Implementierung.
-//
-// Vorlagen-Priorität: 1. explizit bei der Erstellung gewählte Vorlage
-// (Transaction.invoiceTemplateId), 2. Patient-Standardvorlage, 3. globale
-// Standardvorlage.
-export async function renderInvoiceHtmlForTransaction(transactionId: string): Promise<string> {
+// ── Gemeinsamer Rendering-Kern ───────────────────────────────────────────────
+// Nimmt bereits aufbereitete Finanz-/Positionsdaten entgegen - kennt nichts von
+// einer echten Transaktion. Wird von renderInvoiceHtmlForTransaction (echte,
+// bereits angelegte Transaktion) UND renderDraftInvoiceHtml (reine Vorschau vor
+// dem Erstellen, noch nichts gespeichert) gemeinsam genutzt.
+interface InvoiceCoreInput {
+  templateId: string | null
+  referenceNumber: string
+  transactionDate: Date
+  payerName: string
+  payerAddress: string
+  amountNet: number
+  vatRate: number
+  vatAmount: number
+  amountGross: number
+  isPaid: boolean
+  notes: string
+  lineItems: Array<{
+    date: Date | null
+    description: string
+    serviceLabel: string | null
+    quantity: number
+    unitPriceNet: number
+    amountNet: number
+  }>
+}
+
+async function renderInvoiceCore(input: InvoiceCoreInput): Promise<string> {
   const { generateEpcQrDataUrl, qrImageHtml } = await import('@/lib/invoice/qr')
   const { getBranding } = await import('@/lib/branding')
 
-  const tx = await prisma.transaction.findUnique({
-    where: { id: transactionId },
-    include: {
-      lineItems: { orderBy: { sortOrder: 'asc' } },
-      patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
-    },
-  })
-  if (!tx) throw new Error('Transaktion nicht gefunden')
-
-  const templateId = (tx as any).invoiceTemplateId ?? (tx.patient as any)?.defaultInvoiceTemplateId ?? null
   const branding = await getBranding()
-  let { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  let { html: templateHtml, guiFields } = await getDefaultTemplate(input.templateId)
   if (!templateHtml || templateHtml.includes('badge-unpaid') || templateHtml.includes('badge-paid')) {
     templateHtml = DEFAULT_INVOICE_HTML
   }
-  const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
+  const fmtEUR = (n: number) => n.toFixed(2).replace('.', ',')
   const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
 
   const paymentDays = guiFields?.paymentDays ?? 14
@@ -450,7 +457,7 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
   if (guiFields?.showQrCode && iban) {
     const dataUrl = await generateEpcQrDataUrl({
       iban, bic, beneficiaryName: praxisNameForQr,
-      amount: parseFloat(tx.amountGross.toString()), reference: tx.referenceNumber,
+      amount: input.amountGross, reference: input.referenceNumber,
     })
     if (dataUrl) qrPlaceholder = qrImageHtml(dataUrl)
   }
@@ -478,24 +485,24 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
     bg_is_watermark:     bgMode === 'watermark',
     signature_image_base64: guiFields?.signatureImageBase64 ?? '',
     signature_image_mime:   guiFields?.signatureImageMime   ?? 'image/png',
-    reference_number:    tx.referenceNumber,
-    transaction_date:    fmtDate(tx.transactionDate),
-    due_date:            fmtDate(new Date(tx.transactionDate.getTime() + paymentDays * 24 * 3600000)),
-    payer_name:          tx.payerName,
-    payer_address:       tx.payerAddress  ?? '',
-    amount_net:          fmtEUR(tx.amountNet),
-    vat_rate:            (parseFloat(tx.vatRate.toString()) * 100).toFixed(0),
-    vat_amount:          fmtEUR(tx.vatAmount),
-    amount_gross:        fmtEUR(tx.amountGross),
-    is_paid:             tx.paymentStatus === 'PAID',
-    vat_enabled:         parseFloat(tx.vatRate.toString()) > 0,
+    reference_number:    input.referenceNumber,
+    transaction_date:    fmtDate(input.transactionDate),
+    due_date:            fmtDate(new Date(input.transactionDate.getTime() + paymentDays * 24 * 3600000)),
+    payer_name:          input.payerName,
+    payer_address:       input.payerAddress ?? '',
+    amount_net:          fmtEUR(input.amountNet),
+    vat_rate:            (input.vatRate * 100).toFixed(0),
+    vat_amount:          fmtEUR(input.vatAmount),
+    amount_gross:        fmtEUR(input.amountGross),
+    is_paid:             input.isPaid,
+    vat_enabled:         input.vatRate > 0,
     payment_info:        paymentInfo,
-    notes:               tx.notes ?? '',
-    line_items: tx.lineItems.map((li: any) => ({
-      date:           li.lineDate ? fmtDate(li.lineDate) : '',
+    notes:               input.notes ?? '',
+    line_items: input.lineItems.map((li) => ({
+      date:           li.date ? fmtDate(li.date) : '',
       description:    li.description,
       service_label:  li.serviceLabel ?? '',
-      quantity:       parseFloat(li.quantity.toString()).toString(),
+      quantity:       li.quantity.toString(),
       unit_price_net: fmtEUR(li.unitPriceNet),
       amount_net:     fmtEUR(li.amountNet),
     })),
@@ -503,4 +510,81 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
 
   const tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
   return renderInvoice(tmpl, invoiceData)
+}
+
+// ── Rechnung für eine konkrete, bereits angelegte Transaktion live rendern ──────
+// Wird nur einmalig beim allerersten Anzeigen/Erstellen aufgerufen - das Ergebnis
+// wird danach als unveränderliches Snapshot gespeichert.
+//
+// Vorlagen-Priorität: 1. explizit bei der Erstellung gewählte Vorlage
+// (Transaction.invoiceTemplateId), 2. Patient-Standardvorlage, 3. globale
+// Standardvorlage.
+export async function renderInvoiceHtmlForTransaction(transactionId: string): Promise<string> {
+  const tx = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+    include: {
+      lineItems: { orderBy: { sortOrder: 'asc' } },
+      patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
+    },
+  })
+  if (!tx) throw new Error('Transaktion nicht gefunden')
+
+  return renderInvoiceCore({
+    templateId: (tx as any).invoiceTemplateId ?? (tx.patient as any)?.defaultInvoiceTemplateId ?? null,
+    referenceNumber: tx.referenceNumber,
+    transactionDate: tx.transactionDate,
+    payerName: tx.payerName,
+    payerAddress: tx.payerAddress ?? '',
+    amountNet: parseFloat(tx.amountNet.toString()),
+    vatRate: parseFloat(tx.vatRate.toString()),
+    vatAmount: parseFloat(tx.vatAmount.toString()),
+    amountGross: parseFloat(tx.amountGross.toString()),
+    isPaid: tx.paymentStatus === 'PAID',
+    notes: tx.notes ?? '',
+    lineItems: tx.lineItems.map((li: any) => ({
+      date: li.lineDate,
+      description: li.description,
+      serviceLabel: li.serviceLabel,
+      quantity: parseFloat(li.quantity.toString()),
+      unitPriceNet: parseFloat(li.unitPriceNet.toString()),
+      amountNet: parseFloat(li.amountNet.toString()),
+    })),
+  })
+}
+
+// ── Reine Vorschau VOR dem Erstellen ─────────────────────────────────────────
+// Wird im /abrechnen-Formular verwendet, damit der Therapeut sieht, was er
+// gleich verschickt, BEVOR irgendetwas in der Datenbank angelegt wird. Nutzt
+// "VORSCHAU" als Platzhalter-Rechnungsnummer, da die echte Nummer erst beim
+// tatsächlichen Erstellen reserviert wird (reserveReferenceNumber).
+export async function renderDraftInvoiceHtml(input: {
+  templateId: string | null
+  payerName: string
+  payerAddress?: string
+  vatRate: number
+  notes?: string
+  lineItems: Array<{
+    date: Date | null
+    description: string
+    serviceLabel: string | null
+    quantity: number
+    unitPriceNet: number
+    amountNet: number
+  }>
+}): Promise<string> {
+  const amountNet = input.lineItems.reduce((sum, li) => sum + li.amountNet, 0)
+  const vatAmount = amountNet * input.vatRate
+  const amountGross = amountNet + vatAmount
+
+  return renderInvoiceCore({
+    templateId: input.templateId,
+    referenceNumber: 'VORSCHAU',
+    transactionDate: new Date(),
+    payerName: input.payerName || 'Patient',
+    payerAddress: input.payerAddress ?? '',
+    amountNet, vatRate: input.vatRate, vatAmount, amountGross,
+    isPaid: false,
+    notes: input.notes ?? '',
+    lineItems: input.lineItems,
+  })
 }
