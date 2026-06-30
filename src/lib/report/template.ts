@@ -37,7 +37,7 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
     max-width: 210mm;
     margin: 0 auto;
     padding: 20mm 20mm 25mm 20mm;
-    min-height: 297mm;
+    min-height: 289mm;
     position: relative;
     display: flex;
     flex-direction: column;
