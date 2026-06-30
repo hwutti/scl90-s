@@ -206,9 +206,7 @@ export async function executeMigration(
           amount: inv.amount,
           date: invoiceDate,
           paymentStatus: paidDate ? 'PAID' : 'PENDING',
-          paidAt: paidDate ?? null,
-          description: `Importiert aus TheraPsy: ${inv.invoiceNr}`,
-          invoiceNumber: inv.invoiceNr,
+          description: `Importiert aus TheraPsy: ${inv.invoiceNr}${paidDate ? ` (bezahlt ${paidDate})` : ' (offen)'}`,
           incomeCategory: 'HONORAR',
         },
       })
