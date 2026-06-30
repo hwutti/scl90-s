@@ -20,6 +20,8 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
     padding: 20mm 20mm 25mm 20mm;
     min-height: 297mm;
     position: relative;
+    display: flex;
+    flex-direction: column;
   }
   @media print {
     @page { size: A4; margin: 0; }
@@ -31,6 +33,7 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
   .bg-layer-wrapper {
     position: relative;
     margin: 0 -20mm;
+    flex: 1;
   }
   .page-content {
     position: relative;
@@ -99,7 +102,7 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
 
 <div class="page">
   {{#if header_image_base64}}
-  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0;">
+  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0; flex-shrink: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}"
       style="width:100%;display:block;max-height:45mm;object-fit:cover;" alt="">
   </div>
@@ -137,7 +140,7 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
   </div><!-- /bg-layer-wrapper -->
 
   {{#if footer_image_base64}}
-  <div style="margin: 0 -20mm -25mm -20mm; line-height: 0;">
+  <div style="margin: 0 -20mm -25mm -20mm; line-height: 0; flex-shrink: 0;">
     <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}"
       style="width:100%;display:block;max-height:35mm;object-fit:cover;" alt="">
   </div>

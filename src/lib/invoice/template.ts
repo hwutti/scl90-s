@@ -8,7 +8,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #1a1a2e; background: #fff; }
-  .page { max-width: 210mm; margin: 0 auto; padding: 20mm 20mm 15mm 20mm; }
+  .page { max-width: 210mm; margin: 0 auto; padding: 20mm 20mm 15mm 20mm; min-height: 297mm; display: flex; flex-direction: column; }
 
   /* Header */
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10mm; padding-bottom: 6mm; border-bottom: 2px solid {{primary_color}}; }
@@ -68,6 +68,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   .bg-layer-wrapper {
     position: relative;
     margin: 0 -20mm;
+    flex: 1;
   }
   .page-content {
     position: relative;
@@ -93,7 +94,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
 <body>
 <div class="page">
   {{#if header_image_base64}}
-  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0;">
+  <div style="margin: -20mm -20mm 0 -20mm; line-height: 0; flex-shrink: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}" style="width: 100%; display: block; max-height: 50mm; object-fit: cover;" alt="">
   </div>
   {{/if}}
@@ -202,7 +203,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div><!-- /bg-layer-wrapper -->
 
   {{#if footer_image_base64}}
-  <div style="margin: 0 -20mm -15mm -20mm; line-height: 0;">
+  <div style="margin: 0 -20mm -15mm -20mm; line-height: 0; flex-shrink: 0;">
     <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}" style="width: 100%; display: block; max-height: 40mm; object-fit: cover;" alt="">
   </div>
   {{else}}
