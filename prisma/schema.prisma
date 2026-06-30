@@ -1208,6 +1208,7 @@ model Transaction {
   // Sonstiges
   notes                   String?
   hellocashReceiptId      String?
+  invoiceTemplateId       String?             // explizite Vorlagen-Wahl bei Erstellung (überschreibt Patient-Default)
 
   createdAt               DateTime            @default(now())
   updatedAt               DateTime            @updatedAt

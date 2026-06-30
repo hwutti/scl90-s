@@ -385,3 +385,102 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
     return { html: DEFAULT_INVOICE_HTML }
   }
 }
+
+// ── Rechnung für eine konkrete Transaktion live rendern ─────────────────────────
+// Wird nur einmalig beim allerersten Anzeigen/Erstellen aufgerufen - das Ergebnis
+// wird danach als unveränderliches Snapshot gespeichert. Zentral hier statt in
+// einzelnen Routen, damit sowohl die API-Routen (Anzeigen/Drucken) als auch der
+// Erstellungs-Service (sofortige Generierung) dieselbe Logik verwenden - keine
+// doppelte Implementierung.
+//
+// Vorlagen-Priorität: 1. explizit bei der Erstellung gewählte Vorlage
+// (Transaction.invoiceTemplateId), 2. Patient-Standardvorlage, 3. globale
+// Standardvorlage.
+export async function renderInvoiceHtmlForTransaction(transactionId: string): Promise<string> {
+  const { generateEpcQrDataUrl, qrImageHtml } = await import('@/lib/invoice/qr')
+  const { getBranding } = await import('@/lib/branding')
+
+  const tx = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+    include: {
+      lineItems: { orderBy: { sortOrder: 'asc' } },
+      patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
+    },
+  })
+  if (!tx) throw new Error('Transaktion nicht gefunden')
+
+  const templateId = (tx as any).invoiceTemplateId ?? (tx.patient as any)?.defaultInvoiceTemplateId ?? null
+  const branding = await getBranding()
+  let { html: templateHtml, guiFields } = await getDefaultTemplate(templateId)
+  if (!templateHtml || templateHtml.includes('badge-unpaid') || templateHtml.includes('badge-paid')) {
+    templateHtml = DEFAULT_INVOICE_HTML
+  }
+  const fmtEUR = (n: any) => parseFloat(n?.toString() ?? '0').toFixed(2).replace('.', ',')
+  const fmtDate = (d: Date) => d.toLocaleDateString('de-AT')
+
+  const paymentDays = guiFields?.paymentDays ?? 14
+  const iban     = guiFields?.iban     || branding.iban     || ''
+  const bic      = guiFields?.bic      || branding.bic      || ''
+  const bankName = guiFields?.bankName || branding.bankName || ''
+  const paymentInfo = iban
+    ? `IBAN: ${iban}${bic ? ` · BIC: ${bic}` : ''}${bankName ? ` · ${bankName}` : ''}`
+    : ''
+  const bgOpacity = ((guiFields?.bgImageOpacity ?? 0.08) as number).toFixed(2)
+  const bgMode    = guiFields?.bgImageMode ?? 'behind'
+  const praxisNameForQr = guiFields?.praxisName || branding.praxisName
+  let qrPlaceholder = ''
+  if (guiFields?.showQrCode && iban) {
+    const dataUrl = await generateEpcQrDataUrl({
+      iban, bic, beneficiaryName: praxisNameForQr,
+      amount: parseFloat(tx.amountGross.toString()), reference: tx.referenceNumber,
+    })
+    if (dataUrl) qrPlaceholder = qrImageHtml(dataUrl)
+  }
+
+  const invoiceData = {
+    praxis_name:         guiFields?.praxisName         || branding.praxisName,
+    praxis_slogan:       branding.slogan               ?? '',
+    praxis_address:      (guiFields?.praxisAddress     || branding.address)       ?? '',
+    praxis_email:        (guiFields?.praxisEmail       || branding.contactEmail)  ?? '',
+    praxis_phone:        (guiFields?.praxisPhone       || branding.contactPhone)  ?? '',
+    logo_base64:         branding.logoBase64           ?? '',
+    logo_mime:           branding.logoMimeType         ?? '',
+    primary_color:       guiFields?.primaryColor       || branding.colorPrimary,
+    invoice_title:       guiFields?.invoiceTitle       ?? 'Honorarnote',
+    tax_number:          guiFields?.taxNumber          ?? '',
+    vat_id:              guiFields?.vatId              ?? '',
+    footer_text:         guiFields?.footerText         ?? '',
+    header_image_base64: guiFields?.headerImageBase64  ?? '',
+    header_image_mime:   guiFields?.headerImageMime    ?? 'image/png',
+    footer_image_base64: guiFields?.footerImageBase64  ?? '',
+    footer_image_mime:   guiFields?.footerImageMime    ?? 'image/png',
+    bg_image_base64:     guiFields?.bgImageBase64      ?? '',
+    bg_image_mime:       guiFields?.bgImageMime        ?? 'image/png',
+    bg_image_opacity:    bgOpacity,
+    bg_is_watermark:     bgMode === 'watermark',
+    reference_number:    tx.referenceNumber,
+    transaction_date:    fmtDate(tx.transactionDate),
+    due_date:            fmtDate(new Date(tx.transactionDate.getTime() + paymentDays * 24 * 3600000)),
+    payer_name:          tx.payerName,
+    payer_address:       tx.payerAddress  ?? '',
+    amount_net:          fmtEUR(tx.amountNet),
+    vat_rate:            (parseFloat(tx.vatRate.toString()) * 100).toFixed(0),
+    vat_amount:          fmtEUR(tx.vatAmount),
+    amount_gross:        fmtEUR(tx.amountGross),
+    is_paid:             tx.paymentStatus === 'PAID',
+    vat_enabled:         parseFloat(tx.vatRate.toString()) > 0,
+    payment_info:        paymentInfo,
+    notes:               tx.notes ?? '',
+    line_items: tx.lineItems.map((li: any) => ({
+      date:           li.lineDate ? fmtDate(li.lineDate) : '',
+      description:    li.description,
+      service_label:  li.serviceLabel ?? '',
+      quantity:       parseFloat(li.quantity.toString()).toString(),
+      unit_price_net: fmtEUR(li.unitPriceNet),
+      amount_net:     fmtEUR(li.amountNet),
+    })),
+  }
+
+  const tmpl = templateHtml.replace(/\{\{qr_code\}\}/g, qrPlaceholder)
+  return renderInvoice(tmpl, invoiceData)
+}

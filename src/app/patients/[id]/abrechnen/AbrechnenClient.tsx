@@ -66,7 +66,7 @@ export function AbrechnenClient({
 
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
-  const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string } | null>(null)
+  const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string; invoiceHtml?: string } | null>(null)
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [emailTo, setEmailTo]   = useState('')
   const [emailMsg, setEmailMsg] = useState('')
@@ -101,7 +101,7 @@ export function AbrechnenClient({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`)
-      setDone({ referenceNumber: data.referenceNumber, transactionId: data.id ?? data.transactionId })
+      setDone({ referenceNumber: data.referenceNumber, transactionId: data.id ?? data.transactionId, invoiceHtml: data.invoiceHtml })
       // E-Mail-Adresse aus Patientenprofil vorausfüllen
       if ((patient as any).email) setEmailTo((patient as any).email)
     } catch (e: any) {
@@ -144,7 +144,8 @@ export function AbrechnenClient({
             <ArrowLeft style={{ width: 14, height: 14 }} /> Zurück zur Akte
           </button>
         </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 40 }}>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 40 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%', maxWidth: 720 }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Check style={{ width: 32, height: 32, color: 'var(--green)' }} />
           </div>
@@ -174,6 +175,18 @@ export function AbrechnenClient({
             </button>
           </div>
 
+          {/* Vorschau */}
+          {done.invoiceHtml && (
+            <div style={{ width: '100%', marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'left' }}>Vorschau</div>
+              <iframe
+                srcDoc={done.invoiceHtml}
+                title="Honorarnote-Vorschau"
+                style={{ width: '100%', height: 480, border: '0.5px solid var(--border)', borderRadius: 10, background: '#fff' }}
+              />
+            </div>
+          )}
+
           {/* E-Mail Formular */}
           {showEmailForm && (
             <div style={{ width: '100%', maxWidth: 440, marginTop: 16, padding: 16, background: 'var(--surface-card)', borderRadius: 12, border: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -200,6 +213,7 @@ export function AbrechnenClient({
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
     )

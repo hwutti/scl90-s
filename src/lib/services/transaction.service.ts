@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { recalcSessionBillingStatus } from './session.service'
+import { renderInvoiceHtmlForTransaction } from '@/lib/invoice/template'
 
 // ─── Referenznummer generieren ───────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ export async function createTransactionFromSessions(params: {
   generateInvoiceDoc?: boolean
   anonymizeInvoice?: boolean
   invoiceTemplateId?: string | null
-}): Promise<{ transactionId: string; referenceNumber: string }> {
+}): Promise<{ transactionId: string; referenceNumber: string; invoiceHtml?: string }> {
 
   return await prisma.$transaction(async (tx) => {
     // 1. Sessions laden und validieren
@@ -105,6 +106,7 @@ export async function createTransactionFromSessions(params: {
         paymentUndoDeadline: params.markAsPaid ? new Date(now.getTime() + 5 * 60 * 1000) : null,
         lifecycleStatus: 'ACTIVE',
         notes: params.notes,
+        invoiceTemplateId: params.invoiceTemplateId || null,
       },
     })
 
@@ -169,19 +171,30 @@ export async function createTransactionFromSessions(params: {
       await recalcSessionBillingStatus(id)
     }
 
-    // InvoiceDocument anlegen wenn gewünscht
+    // InvoiceDocument anlegen wenn gewünscht - sofort vollständig gerendert
+    // (vorher wurde hier nur eine leere Zeile ohne Inhalt angelegt, dadurch ging
+    // sowohl die gewählte Vorlage als auch jede Vorschau verloren)
+    let invoiceHtml: string | undefined
     if (params.generateInvoiceDoc !== false) {
       try {
+        invoiceHtml = await renderInvoiceHtmlForTransaction(result.transactionId)
         await prisma.invoiceDocument.create({
           data: {
             transactionId: result.transactionId,
+            documentType: 'INVOICE_PDF',
+            format: 'html',
             anonymized: params.anonymizeInvoice ?? false,
+            data: Buffer.from(invoiceHtml, 'utf8'),
+            mimeType: 'text/html',
           },
         })
-      } catch (_) { /* Invoice-Generierung ist nicht kritisch */ }
+      } catch (e) {
+        console.error('[invoice] Sofort-Generierung fehlgeschlagen:', e)
+        /* nicht kritisch - Dokument wird beim ersten Anzeigen/Drucken nachträglich erzeugt */
+      }
     }
 
-    return result
+    return { ...result, invoiceHtml }
   })
 }
 
