@@ -8,7 +8,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const sessions = await prisma.therapySession.findMany({
     where: { patientId: params.id },
-    orderBy: { sessionDate: 'desc' },
+    orderBy: [{ sessionDate: 'desc' }, { sessionNumber: 'desc' }],
     include: {
       protocols: { select: { id: true, type: true } },
       txAllocations: {

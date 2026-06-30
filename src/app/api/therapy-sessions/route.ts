@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   const sessions = await prisma.therapySession.findMany({
     where,
-    orderBy: { sessionDate: 'desc' },
+    orderBy: [{ sessionDate: 'desc' }, { sessionNumber: 'desc' }],
     include: {
       patient: { select: { firstName: true, lastName: true } },
       protocols: { select: { id: true, type: true } },

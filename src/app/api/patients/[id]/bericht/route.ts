@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           ...(zeitraumVon && { sessionDate: { gte: new Date(zeitraumVon) } }),
           ...(zeitraumBis && { sessionDate: { lte: new Date(zeitraumBis) } }),
         },
-        orderBy: { sessionDate: 'asc' },
+        orderBy: [{ sessionDate: 'asc' }, { sessionNumber: 'asc' }],
         include: {
           protocols: {
             include: { sections: true }

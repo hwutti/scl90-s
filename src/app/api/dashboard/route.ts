@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     prisma.appointment.count({ where: { ...where, startAt: { gte: now }, status: { notIn: ['CANCELLED'] } } }),
     prisma.appointment.count({ where: { ...where, startAt: { gte: today, lt: new Date(today.getTime() + 24*3600000) }, status: { notIn: ['CANCELLED'] } } }),
     prisma.therapySession.findMany({
-      where, orderBy: { sessionDate: 'desc' }, take: 8,
+      where, orderBy: [{ sessionDate: 'desc' }, { sessionNumber: 'desc' }], take: 8,
       include: { patient: { select: { firstName: true, lastName: true, codeName: true } } },
     }),
     // Activity last 14 days

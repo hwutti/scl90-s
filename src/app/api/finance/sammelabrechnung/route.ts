@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    orderBy: [{ patient: { lastName: 'asc' } }, { sessionDate: 'asc' }],
+    orderBy: [{ patient: { lastName: 'asc' } }, { sessionDate: 'asc' }, { sessionNumber: 'asc' }],
   })
 
   // Gruppieren nach Patient
