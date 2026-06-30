@@ -68,6 +68,7 @@ enum AuditAction {
   DATA_DELETED
   BACKUP_CREATED
   FINANCE_DATA_EXPORTED
+  DUNNING_SENT
   APPOINTMENT_CREATED
   APPOINTMENT_CONFIRMED
   APPOINTMENT_CANCELLED
@@ -134,6 +135,12 @@ enum TxLifecycleStatus {
 enum TxPaymentStatus {
   UNPAID
   PAID
+}
+
+enum DunningLevel {
+  ERINNERUNG
+  MAHNUNG_1
+  MAHNUNG_2
 }
 
 enum TxPaymentMethod {
@@ -582,8 +589,12 @@ model PraxisConfig {
   anamnesisTemplate String? // JSON: [{title, prefilledText}]
 
   // BMD-Export Kontozuordnung (JSON, vor erster Nutzung mit Steuerberater abstimmen!)
-  // { erlosUstBefreit, erlosUstPflichtig, ustSatz, expenseAccounts: { [ExpenseCategory]: string } }
+  // { erlosUstBefreit, erlosUstPflichtig, expenseAccounts: { [ExpenseCategory]: string } }
   bmdSettings     String?
+
+  // Mahnwesen: Fristen in Tagen zwischen den Stufen (JSON)
+  // { erinnerungDays, mahnung1Days, mahnung2Days }
+  dunningSettings String?
 
   updatedAt       DateTime @updatedAt
   updatedBy       String?
@@ -1225,6 +1236,7 @@ model Transaction {
   sessionAllocations      TxSessionAllocation[]
   invoiceDocuments        InvoiceDocument[]
   receipts                TransactionReceipt[]    @relation("TxReceipts")
+  dunnings                Dunning[]
 
   @@index([patientId])
   @@index([transactionDate])
@@ -1292,6 +1304,26 @@ model InvoiceDocument {
   markedSentAt          DateTime?
   deletedAt             DateTime?
   createdAt             DateTime            @default(now())
+
+  @@index([transactionId])
+}
+
+// ─── Mahnwesen ───────────────────────────────────────────────────────────────
+// Protokoll tatsaechlich versendeter Mahnungen. Vorschlaege selbst werden NICHT
+// persistiert, sondern bei jedem Aufruf live aus Transaction + diesem Verlauf
+// berechnet (src/lib/finance/dunningSuggestions.ts) - so bleibt der Stand immer
+// aktuell (z.B. wenn zwischenzeitlich bezahlt wurde).
+model Dunning {
+  id            String       @id @default(cuid())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id])
+  level         DunningLevel
+  sentAt        DateTime     @default(now())
+  sentBy        String       // userId
+  emailTo       String?      // null = nur PDF erzeugt/heruntergeladen, kein Mailversand
+  pdf           Bytes        // unveraenderliches Archiv des tatsaechlich versendeten Schreibens
+  pdfMime       String       @default("application/pdf")
+  createdAt     DateTime     @default(now())
 
   @@index([transactionId])
 }

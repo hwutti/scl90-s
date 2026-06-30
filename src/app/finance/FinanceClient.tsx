@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SammelabrechungPanel } from './SammelabrechungPanel'
 import { BmdExportPanel } from './BmdExportPanel'
+import { DunningPanel } from './DunningPanel'
 import {
   Plus, X, Trash2, Download, TrendingUp, TrendingDown, DollarSign,
   Car, RefreshCw, FileText, Check, RotateCcw, Ban, Search,
@@ -45,7 +46,7 @@ function fmtDate(s: string | Date) {
   return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(s))
 }
 
-type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'sammelabrechnung' | 'bmd'
+type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'sammelabrechnung' | 'bmd' | 'mahnwesen'
 
 // ── Haupt-Komponente ─────────────────────────────────────────────────────────
 
@@ -309,6 +310,7 @@ export function FinanceClient() {
             ['gewinn',   'Gewinnermittlung'],
             ['sammelabrechnung', 'Sammelabrechnung'],
             ['bmd', 'BMD-Export'],
+            ['mahnwesen', 'Mahnwesen'],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{
@@ -821,6 +823,10 @@ export function FinanceClient() {
 
         {tab === 'bmd' && (
           <BmdExportPanel year={year} />
+        )}
+
+        {tab === 'mahnwesen' && (
+          <DunningPanel />
         )}
       </div>
 

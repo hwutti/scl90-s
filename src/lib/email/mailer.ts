@@ -99,3 +99,43 @@ export function buildInvoiceEmail({
   const text = `Honorarnote ${referenceNumber}\nBetrag: ${amount}${dueDate ? `\nFällig bis: ${dueDate}` : ''}\n\nBei Fragen wenden Sie sich bitte an ${praxisName}.`
   return { subject, html, text }
 }
+
+// E-Mail Template für Mahnschreiben (Zahlungserinnerung / Mahnung)
+export function buildDunningEmail({
+  level, patientName, referenceNumber, amount, praxisName,
+}: {
+  level: 'ERINNERUNG' | 'MAHNUNG_1' | 'MAHNUNG_2'
+  patientName: string
+  referenceNumber: string
+  amount: string
+  praxisName: string
+}): { subject: string; html: string; text: string } {
+  const titles: Record<string, string> = { ERINNERUNG: 'Zahlungserinnerung', MAHNUNG_1: '1. Mahnung', MAHNUNG_2: '2. Mahnung' }
+  const title = titles[level]
+  const subject = `${title} – Honorarnote ${referenceNumber} – ${praxisName}`
+  const html = `
+    <div style="font-family:sans-serif;padding:32px;max-width:600px;color:#1a1a2e">
+      <h2 style="color:#4f46e5;margin-bottom:4px">${praxisName}</h2>
+      <p style="color:#888;margin-top:0">Psychotherapeutische Praxis</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p>Sehr geehrte/r ${patientName},</p>
+      <p>anbei erhalten Sie unsere ${title} zur unten angeführten, noch offenen Honorarnote. Die Details und den genauen Wortlaut entnehmen Sie bitte dem beigefügten PDF.</p>
+      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:20px 0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="color:#666">Rechnungsnummer</span>
+          <strong>${referenceNumber}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:#666">Offener Betrag</span>
+          <strong style="color:#4f46e5">${amount}</strong>
+        </div>
+      </div>
+      <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
+      <p>Mit freundlichen Grüßen<br><strong>${praxisName}</strong></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#aaa">Diese E-Mail wurde automatisch von KDS generiert.</p>
+    </div>
+  `
+  const text = `${title} – Honorarnote ${referenceNumber}\nOffener Betrag: ${amount}\n\nDetails siehe beigefügtes PDF. Bei Fragen wenden Sie sich bitte an ${praxisName}.`
+  return { subject, html, text }
+}
