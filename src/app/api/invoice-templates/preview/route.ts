@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
   data.bg_image_mime       = guiFields?.bgImageMime       ?? 'image/png'
   data.bg_image_opacity    = bgOpacity
   data.bg_is_watermark     = bgMode === 'watermark'
+  data.signature_image_base64 = guiFields?.signatureImageBase64 ?? ''
+  data.signature_image_mime   = guiFields?.signatureImageMime   ?? 'image/png'
 
   // Echte Transaktion laden
   if (useReal && transactionId) {

@@ -120,6 +120,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     bg_image_mime:        guiFields?.bgImageMime       || 'image/png',
     bg_image_opacity:     bgOpacity,
     bg_is_watermark:      bgMode === 'watermark',
+    signature_image_base64: guiFields?.signatureImageBase64 ?? '',
+    signature_image_mime:   guiFields?.signatureImageMime   ?? 'image/png',
     has_header_image:     !!(guiFields?.headerImageBase64),
     has_footer_image:     !!(guiFields?.footerImageBase64),
     content:              contentHtml,

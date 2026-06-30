@@ -31,6 +31,8 @@ interface GuiFields {
   bgImageMime: string
   bgImageOpacity: number
   bgImageMode: string
+  signatureImageBase64: string
+  signatureImageMime: string
 }
 
 interface Template {
@@ -79,6 +81,8 @@ const EMPTY_GUI: GuiFields = {
   bgImageMime: '',
   bgImageOpacity: 0.08,
   bgImageMode: 'behind',
+  signatureImageBase64: '',
+  signatureImageMime: '',
 }
 
 function templateToGui(t: Template): GuiFields {
@@ -105,6 +109,8 @@ function templateToGui(t: Template): GuiFields {
     bgImageMime:       (t as any).bgImageMime       ?? '',
     bgImageOpacity:    (t as any).bgImageOpacity    ?? 0.08,
     bgImageMode:       (t as any).bgImageMode       ?? 'behind',
+    signatureImageBase64: (t as any).signatureImageBase64 ?? '',
+    signatureImageMime:   (t as any).signatureImageMime   ?? '',
   }
 }
 
@@ -344,11 +350,12 @@ export function RechnungsvorlageClient({
     headerImage: { w: 2480, h: 400 },
     footerImage:  { w: 2480, h: 300 },
     bgImage:      { w: 1240, h: 1754 }, // A4 halbe Auflösung
+    signatureImage: { w: 800, h: 400 },
   }
   const JPEG_QUALITY = 0.82
 
   function compressAndStore(
-    field: 'headerImage' | 'footerImage' | 'bgImage',
+    field: 'headerImage' | 'footerImage' | 'bgImage' | 'signatureImage',
     file: File,
   ) {
     const isSvg = file.type === 'image/svg+xml'
@@ -406,7 +413,7 @@ export function RechnungsvorlageClient({
   }
 
   function handleImageUpload(
-    field: 'headerImage' | 'footerImage' | 'bgImage',
+    field: 'headerImage' | 'footerImage' | 'bgImage' | 'signatureImage',
     e: React.ChangeEvent<HTMLInputElement>
   ) {
     const file = e.target.files?.[0]
@@ -419,7 +426,7 @@ export function RechnungsvorlageClient({
     compressAndStore(field, file)
   }
 
-  function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage') {
+  function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage' | 'signatureImage') {
     updateGui(`${field}Base64` as keyof GuiFields, '')
     updateGui(`${field}Mime` as keyof GuiFields, '')
   }
@@ -779,6 +786,33 @@ export function RechnungsvorlageClient({
                           </div>
                         </div>
 
+                        {/* Unterschrift / Stempel */}
+                        <div>
+                          <label style={labelStyle}>Unterschrift / Stempel (unten rechts)</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {gui.signatureImageBase64 ? (
+                              <div style={{ position: 'relative', border: '0.5px solid var(--border)', borderRadius: 8, overflow: 'hidden', background: 'var(--surface-panel)' }}>
+                                <img
+                                  src={`data:${gui.signatureImageMime};base64,${gui.signatureImageBase64}`}
+                                  style={{ maxWidth: 200, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '8px auto' }}
+                                  alt="Unterschrift"
+                                />
+                                <button onClick={() => clearImage('signatureImage')}
+                                  style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', padding: '2px 6px', fontSize: 11 }}>
+                                  ✕ Entfernen
+                                </button>
+                              </div>
+                            ) : (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1.5px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
+                                <input type="file" accept="image/png,image/jpeg,image/svg+xml,application/pdf" style={{ display: 'none' }}
+                                  onChange={e => handleImageUpload('signatureImage', e)} />
+                                📁 PNG, JPG, SVG oder PDF hochladen
+                              </label>
+                            )}
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Fertige Grafik mit Unterschrift + Stempel kombiniert, transparenter Hintergrund empfohlen (PNG)</div>
+                          </div>
+                        </div>
+
                         {/* Hintergrundbild */}
                         <div>
                           <label style={labelStyle}>Hintergrundbild / Briefpapier</label>
@@ -862,6 +896,7 @@ export function RechnungsvorlageClient({
                           ['{{header_image_mime}}', 'Header-Bild MIME-Typ'],
                           ['{{footer_image_base64}}', 'Footer-Bild (Base64)'],
                           ['{{bg_image_base64}}', 'Hintergrundbild (Base64)'],
+                          ['{{signature_image_base64}}', 'Unterschrift/Stempel (Base64)'],
                           ['{{bg_image_opacity}}', 'Hintergrund-Deckkraft (0.0–1.0)'],
                           ['{{#if header_image_base64}}...{{/if}}', 'Nur wenn Header-Bild vorhanden'],
                           ['{{#if footer_image_base64}}...{{/if}}', 'Nur wenn Footer-Bild vorhanden'],

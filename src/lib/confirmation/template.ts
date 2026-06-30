@@ -133,6 +133,9 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
 
   <div class="signature">
     <p>Mit freundlichen Grüßen,</p>
+    {{#if signature_image_base64}}
+    <img src="data:{{signature_image_mime}};base64,{{signature_image_base64}}" style="max-width:60mm; max-height:26mm; object-fit:contain; display:block; margin-top:4mm;" alt="Unterschrift">
+    {{/if}}
     <div class="sig-line">{{therapeut_name}}<br>{{praxis_name}}</div>
   </div>
 
@@ -294,6 +297,8 @@ export async function getDefaultConfirmationTemplate(
         bgImageMime:       template.bgImageMime       ?? 'image/png',
         bgImageOpacity:    template.bgImageOpacity    ?? 0.06,
         bgImageMode:       template.bgImageMode       ?? 'behind',
+        signatureImageBase64: template.signatureImageBase64 ?? '',
+        signatureImageMime:   template.signatureImageMime   ?? 'image/png',
         customHtml:        template.customHtml        ?? false,
       },
     }

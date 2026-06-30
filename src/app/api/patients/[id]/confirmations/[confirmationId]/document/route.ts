@@ -141,6 +141,8 @@ async function renderFreshConfirmationHtml(confirmation: any): Promise<string> {
     bg_image_mime: guiFields?.bgImageMime || 'image/png',
     bg_image_opacity: bgOpacity,
     bg_is_watermark: bgMode === 'watermark',
+    signature_image_base64: guiFields?.signatureImageBase64 ?? '',
+    signature_image_mime:   guiFields?.signatureImageMime   ?? 'image/png',
     heutiges_datum: placeholders.heutiges_datum,
     titel: placeholders.titel,
     therapeut_name: placeholders.therapeut_name,

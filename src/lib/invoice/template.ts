@@ -199,6 +199,12 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div>
   {{/if}}
 
+  {{#if signature_image_base64}}
+  <div style="display:flex; justify-content:flex-end; margin-top:8mm;">
+    <img src="data:{{signature_image_mime}};base64,{{signature_image_base64}}" style="max-width:60mm; max-height:28mm; object-fit:contain;" alt="Unterschrift">
+  </div>
+  {{/if}}
+
   </div><!-- /page-content -->
   </div><!-- /bg-layer-wrapper -->
 
@@ -285,6 +291,8 @@ export type InvoiceData = {
   bg_image_mime?: string
   bg_image_opacity?: string
   bg_is_watermark?: boolean
+  signature_image_base64?: string
+  signature_image_mime?: string
   line_items: Array<{
     date: string
     description: string
@@ -333,6 +341,7 @@ export function renderInvoice(template: string, data: InvoiceData): string {
     'invoice_title','tax_number','vat_id','footer_text',
     'header_image_base64','header_image_mime','footer_image_base64','footer_image_mime',
     'bg_image_base64','bg_image_mime','bg_image_opacity',
+    'signature_image_base64','signature_image_mime',
   ]
   for (const key of simpleKeys) {
     const val = String((data as any)[key] || '')
@@ -385,6 +394,8 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
         bgImageMime:        template.bgImageMime        ?? '',
         bgImageOpacity:     template.bgImageOpacity     ?? 0.08,
         bgImageMode:        template.bgImageMode        ?? 'behind',
+        signatureImageBase64: template.signatureImageBase64 ?? '',
+        signatureImageMime:   template.signatureImageMime   ?? 'image/png',
         customHtml:         template.customHtml         ?? false,
       }
     }
@@ -465,6 +476,8 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
     bg_image_mime:       guiFields?.bgImageMime        ?? 'image/png',
     bg_image_opacity:    bgOpacity,
     bg_is_watermark:     bgMode === 'watermark',
+    signature_image_base64: guiFields?.signatureImageBase64 ?? '',
+    signature_image_mime:   guiFields?.signatureImageMime   ?? 'image/png',
     reference_number:    tx.referenceNumber,
     transaction_date:    fmtDate(tx.transactionDate),
     due_date:            fmtDate(new Date(tx.transactionDate.getTime() + paymentDays * 24 * 3600000)),

@@ -1327,6 +1327,8 @@ model InvoiceTemplate {
   bgImageMime        String?
   bgImageOpacity     Float     @default(0.08)   // 0.0–1.0
   bgImageMode        String    @default("behind") // "behind" | "watermark"
+  signatureImageBase64 String? // Unterschrift + Stempel, unten rechts
+  signatureImageMime   String?
 
   // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_INVOICE_HTML)
   // Wenn true: Nutzer hat im HTML-Editor manuell editiert -> gespeicherter htmlContent bleibt dauerhaft erhalten
@@ -1822,6 +1824,8 @@ model ReportTemplate {
   bgImageMime        String?
   bgImageOpacity     Float   @default(0.06)
   bgImageMode        String  @default("behind")
+  signatureImageBase64 String? // Unterschrift + Stempel, unten rechts
+  signatureImageMime   String?
 
   // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_REPORT_HTML)
   // Wenn true: Nutzer hat im HTML-Editor manuell editiert -> gespeicherter htmlContent bleibt dauerhaft erhalten
@@ -1867,6 +1871,8 @@ model ConfirmationTemplate {
   bgImageMime        String?
   bgImageOpacity     Float    @default(0.06)
   bgImageMode        String   @default("behind")
+  signatureImageBase64 String? // Unterschrift + Stempel, unten rechts
+  signatureImageMime   String?
 
   // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_CONFIRMATION_HTML)
   customHtml      Boolean  @default(false)

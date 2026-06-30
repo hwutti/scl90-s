@@ -22,6 +22,7 @@ interface GuiFields {
   footerImageBase64: string; footerImageMime: string
   bgImageBase64: string; bgImageMime: string
   bgImageOpacity: number; bgImageMode: string
+  signatureImageBase64: string; signatureImageMime: string
 }
 
 const EMPTY_GUI: GuiFields = {
@@ -30,6 +31,7 @@ const EMPTY_GUI: GuiFields = {
   taxNumber: '', vatId: '', footerText: '',
   headerImageBase64: '', headerImageMime: '', footerImageBase64: '', footerImageMime: '',
   bgImageBase64: '', bgImageMime: '', bgImageOpacity: 0.06, bgImageMode: 'behind',
+  signatureImageBase64: '', signatureImageMime: '',
 }
 
 function templateToGui(t: any): GuiFields {
@@ -52,6 +54,8 @@ function templateToGui(t: any): GuiFields {
     bgImageMime:       t.bgImageMime        ?? '',
     bgImageOpacity:    t.bgImageOpacity     ?? 0.06,
     bgImageMode:       t.bgImageMode        ?? 'behind',
+    signatureImageBase64: t.signatureImageBase64 ?? '',
+    signatureImageMime:   t.signatureImageMime   ?? '',
   }
 }
 
@@ -59,6 +63,7 @@ const MAX_DIMS: Record<string, { w: number; h: number }> = {
   headerImage: { w: 2480, h: 400 },
   footerImage:  { w: 2480, h: 300 },
   bgImage:      { w: 1240, h: 1754 },
+  signatureImage: { w: 800, h: 400 },
 }
 
 const PLACEHOLDER_GROUPS: { label: string; items: [string, string][] }[] = [
@@ -158,7 +163,7 @@ export function BestaetigungsvorlageClient({ templates: initialTemplates, defaul
   function updateGui(field: keyof GuiFields, value: any) { setGui(g => ({ ...g, [field]: value })); markDirty() }
 
   // Bild-Upload mit Komprimierung
-  function handleImageUpload(field: 'headerImage' | 'footerImage' | 'bgImage', e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageUpload(field: 'headerImage' | 'footerImage' | 'bgImage' | 'signatureImage', e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const isSvg = file.type === 'image/svg+xml' || file.type === 'application/pdf'
@@ -190,7 +195,7 @@ export function BestaetigungsvorlageClient({ templates: initialTemplates, defaul
     }
     img.src = url
   }
-  function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage') {
+  function clearImage(field: 'headerImage' | 'footerImage' | 'bgImage' | 'signatureImage') {
     updateGui(`${field}Base64` as keyof GuiFields, '')
     updateGui(`${field}Mime` as keyof GuiFields, '')
   }
@@ -276,7 +281,7 @@ export function BestaetigungsvorlageClient({ templates: initialTemplates, defaul
   const lbl = { style: { fontSize: 11, fontWeight: 500 as const, color: 'var(--text-muted)', display: 'block', marginBottom: 4 } }
   const sec = { style: { fontSize: 12, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 10, paddingBottom: 6, borderBottom: '0.5px solid var(--border)' } }
 
-  const ImageUpload = ({ field, label, maxH, hint }: { field: 'headerImage'|'footerImage'|'bgImage', label: string, maxH: number, hint: string }) => {
+  const ImageUpload = ({ field, label, maxH, hint }: { field: 'headerImage'|'footerImage'|'bgImage'|'signatureImage', label: string, maxH: number, hint: string }) => {
     const b64 = gui[`${field}Base64` as keyof GuiFields] as string
     const mime = gui[`${field}Mime` as keyof GuiFields] as string
     return (
@@ -458,6 +463,7 @@ export function BestaetigungsvorlageClient({ templates: initialTemplates, defaul
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                         <ImageUpload field="headerImage" label="Header-Bild (Briefkopf-Banner)" maxH={80} hint="Empfohlen: 2480 × 300 px" />
                         <ImageUpload field="footerImage" label="Footer-Bild (Brieffuß-Banner)" maxH={60} hint="Empfohlen: 2480 × 200 px" />
+                        <ImageUpload field="signatureImage" label="Unterschrift / Stempel (unten rechts)" maxH={70} hint="Fertige Grafik, transparenter Hintergrund empfohlen (PNG)" />
                         <ImageUpload field="bgImage" label="Hintergrundbild / Briefpapier" maxH={90} hint="Empfohlen: A4 (2480 × 3508 px)" />
                         {gui.bgImageBase64 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
