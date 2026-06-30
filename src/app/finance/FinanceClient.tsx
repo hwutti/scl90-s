@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { SammelabrechungPanel } from './SammelabrechungPanel'
+import { BmdExportPanel } from './BmdExportPanel'
 import {
   Plus, X, Trash2, Download, TrendingUp, TrendingDown, DollarSign,
   Car, RefreshCw, FileText, Check, RotateCcw, Ban, Search,
@@ -44,7 +45,7 @@ function fmtDate(s: string | Date) {
   return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(s))
 }
 
-type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'sammelabrechnung'
+type MainTab = 'overview' | 'income' | 'expenses' | 'mileage' | 'gewinn' | 'sammelabrechnung' | 'bmd'
 
 // ── Haupt-Komponente ─────────────────────────────────────────────────────────
 
@@ -306,6 +307,7 @@ export function FinanceClient() {
             ['mileage',  'Fahrtenbuch'],
             ['gewinn',   'Gewinnermittlung'],
             ['sammelabrechnung', 'Sammelabrechnung'],
+            ['bmd', 'BMD-Export'],
           ] as [MainTab, string][]).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{
@@ -684,6 +686,13 @@ export function FinanceClient() {
         {/* ── GEWINNERMITTLUNG ── */}
         {tab === 'gewinn' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => window.open(`/api/finance/profit-statement/export?year=${year}`, '_blank')}
+                className="btn-secondary" style={{ fontSize: 12 }}>
+                <Download style={{ width: 13, height: 13 }} /> Aufstellung als PDF (für Steuerberater/Finanzamt)
+              </button>
+            </div>
+
             {/* Disclaimer */}
             <div style={{
               padding: '10px 14px', background: 'var(--amber-bg)',
@@ -695,6 +704,29 @@ export function FinanceClient() {
                 Diese Auswertung dient der Orientierung und stellt <strong>keine verbindliche Steuerberatung</strong> dar.
                 Bitte wenden Sie sich für steuerliche Fragen an eine zugelassene Steuerberatung.
               </span>
+            </div>
+
+            {/* USt-Aufteilung */}
+            <div className="card" style={{ padding: 20 }}>
+              <h2 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Umsatzsteuerliche Zuordnung der Einnahmen
+              </h2>
+              <div className="field-row">
+                <span className="field-label">Honorare – USt-befreit (§ 6 Abs 1 Z 19 UStG)</span>
+                <span className="field-value">{fmtEUR(profit?.ustSplit?.befreitNetto ?? 0)}</span>
+              </div>
+              {(profit?.ustSplit?.pflichtigNetto ?? 0) > 0 && (
+                <div className="field-row">
+                  <span className="field-label">Sonstige Leistungen – USt-pflichtig (z. B. Supervision, 20%)</span>
+                  <span className="field-value">{fmtEUR(profit?.ustSplit?.pflichtigNetto ?? 0)} (+{fmtEUR(profit?.ustSplit?.pflichtigUst ?? 0)} USt)</span>
+                </div>
+              )}
+              {(profit?.ustSplit?.legacyOhneZuordnung ?? 0) > 0 && (
+                <div className="field-row">
+                  <span className="field-label">Sonstige Einnahmen (Alt-Erfassung, ohne USt-Zuordnung)</span>
+                  <span className="field-value">{fmtEUR(profit?.ustSplit?.legacyOhneZuordnung ?? 0)}</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -780,6 +812,10 @@ export function FinanceClient() {
 
         {tab === 'sammelabrechnung' && (
           <SammelabrechungPanel year={year} />
+        )}
+
+        {tab === 'bmd' && (
+          <BmdExportPanel year={year} />
         )}
       </div>
 

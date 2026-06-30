@@ -67,6 +67,7 @@ enum AuditAction {
   USER_LOGOUT
   DATA_DELETED
   BACKUP_CREATED
+  FINANCE_DATA_EXPORTED
   APPOINTMENT_CREATED
   APPOINTMENT_CONFIRMED
   APPOINTMENT_CANCELLED
@@ -579,6 +580,11 @@ model PraxisConfig {
 
   bundesland      String   @default("Kärnten")  // für Schulferien
   anamnesisTemplate String? // JSON: [{title, prefilledText}]
+
+  // BMD-Export Kontozuordnung (JSON, vor erster Nutzung mit Steuerberater abstimmen!)
+  // { erlosUstBefreit, erlosUstPflichtig, ustSatz, expenseAccounts: { [ExpenseCategory]: string } }
+  bmdSettings     String?
+
   updatedAt       DateTime @updatedAt
   updatedBy       String?
 }
