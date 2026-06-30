@@ -349,6 +349,7 @@ model Patient {
   travelLogs            TravelLogEntry[]        @relation("PatientTravelLog")
   videoCalls            VideoCall[]             @relation("PatientVideoCalls")
   ratings               SessionRating[]         @relation("PatientRatings")
+  audioRecordings       AudioRecording[]        @relation("PatientAudio")
   reportDocuments       PatientReportDocument[]
   confirmations         Confirmation[]
 
@@ -1568,22 +1569,29 @@ model ExportJob {
   @@index([createdByUserId])
 }
 
-// ─── Audio-Aufnahmen in Sitzungen ────────────────────────────────────────────
+// ─── Audio-Aufnahmen (Sitzungen + Patientenebene) ─────────────────────────────
 
 model AudioRecording {
-  id          String         @id @default(cuid())
-  sessionId   String
-  session     TherapySession @relation("SessionAudio", fields: [sessionId], references: [id], onDelete: Cascade)
+  id          String          @id @default(cuid())
+  // Entweder an eine Sitzung ODER direkt an einen Patienten geknüpft (oder beides)
+  sessionId   String?
+  session     TherapySession? @relation("SessionAudio", fields: [sessionId], references: [id], onDelete: Cascade)
+  patientId   String?
+  patient     Patient?        @relation("PatientAudio", fields: [patientId], references: [id], onDelete: Cascade)
+  label       String?         // Benutzerfreundlicher Name, z.B. "Erstsitzung Notiz"
   fileName    String
-  mimeType    String         @default("audio/webm")
-  size        Int
+  mimeType    String          @default("audio/webm")
+  size        Int             // Bytes (original, unverschlüsselt)
   durationSec Int?
-  data        Bytes
-  encrypted   Boolean        @default(false)
-  createdAt   DateTime       @default(now())
+  data        Bytes           // AES-256-GCM verschlüsselt wenn encrypted=true
+  encrypted   Boolean         @default(true)
+  iv          String?         // Hex-kodierter IV für AES-GCM (nur wenn encrypted=true)
+  source      String          @default("UPLOAD") // UPLOAD | BROWSER_RECORDING
+  createdAt   DateTime        @default(now())
   createdBy   String
 
   @@index([sessionId])
+  @@index([patientId])
 }
 
 // ─── Supervision ─────────────────────────────────────────────────────────────

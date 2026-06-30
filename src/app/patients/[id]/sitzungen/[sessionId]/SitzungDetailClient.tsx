@@ -7,6 +7,7 @@ import {
   User, ChevronRight, Mic, ClipboardList,
 } from 'lucide-react'
 import { ProtocolEditor } from '@/components/protocol/ProtocolEditor'
+import { AudioRecorderPanel } from '@/components/audio/AudioRecorderPanel'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ const DIENSTLEISTUNGEN = [
   'Gutachten',
 ]
 
-type DetailTab = 'kurzprotokoll' | 'langprotokoll' | 'leistungen' | 'bewertungen' | 'weiteres'
+type DetailTab = 'kurzprotokoll' | 'langprotokoll' | 'leistungen' | 'bewertungen' | 'weiteres' | 'audio'
 
 const NAV_ITEMS: { key: DetailTab; label: string; icon: any }[] = [
   { key: 'kurzprotokoll', label: 'Kurzprotokoll', icon: FileText },
@@ -79,6 +80,7 @@ const NAV_ITEMS: { key: DetailTab; label: string; icon: any }[] = [
   { key: 'leistungen', label: 'Leistungen', icon: Euro },
   { key: 'bewertungen', label: 'Bewertungen', icon: MoreHorizontal },
   { key: 'weiteres', label: 'Weiteres', icon: MoreHorizontal },
+  { key: 'audio', label: 'Audio', icon: MoreHorizontal },
 ]
 
 // ── Bewertungs-Slider ─────────────────────────────────────────────────────────
@@ -647,6 +649,16 @@ export function SitzungDetailClient({
           )}
 
           {/* ── WEITERES ── */}
+          {tab === 'audio' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Audio-Aufnahmen</h2>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                Aufnahmen sind AES-256 verschlüsselt gespeichert. Nur berechtigte Therapeut:innen können sie abspielen.
+              </p>
+              <AudioRecorderPanel sessionId={session.id} />
+            </div>
+          )}
+
           {tab === 'weiteres' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Weiteres</h2>

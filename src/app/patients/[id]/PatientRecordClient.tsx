@@ -13,6 +13,7 @@ import { searchICD10 } from '@/lib/icd10/codes'
 import { SessionsBillingPanel } from './SessionsBillingPanel'
 import { PatientStatsPanel } from './PatientStatsPanel'
 import { PatientShareButton } from '@/components/patients/PatientShareButton'
+import { AudioRecorderPanel } from '@/components/audio/AudioRecorderPanel'
 
 type Tab = 'uebersicht' | 'klinik' | 'sitzungen' | 'verlauf'
 
@@ -949,6 +950,20 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <SessionsBillingPanel patientId={patient.id} role={role} />
 
+            {/* Audio-Aufnahmen */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <details>
+                <summary style={{ padding: '13px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+                  <span>🎙️ Audio-Aufnahmen</span>
+                </summary>
+                <div style={{ borderTop: '0.5px solid var(--border)', padding: 16 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                    Aufnahmen ohne Sitzungsbezug. Sitzungsspezifische Aufnahmen findest du im jeweiligen Sitzungs-Tab → Audio.
+                  </p>
+                  <AudioRecorderPanel patientId={patient.id} />
+                </div>
+              </details>
+            </div>
             {/* Dokumente */}
             <div className="card" style={{ overflow: 'hidden' }}>
               <details>
