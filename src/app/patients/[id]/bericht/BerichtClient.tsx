@@ -252,7 +252,9 @@ export function BerichtClient({
                       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                       background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)',
                     }}>
-                      <Lock style={{ width: 13, height: 13, color: 'var(--text-muted)', flexShrink: 0 }} title="Unveränderlich archiviert" />
+                      <span title="Unveränderlich archiviert" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                        <Lock style={{ width: 13, height: 13, color: 'var(--text-muted)' }} />
+                      </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {doc.reportTypeLabel}
