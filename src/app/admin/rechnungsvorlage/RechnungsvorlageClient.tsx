@@ -53,6 +53,7 @@ interface Template {
   praxisEmail: string | null
   footerText: string | null
   showQrCode: boolean
+  customHtml: boolean
 }
 
 const EMPTY_GUI: GuiFields = {
@@ -290,6 +291,23 @@ export function RechnungsvorlageClient({
         body: JSON.stringify({ isDefault: true }),
       })
       setTemplates(ts => ts.map(t => ({ ...t, isDefault: t.id === activeId })))
+    } catch { /* ignore */ }
+  }
+
+  // ── Auf automatisches Standard-Layout zurücksetzen ──────────────────────────────
+
+  async function resetToAutoLayout() {
+    if (!activeId) return
+    if (!confirm('Eigene HTML-Anpassungen verwerfen und auf das automatische Standard-Layout zurücksetzen?')) return
+    try {
+      const res = await fetch(`/api/invoice-templates/${activeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetToAuto: true }),
+      })
+      const updated = await res.json()
+      setTemplates(ts => ts.map(t => t.id === activeId ? { ...t, ...updated } : t))
+      setEditorMode('gui')
     } catch { /* ignore */ }
   }
 
@@ -544,6 +562,29 @@ export function RechnungsvorlageClient({
                   )}
                 </div>
               </div>
+
+              {/* Layout-Status */}
+              {active.customHtml ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px',
+                  background: 'var(--color-warning-light, #fff7e6)', borderBottom: '0.5px solid var(--border)',
+                  fontSize: 11.5, color: 'var(--text-secondary)',
+                }}>
+                  <AlertCircle style={{ width: 13, height: 13, flexShrink: 0, color: '#b8860b' }} />
+                  <span style={{ flex: 1 }}>Eigene HTML-Anpassung aktiv – Layout-Updates werden nicht automatisch übernommen.</span>
+                  <button onClick={resetToAutoLayout} className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                    Zurücksetzen
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px',
+                  borderBottom: '0.5px solid var(--border)', fontSize: 11.5, color: 'var(--text-muted)',
+                }}>
+                  <Check style={{ width: 13, height: 13, flexShrink: 0, color: 'var(--green, #16a34a)' }} />
+                  <span>Layout wird automatisch aktuell gehalten</span>
+                </div>
+              )}
 
               {/* Editor-Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>

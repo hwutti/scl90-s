@@ -1305,6 +1305,10 @@ model InvoiceTemplate {
   bgImageOpacity     Float     @default(0.08)   // 0.0–1.0
   bgImageMode        String    @default("behind") // "behind" | "watermark"
 
+  // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_INVOICE_HTML)
+  // Wenn true: Nutzer hat im HTML-Editor manuell editiert -> gespeicherter htmlContent bleibt dauerhaft erhalten
+  customHtml      Boolean   @default(false)
+
   patients        Patient[] @relation("PatientInvoiceTemplate")
 }
 
@@ -1795,6 +1799,10 @@ model ReportTemplate {
   bgImageMime        String?
   bgImageOpacity     Float   @default(0.06)
   bgImageMode        String  @default("behind")
+
+  // Wenn false: htmlContent wird ignoriert, App nutzt immer das aktuelle Code-Layout (DEFAULT_REPORT_HTML)
+  // Wenn true: Nutzer hat im HTML-Editor manuell editiert -> gespeicherter htmlContent bleibt dauerhaft erhalten
+  customHtml      Boolean @default(false)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

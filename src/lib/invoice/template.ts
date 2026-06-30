@@ -348,7 +348,10 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
     }
     if (!template) return { html: DEFAULT_INVOICE_HTML }
     return {
-      html: template.htmlContent,
+      // GUI-Vorlagen (customHtml=false) bekommen immer das aktuelle Code-Layout,
+      // damit Layout-Fixes sofort greifen statt an einem eingefrorenen Snapshot zu hängen.
+      // Nur explizit im HTML-Editor angepasste Vorlagen behalten ihren eigenen htmlContent.
+      html: template.customHtml ? template.htmlContent : DEFAULT_INVOICE_HTML,
       guiFields: {
         invoiceTitle:       template.invoiceTitle       ?? 'Honorarnote',
         primaryColor:       template.primaryColor       ?? '#4f46e5',
@@ -372,6 +375,7 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
         bgImageMime:        template.bgImageMime        ?? '',
         bgImageOpacity:     template.bgImageOpacity     ?? 0.08,
         bgImageMode:        template.bgImageMode        ?? 'behind',
+        customHtml:         template.customHtml         ?? false,
       }
     }
   } catch {

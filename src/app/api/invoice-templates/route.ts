@@ -37,7 +37,13 @@ export async function POST(req: NextRequest) {
     // duplicateFrom: HTML aus einer anderen Vorlage kopieren
     if (body.duplicateFrom) {
       const src = await prisma.invoiceTemplate.findUnique({ where: { id: body.duplicateFrom } })
-      if (src) data.htmlContent = src.htmlContent
+      if (src) {
+        data.htmlContent = src.htmlContent
+        data.customHtml = src.customHtml
+      }
+    } else if (data.htmlContent) {
+      // Explizit beim Erstellen mitgeliefertes HTML gilt als manuelle Anpassung
+      data.customHtml = true
     }
     // htmlContent fallback auf Default
     if (!data.htmlContent) data.htmlContent = DEFAULT_INVOICE_HTML

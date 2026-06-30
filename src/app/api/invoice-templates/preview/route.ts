@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   let resolvedHtml = htmlContent
   if (!resolvedHtml && templateId) {
     const tmpl = await prisma.invoiceTemplate.findUnique({ where: { id: templateId } })
-    if (tmpl) resolvedHtml = tmpl.htmlContent
+    if (tmpl) resolvedHtml = tmpl.customHtml ? tmpl.htmlContent : DEFAULT_INVOICE_HTML
   }
   if (!resolvedHtml) resolvedHtml = DEFAULT_INVOICE_HTML
 

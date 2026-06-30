@@ -51,14 +51,14 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
   {{#if bg_image_base64}}
   .bg-layer {
     position: absolute;
-    {{#if has_header_image}}top: 50mm;{{else}}top: 0;{{/if}}
-    {{#if has_footer_image}}bottom: 40mm;{{else}}bottom: 0;{{/if}}
     left: 0; right: 0;
+    top: 0; bottom: 0;
     background-image: url(data:{{bg_image_mime}};base64,{{bg_image_base64}});
     background-size: cover; background-position: center;
     opacity: {{bg_image_opacity}};
     {{#if bg_is_watermark}}z-index: 100; pointer-events: none;{{else}}z-index: 0;{{/if}}
   }
+  .bg-layer-wrapper { position: relative; }
   .page-content { position: relative; z-index: 1; }
   {{/if}}
 
@@ -139,15 +139,16 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="page">
-  {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
-  <div class="{{#if bg_image_base64}}page-content{{/if}}">
-
   {{#if header_image_base64}}
   <div style="margin: -20mm -20mm 6mm -20mm; line-height: 0;">
     <img src="data:{{header_image_mime}};base64,{{header_image_base64}}"
       style="width:100%;display:block;max-height:45mm;object-fit:cover;" alt="">
   </div>
   {{/if}}
+
+  <div class="bg-layer-wrapper">
+  {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
+  <div class="page-content">
 
   <div class="letterhead" {{#if header_image_base64}}style="border-top:none;"{{/if}}>
     <div class="letterhead-left">
@@ -179,6 +180,9 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
     <div class="sig-line">{{therapist_name}}<br>{{praxis_name}}</div>
   </div>
 
+  </div><!-- /page-content -->
+  </div><!-- /bg-layer-wrapper -->
+
   {{#if footer_image_base64}}
   <div style="margin: 8mm -20mm -25mm -20mm; line-height: 0;">
     <img src="data:{{footer_image_mime}};base64,{{footer_image_base64}}"
@@ -191,7 +195,6 @@ export const DEFAULT_REPORT_HTML = `<!DOCTYPE html>
   </div>
   {{/if}}
 
-  </div>
 </div>
 </body>
 </html>`
@@ -254,7 +257,8 @@ export async function getDefaultReportTemplate(
     if (!template) return { html: DEFAULT_REPORT_HTML, guiFields: {} }
 
     return {
-      html: template.htmlContent || DEFAULT_REPORT_HTML,
+      // GUI-Vorlagen (customHtml=false) bekommen immer das aktuelle Code-Layout.
+      html: template.customHtml ? (template.htmlContent || DEFAULT_REPORT_HTML) : DEFAULT_REPORT_HTML,
       guiFields: {
         primaryColor:     template.primaryColor     ?? '#1a1a2e',
         fontFamily:       template.fontFamily       ?? 'Times New Roman, serif',
@@ -276,6 +280,7 @@ export async function getDefaultReportTemplate(
         bgImageMime:       template.bgImageMime       ?? 'image/png',
         bgImageOpacity:    template.bgImageOpacity    ?? 0.06,
         bgImageMode:       template.bgImageMode       ?? 'behind',
+        customHtml:        template.customHtml        ?? false,
       }
     }
   } catch {

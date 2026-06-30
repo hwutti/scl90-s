@@ -31,6 +31,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (ALLOWED_FIELDS.has(k)) data[k] = v
   }
 
+  // htmlContent wird nur im rohen HTML-Editor mitgeschickt -> als manuelle Anpassung markieren
+  if (typeof data.htmlContent === 'string') {
+    data.customHtml = true
+  }
+  // Explizites Zurücksetzen auf das automatische Standard-Layout
+  if (body.resetToAuto === true) {
+    data.customHtml = false
+  }
+
   try {
     if (data.isDefault) {
       await prisma.invoiceTemplate.updateMany({ data: { isDefault: false } })

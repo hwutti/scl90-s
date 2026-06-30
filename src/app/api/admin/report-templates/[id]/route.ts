@@ -25,6 +25,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const [k, v] of Object.entries(body)) {
     if (ALLOWED.has(k)) data[k] = v
   }
+  // htmlContent wird nur im rohen HTML-Editor mitgeschickt -> als manuelle Anpassung markieren
+  if (typeof data.htmlContent === 'string') {
+    data.customHtml = true
+  }
+  // Explizites Zurücksetzen auf das automatische Standard-Layout
+  if (body.resetToAuto === true) {
+    data.customHtml = false
+  }
   try {
     if (data.isDefault) {
       const current = await prisma.reportTemplate.findUnique({ where: { id: params.id } })

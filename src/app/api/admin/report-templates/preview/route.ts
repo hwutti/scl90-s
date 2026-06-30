@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   let resolvedHtml = editorMode === 'html' ? htmlContent : null
   if (!resolvedHtml && templateId) {
     const tmpl = await prisma.reportTemplate.findUnique({ where: { id: templateId } })
-    if (tmpl) resolvedHtml = tmpl.htmlContent
+    if (tmpl) resolvedHtml = tmpl.customHtml ? tmpl.htmlContent : DEFAULT_REPORT_HTML
   }
   if (!resolvedHtml) resolvedHtml = DEFAULT_REPORT_HTML
 

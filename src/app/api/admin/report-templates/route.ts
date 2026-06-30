@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     if (ALLOWED.has(k)) data[k] = v
   }
   if (!data.htmlContent) data.htmlContent = DEFAULT_REPORT_HTML
+  else data.customHtml = true
   if (!data.reportType) data.reportType = 'all'
 
   try {
@@ -51,7 +52,10 @@ export async function POST(req: NextRequest) {
     // duplicateFrom
     if (body.duplicateFrom) {
       const src = await prisma.reportTemplate.findUnique({ where: { id: body.duplicateFrom } })
-      if (src) data.htmlContent = src.htmlContent
+      if (src) {
+        data.htmlContent = src.htmlContent
+        data.customHtml = src.customHtml
+      }
     }
     const t = await prisma.reportTemplate.create({ data })
     return NextResponse.json(t)
