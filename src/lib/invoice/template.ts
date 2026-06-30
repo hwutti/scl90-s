@@ -201,7 +201,10 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
 
   {{#if signature_image_base64}}
   <div style="display:flex; justify-content:flex-end; margin-top:8mm;">
-    <img src="data:{{signature_image_mime}};base64,{{signature_image_base64}}" style="max-width:60mm; max-height:28mm; object-fit:contain;" alt="Unterschrift">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <img src="data:{{signature_image_mime}};base64,{{signature_image_base64}}" style="max-width:60mm; max-height:28mm; object-fit:contain;" alt="Unterschrift">
+      <div style="border-top:1px solid #1a1a1a; width:55mm; margin-top:2mm; padding-top:1.5mm; font-size:8.5pt; color:#444; text-align:center;">{{praxis_name}}</div>
+    </div>
   </div>
   {{/if}}
 

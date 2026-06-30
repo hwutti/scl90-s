@@ -339,7 +339,15 @@ success "Nginx konfiguriert und neu geladen"
 # =============================================================================
 step "Backup einrichten"
 mkdir -p "$BACKUP_DIR"
-chown postgres:postgres "$BACKUP_DIR"
+# Verzeichnis wird sowohl vom Cron-Job (User postgres) als auch vom manuellen
+# "Backup erstellen"-Button in der Web-UI (läuft als User $APP_USER) beschrieben.
+# Gemeinsame Gruppe mit Schreibrecht + Setgid, damit beide Seiten unabhängig
+# voneinander Dateien anlegen können (sonst: EACCES beim manuellen Backup).
+groupadd -f kds-backup
+usermod -aG kds-backup "$APP_USER"
+usermod -aG kds-backup postgres
+chgrp kds-backup "$BACKUP_DIR"
+chmod 2775 "$BACKUP_DIR"
 
 cat > /etc/cron.d/kds-backup << CRON_EOF
 0 2 * * * postgres pg_dump $DB_NAME | gzip > $BACKUP_DIR/kds_\$(date +\%Y\%m\%d_\%H\%M).sql.gz && find $BACKUP_DIR -name "*.sql.gz" -mtime +$BACKUP_KEEP_DAYS -delete

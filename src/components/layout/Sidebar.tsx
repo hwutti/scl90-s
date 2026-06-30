@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro, Video, ClipboardList, GraduationCap , Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -67,7 +67,20 @@ function NotificationBell({ userId }: { userId: string }) {
 export function Sidebar({ branding }: { branding: BrandingConfig }) {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const { theme, toggle } = useTheme()
+  const [closedItems, setClosedItems] = useState<Set<string>>(new Set())
+
+  function toggleItem(e: React.MouseEvent, href: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setClosedItems(prev => {
+      const next = new Set(prev)
+      if (next.has(href)) next.delete(href)
+      else next.add(href)
+      return next
+    })
+  }
   const role = (session?.user as any)?.role ?? 'PATIENT'
   const name = session?.user?.name ?? ''
   const userId = (session?.user as any)?.id ?? ''
@@ -118,16 +131,23 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
         {visibleNav.map(item => {
           const isActive = pathname.startsWith(item.href)
           const subActive = item.sub?.some((s: any) => s.sub ? s.sub.some((c: any) => pathname.startsWith(c.href)) : pathname.startsWith(s.href))
-          const isOpen = isActive || subActive
+          const isOpen = (isActive || subActive) && !closedItems.has(item.href)
           return (
             <div key={item.href}>
-              <Link href={item.href} className={cn('nav-link', isOpen && 'active')} style={{ marginBottom: 1 }}>
+              <div
+                onClick={() => router.push(item.href)}
+                role="link" tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter') router.push(item.href) }}
+                className={cn('nav-link', (isActive || subActive) && 'active')} style={{ marginBottom: 1 }}>
                 <item.icon style={{ width: 15, height: 15, flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 13 }}>{item.label}</span>
                 {item.sub && (
-                  <ChevronRight style={{ width: 13, height: 13, opacity: 0.4, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+                  <button onClick={e => toggleItem(e, item.href)} aria-label={isOpen ? 'Einklappen' : 'Ausklappen'}
+                    style={{ background: 'none', border: 'none', padding: 4, margin: '-4px -4px -4px 0', cursor: 'pointer', display: 'flex', color: 'inherit' }}>
+                    <ChevronRight style={{ width: 13, height: 13, opacity: 0.4, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+                  </button>
                 )}
-              </Link>
+              </div>
               {item.sub && isOpen && (
                 <div style={{ paddingLeft: 24, marginBottom: 4 }}>
                   {item.sub.map((s: any) => {

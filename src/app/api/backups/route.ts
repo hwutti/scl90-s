@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     await prisma.auditLog.create({
       data: {
         userId,
-        action: 'DATA_DELETED', // Backup-Aktion
+        action: 'BACKUP_CREATED',
         details: { action: 'backup_created', filename, path: filepath },
       },
     })

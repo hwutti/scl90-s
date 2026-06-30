@@ -10,6 +10,7 @@ const ALLOWED = new Set([
   'footerText','showPageNumbers','showDataProtection',
   'headerImageBase64','headerImageMime','footerImageBase64','footerImageMime',
   'bgImageBase64','bgImageMime','bgImageOpacity','bgImageMode',
+  'signatureImageBase64','signatureImageMime',
 ])
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
