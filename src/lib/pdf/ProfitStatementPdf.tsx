@@ -171,7 +171,7 @@ export function ProfitStatementPdf(p: ProfitStatementPdfProps) {
         </View>
         <View style={S.tableRow}>
           <Text style={[S.td, S.colLabel]}>Grundfreibetrag (15 % des Gewinns)</Text>
-          <Text style={[S.td, S.colVal]}>− {fmt(p.grundfreibetrag)}</Text>
+          <Text style={[S.td, S.colVal]}>- {fmt(p.grundfreibetrag)}</Text>
         </View>
         <View style={S.tableRowTotal}>
           <Text style={[S.tdBold, S.colLabel]}>Einkünfte aus selbständiger Arbeit</Text>
@@ -202,7 +202,7 @@ export function ProfitStatementPdf(p: ProfitStatementPdfProps) {
               {e.bezug && <Text style={S.jTdMuted}>{e.bezug}</Text>}
             </View>
             <Text style={[S.jTd, S.jColAmt]}>{fmt(e.netto)}</Text>
-            <Text style={[S.jTd, S.jColAmt]}>{e.direction === 'EXPENSE' ? '−' : ''}{fmt(e.brutto)}</Text>
+            <Text style={[S.jTd, S.jColAmt]}>{e.direction === 'EXPENSE' ? '-' : ''}{fmt(e.brutto)}</Text>
           </View>
         ))}
 
