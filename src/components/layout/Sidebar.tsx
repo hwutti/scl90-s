@@ -30,6 +30,7 @@ const NAV_ITEMS = [
       { href: '/admin/availability', label: 'Verfügbarkeit' },
       { href: '/admin/norm-tables', label: 'Normwerte' },
       { href: '/admin/branding', label: 'Branding & Praxis' },
+      { href: '/admin/praxis-modus', label: 'Praxis-Modus' },
       { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlage' },
       { href: '/admin/berichtsvorlage', label: 'Berichtsvorlage' },
       { href: '/admin/smtp', label: 'E-Mail / SMTP' },

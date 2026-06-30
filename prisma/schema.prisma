@@ -222,6 +222,8 @@ model User {
   therapySessions       TherapySession[]        @relation("TherapistSessions")
   userTransactions      Transaction[]           @relation("UserTransactions")
   googleCalendar        GoogleCalendarConnection? @relation("UserGoogleCalendar")
+  patientSharesOwned    PatientShare[] @relation("OwnerUser")
+  patientSharesReceived PatientShare[] @relation("SharedWithUser")
   videoCalls            VideoCall[]             @relation("UserVideoCalls")
   exportJobs            ExportJob[]             @relation("UserExportJobs")
   supervisionEntriesAs  SupervisionEntry[]      @relation("SuperviseeEntries")
@@ -287,6 +289,7 @@ model Patient {
   defaultUnitPriceNet    Decimal?  @db.Decimal(10,2)  // Kosten pro Einheit
   defaultHourlyRateNet   Decimal?  @db.Decimal(10,2)  // Stundensatz
   defaultInvoiceTemplateId String?
+  sharedWith    PatientShare[] @relation("PatientShares")
   defaultInvoiceTemplate   InvoiceTemplate? @relation("PatientInvoiceTemplate", fields: [defaultInvoiceTemplateId], references: [id])
   defaultVatRate         Decimal?  @db.Decimal(5,4) @default(0)    // Standard-MwSt. 0=0%, 0.1=10%, 0.2=20%
   defaultPaymentMethod   String?   @default("UNBAR_BANK_TRANSFER")  // CASH | CARD_BANKOMAT | UNBAR_BANK_TRANSFER
@@ -564,6 +567,12 @@ model PraxisConfig {
   bankName        String?
   taxNumber       String?   // Steuernummer
   vatId           String?   // UID-Nummer
+
+  // Praxis-Modus
+  practiceMode    String   @default("single")   // "single" | "group"
+  // Admin-Berechtigungen in Gruppenpraxis (JSON)
+  // { seeCalendar: bool, seePatients: bool, seeProtocols: bool, seeDiagnoses: bool, seeFinance: bool, calendarAnonymized: bool }
+  adminPermissions String?
 
   bundesland      String   @default("Kärnten")  // für Schulferien
   anamnesisTemplate String? // JSON: [{title, prefilledText}]
@@ -1789,4 +1798,18 @@ model ReportTemplate {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model PatientShare {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation("PatientShares", fields: [patientId], references: [id])
+  ownerId       String   // Therapeut dem der Patient gehört
+  sharedWithId  String   // Therapeut dem Zugriff gewährt wird
+  sharedWith    User     @relation("SharedWithUser", fields: [sharedWithId], references: [id])
+  owner         User     @relation("OwnerUser", fields: [ownerId], references: [id])
+  canEdit       Boolean  @default(false)  // false = nur lesen
+  createdAt     DateTime @default(now())
+
+  @@unique([patientId, sharedWithId])
 }

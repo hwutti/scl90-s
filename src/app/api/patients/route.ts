@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPracticeConfig } from '@/lib/access'
 import { generatePin } from '@/lib/utils'
 import { Gender } from '@prisma/client'
 
@@ -13,9 +14,33 @@ export async function GET() {
   const role   = (session.user as any).role
   if (!['ADMIN','THERAPIST'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const where = role === 'ADMIN'
-    ? { deletedAt: null }
-    : { deletedAt: null, therapists: { some: { therapistId: userId } } }
+  // Praxis-Modus: Zugriffsrechte prüfen
+  const { mode, perms } = await getPracticeConfig()
+
+  let where: any
+  if (role === 'ADMIN') {
+    if (mode === 'group' && !perms.seePatients) {
+      return NextResponse.json([]) // Admin in Gruppenpraxis ohne Berechtigung
+    }
+    where = { deletedAt: null }
+  } else {
+    // Therapeut: eigene Patienten + freigegebene
+    const shares = await prisma.patientShare.findMany({
+      where: { sharedWithId: userId },
+      select: { patientId: true },
+    })
+    if (shares.length > 0) {
+      where = {
+        deletedAt: null,
+        OR: [
+          { therapists: { some: { therapistId: userId } } },
+          { id: { in: shares.map((s: any) => s.patientId) } },
+        ],
+      }
+    } else {
+      where = { deletedAt: null, therapists: { some: { therapistId: userId } } }
+    }
+  }
 
   const patients = await prisma.patient.findMany({
     where,

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { notifyAppointment, expandRecurrence } from '@/lib/calendar'
+import { getPracticeConfig } from '@/lib/access'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -25,6 +26,17 @@ export async function GET(req: NextRequest) {
     where.status = { notIn: ['CANCELLED'] }
   } else if (role === 'THERAPIST') {
     where.therapistId = therapistId || userId
+  } else if (role === 'ADMIN') {
+    // In Gruppenpraxis: Admin sieht Kalender nur wenn Berechtigung vorhanden
+    const { mode, perms } = await getPracticeConfig()
+    if (mode === 'group' && !perms.seeCalendar) {
+      return NextResponse.json([])
+    }
+    // Bei therapistId-Filter: nur diesen Therapeuten zeigen
+    if (therapistId && therapistId !== 'ALL') {
+      where.therapistId = therapistId
+    }
+    // Sonst alle (ADMIN sieht alle in Einzelpraxis oder wenn berechtigt)
   }
 
   const appointments = await prisma.appointment.findMany({
@@ -36,6 +48,17 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { startAt: 'asc' },
   })
+
+  // Anonymisierung für Admin in Gruppenpraxis
+  if (role === 'ADMIN') {
+    const { mode, perms } = await getPracticeConfig()
+    if (mode === 'group' && perms.calendarAnonymized) {
+      return NextResponse.json(appointments.map(a => ({
+        ...a,
+        patient: a.patient ? { id: a.patient.id, firstName: 'Patient', lastName: '••••' } : null,
+      })))
+    }
+  }
 
   return NextResponse.json(appointments)
 }

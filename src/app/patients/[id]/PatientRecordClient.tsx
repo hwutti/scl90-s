@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { searchICD10 } from '@/lib/icd10/codes'
 import { SessionsBillingPanel } from './SessionsBillingPanel'
 import { PatientStatsPanel } from './PatientStatsPanel'
+import { PatientShareButton } from '@/components/patients/PatientShareButton'
 
 type Tab = 'uebersicht' | 'klinik' | 'sitzungen' | 'verlauf'
 
@@ -515,6 +516,7 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
 
         {/* ── GRUPPEN-TABS ── */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+          <PatientShareButton patientId={patient.id} />
           <button
             onClick={() => router.push(`/patients/${patient.id}/bericht`)}
             className="btn-secondary"
