@@ -127,6 +127,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const html = renderReportTemplate(templateHtml, data)
 
+  // Archivierung: NUR beim tatsächlichen Ausstellen (Drucken/PDF), nicht bei der
+  // Vorschau. Einmal archiviert, bleibt dieser Inhalt für immer unverändert -
+  // spätere Branding-/Vorlagen-Änderungen wirken sich nicht mehr darauf aus.
+  if (body.finalize === true) {
+    await prisma.patientReportDocument.create({
+      data: {
+        patientId: patient.id,
+        reportType,
+        createdByUserId: (session.user as any).id,
+        anonymized: anonymize ?? false,
+        data: Buffer.from(html, 'utf8'),
+        mimeType: 'text/html',
+      },
+    })
+  }
+
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' }
   })

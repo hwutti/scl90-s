@@ -119,6 +119,9 @@ export function BerichtClient({
             status:          form.status,
             empfehlung:      form.empfehlung,
           },
+          // Nur beim echten Drucken/PDF wird ein unveränderliches Archiv-Exemplar
+          // angelegt - die Vorschau bleibt ein reiner, nicht gespeicherter Entwurf
+          finalize: openPrint,
         }),
       })
       if (!res.ok) throw new Error(`Fehler ${res.status}`)

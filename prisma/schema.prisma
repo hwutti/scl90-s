@@ -338,6 +338,7 @@ model Patient {
   travelLogs            TravelLogEntry[]        @relation("PatientTravelLog")
   videoCalls            VideoCall[]             @relation("PatientVideoCalls")
   ratings               SessionRating[]         @relation("PatientRatings")
+  reportDocuments       PatientReportDocument[]
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -821,6 +822,26 @@ model PatientDocument {
   @@index([patientId])
   @@index([category])
   @@index([sessionId])
+}
+
+// Unveränderliches Archiv für ausgestellte Patientenberichte (Therapiebericht/
+// Arztbrief/Verlaufsbericht). Wird beim Klick auf "Drucken / PDF" angelegt -
+// die "Vorschau" erzeugt bewusst KEINEN Archiv-Eintrag, da sie noch ein
+// Entwurf ist. Einmal archiviert, ändert sich der Inhalt nie wieder, auch wenn
+// sich Branding/Steuernummer/Vorlage später ändern.
+model PatientReportDocument {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  reportType      String    // therapiebericht | arztbrief | verlaufsbericht
+  createdByUserId String
+  data            Bytes     // gerendertes HTML, eingefroren zum Ausstellungszeitpunkt
+  mimeType        String    @default("text/html")
+  anonymized      Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([patientId])
 }
 
 // ─── Therapieplan & Ziele ────────────────────────────────────────────────────
