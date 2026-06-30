@@ -69,14 +69,12 @@ export const DEFAULT_BMD_EXPENSE_ACCOUNTS: Record<string, string> = {
 export interface BmdSettings {
   erlosUstBefreit: string
   erlosUstPflichtig: string
-  ustSatz: number
   expenseAccounts: Record<string, string>
 }
 
 export const DEFAULT_BMD_SETTINGS: BmdSettings = {
   erlosUstBefreit: '4000',
   erlosUstPflichtig: '4020',
-  ustSatz: 20,
   expenseAccounts: DEFAULT_BMD_EXPENSE_ACCOUNTS,
 }
 
@@ -87,7 +85,6 @@ export function parseBmdSettings(json: string | null | undefined): BmdSettings {
     return {
       erlosUstBefreit: parsed.erlosUstBefreit ?? DEFAULT_BMD_SETTINGS.erlosUstBefreit,
       erlosUstPflichtig: parsed.erlosUstPflichtig ?? DEFAULT_BMD_SETTINGS.erlosUstPflichtig,
-      ustSatz: parsed.ustSatz ?? DEFAULT_BMD_SETTINGS.ustSatz,
       expenseAccounts: { ...DEFAULT_BMD_EXPENSE_ACCOUNTS, ...(parsed.expenseAccounts ?? {}) },
     }
   } catch {

@@ -31,7 +31,6 @@ export async function PATCH(req: NextRequest) {
     ...parseBmdSettings(current?.bmdSettings),
     ...(body.erlosUstBefreit !== undefined && { erlosUstBefreit: String(body.erlosUstBefreit) }),
     ...(body.erlosUstPflichtig !== undefined && { erlosUstPflichtig: String(body.erlosUstPflichtig) }),
-    ...(body.ustSatz !== undefined && { ustSatz: Number(body.ustSatz) }),
     ...(body.expenseAccounts !== undefined && {
       expenseAccounts: { ...parseBmdSettings(current?.bmdSettings).expenseAccounts, ...body.expenseAccounts },
     }),

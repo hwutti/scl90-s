@@ -18,7 +18,6 @@ const EXPENSE_CATS: Record<string, string> = {
 interface BmdSettings {
   erlosUstBefreit: string
   erlosUstPflichtig: string
-  ustSatz: number
   expenseAccounts: Record<string, string>
 }
 
@@ -96,7 +95,7 @@ export function BmdExportPanel({ year }: { year: number }) {
           Kontozuordnung
         </h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
               Erlöskonto USt-befreit
@@ -111,14 +110,12 @@ export function BmdExportPanel({ year }: { year: number }) {
             <input value={settings.erlosUstPflichtig} onChange={e => updateField('erlosUstPflichtig', e.target.value)}
               style={{ width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 7, border: '0.5px solid var(--border)', background: 'var(--surface-page)', color: 'var(--text-primary)' }} />
           </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-              USt-Satz (%)
-            </label>
-            <input type="number" value={settings.ustSatz} onChange={e => updateField('ustSatz', Number(e.target.value))}
-              style={{ width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 7, border: '0.5px solid var(--border)', background: 'var(--surface-page)', color: 'var(--text-primary)' }} />
-          </div>
         </div>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -8, marginBottom: 14 }}>
+          Der USt-Satz selbst wird nicht hier eingestellt, sondern kommt pro Buchung direkt aus dem System
+          (Feld "USt-Satz" der jeweiligen Transaktion) — hier wird nur festgelegt, auf welches Konto
+          gebucht wird, je nachdem ob die Buchung USt-befreit oder USt-pflichtig ist.
+        </p>
 
         <button onClick={() => setShowAccounts(s => !s)} className="btn-ghost"
           style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, marginBottom: showAccounts ? 10 : 0 }}>
