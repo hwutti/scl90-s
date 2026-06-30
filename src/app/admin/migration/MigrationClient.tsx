@@ -73,6 +73,8 @@ export function MigrationClient() {
   const [selectedAreas, setSelectedAreas] = useState<Set<string>>(new Set())
   const [expandedArea, setExpandedArea] = useState<string | null>(null)
   const [result, setResult] = useState<MigrationResult | null>(null)
+  const [serverPath, setServerPath] = useState('/tmp/kds-migration-upload.rar')
+  const [serverPathLoading, setServerPathLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleFile = useCallback(async (file: File) => {
@@ -90,6 +92,20 @@ export function MigrationClient() {
     } catch (e: any) { setError(e.message ?? 'Netzwerkfehler') }
     finally { setUploading(false) }
   }, [])
+
+  async function handleServerPath() {
+    setError(null); setServerPathLoading(true)
+    try {
+      const res = await fetch(`/api/admin/migration/parse?serverPath=${encodeURIComponent(serverPath)}`)
+      let data: any
+      try { data = await res.json() } catch { setError('Server-Fehler: Antwort war kein gültiges JSON.'); return }
+      if (!res.ok) { setError(data.error ?? 'Fehler beim Verarbeiten.'); return }
+      setPreview(data)
+      setSelectedAreas(new Set(data.areas.filter((a: MigrationArea) => a.canImport).map((a: MigrationArea) => a.id)))
+      setStep('preview')
+    } catch (e: any) { setError(e.message ?? 'Netzwerkfehler') }
+    finally { setServerPathLoading(false) }
+  }
 
   async function runImport() {
     if (!preview) return
@@ -125,6 +141,20 @@ export function MigrationClient() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>.rar oder .zip — aus TheraPsy → Dateien exportieren</p>
             {uploading && <p style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 12 }}>Wird verarbeitet…</p>}
             <input ref={fileRef} type="file" accept=".rar,.zip" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+          </div>
+          <div style={{ marginTop: 16, padding: 16, background: 'var(--surface-2)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-primary)' }}>Oder: Datei direkt auf den Server legen <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(empfohlen für Dateien &gt;4 MB)</span></p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Datei per SCP/SFTP auf den Server kopieren, z. B.:</p>
+            <code style={{ display: 'block', fontSize: 11, background: 'var(--surface-card)', padding: '6px 10px', borderRadius: 6, marginBottom: 10, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
+              scp Export_30.06.2026.rar kds@192.168.0.79:/tmp/kds-migration-upload.rar
+            </code>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={serverPath} onChange={e => setServerPath(e.target.value)} placeholder="/tmp/kds-migration-upload.rar"
+                style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: 7, border: '0.5px solid var(--border)', background: 'var(--surface-card)', color: 'var(--text-primary)', fontFamily: 'monospace' }} />
+              <button onClick={handleServerPath} disabled={serverPathLoading} className="btn-secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                {serverPathLoading ? 'Liest…' : 'Vom Server lesen'}
+              </button>
+            </div>
           </div>
           {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--red-bg)', borderRadius: 8, fontSize: 12, color: 'var(--red)' }}>{error}</div>}
         </div>

@@ -7,7 +7,68 @@ import { execSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
 
-export const maxDuration = 120
+// ─── Server-Pfad-Endpoint ─────────────────────────────────────────────────────
+// GET /api/admin/migration/parse?serverPath=/tmp/kds-migration-upload.rar
+// Liest die Datei direkt vom Server-Dateisystem — umgeht Next.js Upload-Limits.
+// Empfohlen für große Dateien (>4 MB).
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user as any).role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Nur Admins dürfen Migrationen durchführen.' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const serverPath = searchParams.get('serverPath')
+
+  // Erlaubte Pfade (Security: nur /tmp/ und /var/kds-migration/)
+  const ALLOWED_DIRS = ['/tmp/', '/var/kds-migration/']
+  if (!serverPath || !ALLOWED_DIRS.some(d => serverPath.startsWith(d))) {
+    return NextResponse.json({ error: 'Nur Pfade unter /tmp/ oder /var/kds-migration/ erlaubt.' }, { status: 400 })
+  }
+
+  if (!fs.existsSync(serverPath)) {
+    return NextResponse.json({ error: `Datei nicht gefunden: ${serverPath}` }, { status: 404 })
+  }
+
+  let tmpDir: string | null = null
+  try {
+    const buffer = fs.readFileSync(serverPath)
+    const hash = await sha256(buffer)
+    const existingRun = await prisma.migrationRun.findUnique({ where: { sourceHash: hash } })
+
+    tmpDir = `/tmp/kds-migration-${Date.now()}`
+    fs.mkdirSync(tmpDir, { recursive: true })
+
+    const isRar = buffer[0] === 0x52 && buffer[1] === 0x61 && buffer[2] === 0x72
+    const ext = isRar ? 'rar' : 'zip'
+    const archivePath = path.join(tmpDir, `export.${ext}`)
+    fs.writeFileSync(archivePath, buffer)
+
+    if (ext === 'rar') {
+      execSync(`unrar x -y "${archivePath}" "${tmpDir}/" 2>&1`, { timeout: 60000 })
+    } else {
+      execSync(`unzip -o "${archivePath}" -d "${tmpDir}/" 2>&1`, { timeout: 60000 })
+    }
+
+    const entries = fs.readdirSync(tmpDir).filter(e => e !== `export.${ext}`)
+    const exportSubDir = entries.find(e => fs.statSync(path.join(tmpDir!, e)).isDirectory())
+    const exportDir = exportSubDir ? path.join(tmpDir, exportSubDir) : tmpDir
+
+    const preview = parseTherapsyExport(exportDir)
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    tmpDir = null
+
+    return NextResponse.json({
+      ...preview,
+      sourceHash: hash,
+      alreadyImported: !!existingRun,
+      previousImport: existingRun ? { ranAt: existingRun.ranAt, stats: JSON.parse(existingRun.stats) } : null,
+    })
+  } catch (err: any) {
+    if (tmpDir) try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+    return NextResponse.json({ error: err?.message ?? 'Fehler beim Parsen.' }, { status: 500 })
+  }
+}
 
 // POST /api/admin/migration/parse
 // Accepts multipart/form-data with field "file" (RAR or ZIP)
