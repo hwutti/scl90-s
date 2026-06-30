@@ -96,6 +96,20 @@ sudo -u postgres psql kds_db -c "UPDATE \"InvoiceTemplate\" SET \"htmlContent\" 
 sudo -u postgres psql kds_db -c "DELETE FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL AND id NOT IN (SELECT DISTINCT ON (\"transactionId\") id FROM \"InvoiceDocument\" WHERE \"deletedAt\" IS NULL ORDER BY \"transactionId\", \"createdAt\" DESC);" 2>/dev/null || true
 sudo -u postgres psql kds_db -c "UPDATE \"TherapySession\" SET name = REGEXP_REPLACE(name, '^Session-0*([0-9]+)', \'Sitzung-\\1\') WHERE name ~ '^Session-[0-9]+';" 2>/dev/null || true
 
+# ─── 5b. Backup-Verzeichnis ────────────────────────────────────────────────────
+# Idempotent (sicher bei jedem Update erneut auszuführen). Notwendig, weil der
+# Cron-Job als postgres läuft, der manuelle "Backup erstellen"-Button in der
+# Web-UI aber als $APP_USER - ohne gemeinsame Gruppe: EACCES beim manuellen Backup.
+step "Backup-Verzeichnis: Berechtigungen sicherstellen"
+BACKUP_DIR="/var/backups/kds"
+mkdir -p "$BACKUP_DIR"
+groupadd -f kds-backup
+usermod -aG kds-backup "$APP_USER"
+usermod -aG kds-backup postgres
+chgrp kds-backup "$BACKUP_DIR"
+chmod 2775 "$BACKUP_DIR"
+success "Backup-Verzeichnis OK (Gruppe kds-backup, Setgid)"
+
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
 step "Seed: Basisdaten prüfen"
 
