@@ -1,9 +1,18 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronRight, FileText, Printer, Loader, AlertCircle, Eye } from 'lucide-react'
+import { ArrowLeft, ChevronRight, FileText, Printer, Loader, AlertCircle, Eye, History, Trash2, Lock } from 'lucide-react'
 
 type ReportType = 'therapiebericht' | 'arztbrief' | 'verlaufsbericht'
+
+interface ArchivedReport {
+  id: string
+  reportType: string
+  reportTypeLabel: string
+  createdByName: string
+  anonymized: boolean
+  createdAt: string
+}
 
 const REPORT_TYPES: { key: ReportType; label: string; desc: string; icon: string }[] = [
   {
@@ -62,6 +71,28 @@ export function BerichtClient({
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
+
+  const [archive, setArchive] = useState<ArchivedReport[]>([])
+  const [archiveLoading, setArchiveLoading] = useState(true)
+
+  async function loadArchive() {
+    setArchiveLoading(true)
+    try {
+      const res = await fetch(`/api/patients/${patient.id}/bericht/archiv`)
+      if (res.ok) setArchive(await res.json())
+    } catch { /* ignore */ }
+    setArchiveLoading(false)
+  }
+
+  useEffect(() => { loadArchive() }, [])
+
+  async function deleteArchived(docId: string) {
+    if (!confirm('Diesen archivierten Bericht wirklich löschen? Das kann nicht rückgängig gemacht werden.')) return
+    try {
+      await fetch(`/api/patients/${patient.id}/bericht/archiv/${docId}`, { method: 'DELETE' })
+      setArchive(a => a.filter(d => d.id !== docId))
+    } catch { /* ignore */ }
+  }
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -129,6 +160,7 @@ export function BerichtClient({
       if (openPrint) {
         const w = window.open('', '_blank')
         if (w) { w.document.write(html); w.document.close() }
+        loadArchive()
       } else {
         setPreviewHtml(html)
         setShowPreview(true)
@@ -198,6 +230,59 @@ export function BerichtClient({
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Bisherige Berichte (unveränderliches Archiv) */}
+            <div>
+              <div {...SEC}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <History style={{ width: 13, height: 13 }} /> Bisherige Berichte
+                </span>
+              </div>
+              {archiveLoading ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 2px' }}>Lade…</div>
+              ) : archive.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 2px' }}>
+                  Noch keine Berichte ausgestellt. Beim Klick auf "Drucken / PDF" wird ein unveränderliches Exemplar archiviert.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {archive.map(doc => (
+                    <div key={doc.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                      background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)',
+                    }}>
+                      <Lock style={{ width: 13, height: 13, color: 'var(--text-muted)', flexShrink: 0 }} title="Unveränderlich archiviert" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {doc.reportTypeLabel}
+                          {doc.anonymized && (
+                            <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--amber)', background: 'var(--amber-bg)', padding: '1px 6px', borderRadius: 4 }}>
+                              anonymisiert
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {new Date(doc.createdAt).toLocaleDateString('de-AT', { dateStyle: 'medium' })} · {new Date(doc.createdAt).toLocaleTimeString('de-AT', { timeStyle: 'short' })} · {doc.createdByName}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => window.open(`/api/patients/${patient.id}/bericht/archiv/${doc.id}`, '_blank')}
+                        className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11.5, flexShrink: 0 }}
+                      >
+                        Öffnen
+                      </button>
+                      <button
+                        onClick={() => deleteArchived(doc.id)}
+                        className="btn-ghost" style={{ padding: 5, color: 'var(--red)', flexShrink: 0 }}
+                        title="Aus Archiv löschen"
+                      >
+                        <Trash2 style={{ width: 13, height: 13 }} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Empfänger (nur bei Arztbrief / Therapiebericht) */}
