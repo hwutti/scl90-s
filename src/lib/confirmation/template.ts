@@ -28,6 +28,15 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
     .no-print { display: none !important; }
   }
 
+  .bg-layer-wrapper {
+    position: relative;
+    margin: 0 -20mm;
+  }
+  .page-content {
+    position: relative;
+    z-index: 1;
+    padding: 0 20mm;
+  }
   {{#if bg_image_base64}}
   .bg-layer {
     position: absolute;
@@ -38,8 +47,6 @@ export const DEFAULT_CONFIRMATION_HTML = `<!DOCTYPE html>
     opacity: {{bg_image_opacity}};
     {{#if bg_is_watermark}}z-index: 100; pointer-events: none;{{else}}z-index: 0;{{/if}}
   }
-  .bg-layer-wrapper { position: relative; }
-  .page-content { position: relative; z-index: 1; }
   {{/if}}
 
   .letterhead {

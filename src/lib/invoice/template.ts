@@ -63,7 +63,17 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   .footer { border-top: 0.5px solid #e5e7eb; padding-top: 5mm; display: flex; justify-content: space-between; font-size: 8.5pt; color: #888; }
   .footer a { color: {{primary_color}}; text-decoration: none; }
 
-  /* Hintergrundbild — nur im Inhaltsbereich zwischen Header und Footer */
+  /* Hintergrundbild — bleedet wie Header/Footer-Bilder bis zum Seitenrand,
+     der eigentliche Inhalt bekommt sein eigenes Padding zurück */
+  .bg-layer-wrapper {
+    position: relative;
+    margin: 0 -20mm;
+  }
+  .page-content {
+    position: relative;
+    z-index: 1;
+    padding: 0 20mm;
+  }
   {{#if bg_image_base64}}
   .bg-layer {
     position: absolute;
@@ -77,10 +87,6 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   .page {
     position: relative;
   }
-  .page-content {
-    position: relative;
-    z-index: 1;
-  }
   {{/if}}
 </style>
 </head>
@@ -92,7 +98,7 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div>
   {{/if}}
 
-  <div class="bg-layer-wrapper" style="position:relative;">
+  <div class="bg-layer-wrapper">
   {{#if bg_image_base64}}<div class="bg-layer"></div>{{/if}}
   <div class="page-content" style="{{#if header_image_base64}}padding-top:8mm;{{/if}}{{#if footer_image_base64}}padding-bottom:8mm;{{/if}}">
 
