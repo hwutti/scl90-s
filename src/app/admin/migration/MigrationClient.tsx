@@ -81,7 +81,8 @@ export function MigrationClient() {
     try {
       const form = new FormData(); form.append('file', file)
       const res = await fetch('/api/admin/migration/parse', { method: 'POST', body: form })
-      const data = await res.json()
+      let data: any
+      try { data = await res.json() } catch { setError('Server-Fehler: Antwort war kein gültiges JSON. Möglicherweise ist die Datei zu groß (max. 50 MB) oder der Server hat einen internen Fehler.'); return }
       if (!res.ok) { setError(data.error ?? 'Fehler beim Verarbeiten.'); return }
       setPreview(data)
       setSelectedAreas(new Set(data.areas.filter((a: MigrationArea) => a.canImport).map((a: MigrationArea) => a.id)))
@@ -101,7 +102,8 @@ export function MigrationClient() {
           patients: getItems('profiles'), sessions: getItems('sessions'),
           invoices: getItems('rechnungen_einnahmen'), bmdRows: getItems('finanzexport') }),
       })
-      const data = await res.json()
+      let data: any
+      try { data = await res.json() } catch { setError('Server-Fehler beim Import.'); setStep('preview'); return }
       if (!res.ok) { setError(data.error ?? 'Fehler.'); setStep('preview'); return }
       setResult(data.result); setStep('done')
     } catch (e: any) { setError(e.message ?? 'Netzwerkfehler'); setStep('preview') }
