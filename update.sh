@@ -26,6 +26,19 @@ step "Git: Änderungen holen"
 sudo -u "$APP_USER" git -C "$APP_DIR" config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard origin/main || fail "git reset fehlgeschlagen"
 sudo -u "$APP_USER" git -C "$APP_DIR" pull origin main || fail "git pull fehlgeschlagen"
+
+# Selbst-Überschreibungs-Schutz: das Script holt sich oben gerade per git pull
+# selbst neu. Bash liest die Datei aber zeilenweise von der Platte - wenn sich
+# die Byte-Offsets durch den Pull verschieben, liest der laufende Prozess ab
+# hier u.U. wirren/falschen Inhalt der NEUEN Datei statt des erwarteten Rests
+# vom ALTEN Stand. Deshalb: einmalig sauber neu starten (exec ersetzt den
+# Prozess, KDS_UPDATED verhindert eine Endlosschleife). Gleiches Muster wie bei
+# fw-update (FF Görtschach).
+if [[ -z "${KDS_UPDATED:-}" ]]; then
+  export KDS_UPDATED=1
+  exec bash "$APP_DIR/update.sh" "$@"
+fi
+
 COMMIT=$(sudo -u "$APP_USER" git -C "$APP_DIR" log --oneline -1)
 success "Commit: $COMMIT"
 
