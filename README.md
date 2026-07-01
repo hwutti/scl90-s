@@ -31,11 +31,12 @@ curl -fsSL https://raw.githubusercontent.com/hwutti/scl90-s/main/install.sh | su
 
 ## Standardzugangsdaten
 
-| Feld | Wert |
-|------|------|
-| URL | http://SERVER-IP oder https://DOMAIN |
-| Admin-E-Mail | `admin@scl90s.local` |
-| Admin-Passwort | `Admin1234!` |
+| Rolle | E-Mail | Passwort |
+|-------|--------|----------|
+| Admin | `admin@kds.local` | `Admin1234!` |
+| Therapeut (Demo) | `therapeut@kds.local` | `Therapeut1234!` |
+
+URL: `http://SERVER-IP` oder `https://DOMAIN`
 
 **Passwort nach erstem Login ändern!**
 
@@ -94,6 +95,21 @@ ALTER ROLE kds_user SUPERUSER;
 SQL
 ```
 
+## TheraPsy-Migration: Datei-Upload per scp
+
+Der Service läuft als Betriebssystem-User `kds`, nicht als der Login-User (z.B. `hwutti`).
+Wird eine Export-Datei per `scp` als Login-User hochgeladen, gehört sie diesem User —
+`kds` kann sie ohne Rechte-Anpassung nicht lesen:
+
+```bash
+scp export.rar dein-user@server:/tmp/kds-migration-upload.rar
+sudo chown kds:kds /tmp/kds-migration-upload.rar
+sudo chmod 644 /tmp/kds-migration-upload.rar
+```
+
+Erst danach in der Anwendung unter Administration → TheraPsy-Migration →
+Server-Pfad `/tmp/kds-migration-upload.rar` eingeben.
+
 ## Tech-Stack
 
 - **Next.js 14** (App Router)
@@ -105,7 +121,7 @@ SQL
 ## Seed-Daten
 
 Der Seed enthält ausschließlich anonyme Demo-Daten:
-- Admin-User: `admin@scl90s.local`
+- Admin-User: `admin@kds.local`
 - Demo-Therapeut: `therapeut@kds.local`
 - Demo-Patient: `Demo Patient` (kein realer Name)
 
