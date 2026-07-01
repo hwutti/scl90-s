@@ -158,7 +158,7 @@ function PatientIcon({
   size?: number
 }) {
   const age    = calcAge(dob)
-  const isKind = age < 18
+  const isKind = age !== null && age < 18
   const color  = categoryType === 'PAIR'   ? '#10b981'
                : categoryType === 'FAMILY' ? '#f97316'
                : categoryType === 'GROUP'  ? '#6366f1'
@@ -192,8 +192,9 @@ function PatientIcon({
   )
 }
 
-function calcAge(dob: string) {
+function calcAge(dob: string): number | null {
   const d = new Date(dob + 'T00:00:00')
+  if (isNaN(d.getTime())) return null
   let age = new Date().getFullYear() - d.getFullYear()
   const m = new Date().getMonth() - d.getMonth()
   if (m < 0 || (m === 0 && new Date().getDate() < d.getDate())) age--
@@ -374,7 +375,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                         {p.lastName}, {p.firstName}
                       </p>
                       <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                        {age} J.
+                        {age !== null ? `${age} J.` : '—'}
                         {(p as any).codeName && (
                           <span className="ml-2 font-mono opacity-60">{(p as any).codeName}</span>
                         )}
