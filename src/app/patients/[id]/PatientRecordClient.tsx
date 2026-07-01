@@ -76,7 +76,9 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
   const [photoSrc, setPhotoSrc] = useState<string|null>(null)
   const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>({
     MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
-    PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+    PAIR: 'kds-pair-default-a,kds-pair-default-b',
+    FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
+    GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
   })
   useEffect(() => {
     fetch('/api/settings/avatars').then(r => r.json()).then(d => {
@@ -430,9 +432,12 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                   ? (patient as any).categoryType
                   : (patient.gender === 'MALE' || patient.gender === 'FEMALE' ? patient.gender : 'DIVERSE')
                 const seed = avatarSeeds[group] ?? `kds-${group.toLowerCase()}-default`
+                const src = seed.includes(',')
+                  ? `/api/avatar?seeds=${encodeURIComponent(seed)}`
+                  : `/api/avatar?seed=${encodeURIComponent(seed)}`
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <img src={`/api/avatar?seed=${encodeURIComponent(seed)}`} alt="" width={68} height={68}
+                    <img src={src} alt="" width={68} height={68}
                       style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)' }} />
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
                       {pillText}
