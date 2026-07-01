@@ -495,6 +495,7 @@ export async function cancelTransaction(params: {
     const cancellation = await tx.transaction.create({
       data: {
         patientId: original.patientId,
+        cooperationPartnerId: (original as any).cooperationPartnerId,
         createdByUserId: params.cancelledByUserId,
         direction: original.direction,
         sourceType: 'CANCELLATION',

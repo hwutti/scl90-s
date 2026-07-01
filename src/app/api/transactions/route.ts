@@ -11,10 +11,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const year = searchParams.get('year')
   const patientId = searchParams.get('patientId')
+  const cooperationPartnerId = searchParams.get('cooperationPartnerId')
   const direction = searchParams.get('direction')
 
   const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
   if (patientId) where.patientId = patientId
+  if (cooperationPartnerId) where.cooperationPartnerId = cooperationPartnerId
   if (direction) where.direction = direction
   if (year) {
     where.transactionDate = {

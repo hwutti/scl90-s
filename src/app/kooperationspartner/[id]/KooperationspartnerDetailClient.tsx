@@ -1,8 +1,18 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Handshake, Save, Pencil, X, FileText } from 'lucide-react'
+import { ArrowLeft, Handshake, Save, Pencil, X, FileText, Check, RotateCcw, Ban, Euro } from 'lucide-react'
+
+function fmtEUR(n: any) {
+  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(parseFloat(n ?? 0))
+}
+function fmtDate(d: string | Date) {
+  return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(d))
+}
+const PAYMENT_METHODS: Record<string, string> = {
+  UNBAR_BANK_TRANSFER: 'Überweisung', CASH: 'Bar', CARD_BANKOMAT: 'Karte / Bankomat',
+}
 
 interface Partner {
   id: string
@@ -55,6 +65,56 @@ export function KooperationspartnerDetailClient({
     setSaving(false)
     setEditing(false)
     router.refresh()
+  }
+
+  // ── Rechnungen dieses Partners ──
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [txLoading, setTxLoading] = useState(true)
+  const [undoCountdown, setUndoCountdown] = useState<Record<string, number>>({})
+
+  async function loadTransactions() {
+    setTxLoading(true)
+    const data = await fetch(`/api/transactions?cooperationPartnerId=${partner.id}`).then(r => r.json())
+    setTransactions(Array.isArray(data) ? data : [])
+    setTxLoading(false)
+  }
+  useEffect(() => { loadTransactions() }, [])
+
+  useEffect(() => {
+    const next: Record<string, number> = {}
+    for (const tx of transactions) {
+      if (tx.paymentStatus === 'PAID' && tx.paymentUndoDeadline) {
+        const secs = Math.floor((new Date(tx.paymentUndoDeadline).getTime() - Date.now()) / 1000)
+        if (secs > 0) next[tx.id] = secs
+      }
+    }
+    setUndoCountdown(next)
+    if (Object.keys(next).length === 0) return
+    const interval = setInterval(() => {
+      setUndoCountdown(prev => {
+        const upd: Record<string, number> = {}
+        for (const [id, s] of Object.entries(prev)) if (s > 1) upd[id] = s - 1
+        return upd
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [transactions])
+
+  async function markPaid(txId: string) {
+    await fetch(`/api/transactions/${txId}/mark-paid`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentMethod: 'UNBAR_BANK_TRANSFER' }),
+    })
+    loadTransactions()
+  }
+  async function undoPayment(txId: string) {
+    await fetch(`/api/transactions/${txId}/undo-payment`, { method: 'POST' })
+    loadTransactions()
+  }
+  async function cancelTx(txId: string) {
+    if (!confirm('Diese Rechnung wirklich stornieren?')) return
+    await fetch(`/api/transactions/${txId}/cancel`, { method: 'POST' })
+    loadTransactions()
   }
 
   return (
@@ -163,6 +223,75 @@ export function KooperationspartnerDetailClient({
               <label className="label">Notizen</label>
               <textarea className="input" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── RECHNUNGEN ── */}
+      <div style={{ marginTop: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 10px' }}>
+          Rechnungen {transactions.length > 0 && `(${transactions.length})`}
+        </h3>
+        {txLoading ? (
+          <div className="empty-state"><div className="spinner" style={{ width: 24, height: 24 }} /></div>
+        ) : transactions.length === 0 ? (
+          <div className="card" style={{ padding: 24 }}>
+            <div className="empty-state">
+              <Euro className="empty-state-icon" style={{ width: 36, height: 36 }} />
+              <p className="empty-state-text">Noch keine Rechnungen.</p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {transactions.map((tx: any) => (
+              <div key={tx.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+                        {tx.referenceNumber}
+                      </span>
+                      <span className={tx.paymentStatus === 'PAID' ? 'badge badge-green' : 'badge badge-amber'}>
+                        {tx.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen'}
+                      </span>
+                      {tx.lifecycleStatus === 'CANCELLED_ORIGINAL' && <span className="badge badge-red">Storniert</span>}
+                      {tx.lifecycleStatus === 'CANCELLATION_TX' && <span className="badge badge-gray">Storno</span>}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <span>{fmtDate(tx.transactionDate)}</span>
+                      <span style={{ fontWeight: 600 }}>{fmtEUR(tx.amountGross)}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{tx.lineItems?.length ?? 0} Position{tx.lineItems?.length !== 1 ? 'en' : ''}</span>
+                      {tx.paymentMethod && <span style={{ color: 'var(--text-muted)' }}>{PAYMENT_METHODS[tx.paymentMethod]}</span>}
+                    </div>
+                    {undoCountdown[tx.id] > 0 && (
+                      <div style={{ marginTop: 6, padding: '4px 10px', background: 'var(--amber-bg)', borderRadius: 6, fontSize: 12, color: 'var(--amber)' }}>
+                        Zahlung rückgängig möglich noch {undoCountdown[tx.id]}s
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                    {tx.paymentStatus === 'UNPAID' && tx.lifecycleStatus === 'ACTIVE' && (
+                      <button onClick={() => markPaid(tx.id)} className="btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }}>
+                        <Check style={{ width: 12, height: 12 }} /> Bezahlt
+                      </button>
+                    )}
+                    {undoCountdown[tx.id] > 0 && (
+                      <button onClick={() => undoPayment(tx.id)} className="btn-danger" style={{ fontSize: 12, padding: '4px 10px' }}>
+                        <RotateCcw style={{ width: 12, height: 12 }} /> Rückgängig
+                      </button>
+                    )}
+                    <button onClick={() => window.open(`/api/transactions/${tx.id}/invoice`, '_blank')} className="btn-secondary" style={{ fontSize: 12, padding: '4px 8px' }} title="Rechnung anzeigen / drucken">
+                      <FileText style={{ width: 13, height: 13 }} />
+                    </button>
+                    {tx.lifecycleStatus === 'ACTIVE' && (
+                      <button onClick={() => cancelTx(tx.id)} className="btn-danger" style={{ fontSize: 12, padding: '4px 8px' }} title="Stornieren">
+                        <Ban style={{ width: 13, height: 13 }} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
