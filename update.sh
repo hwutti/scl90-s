@@ -8,6 +8,7 @@ set -u
 APP_DIR="/opt/kds"
 APP_USER="kds"
 SERVICE="kds"
+APP_PORT="3000"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 step()    { echo -e "\n${GREEN}▶ $1${NC}"; }
@@ -140,19 +141,22 @@ success "Backup-Verzeichnis OK (Gruppe kds-backup, Setgid)"
 # u.U. nicht und lehnen den Request am Proxy mit 413 ab, bevor er überhaupt bei
 # Next.js ankommt (kein Log in journalctl -u kds). Idempotent nachrüsten.
 step "Nginx: client_max_body_size prüfen"
-NGINX_KDS_CONF="/etc/nginx/sites-available/kds"
-if [[ -f "$NGINX_KDS_CONF" ]] && ! grep -q "client_max_body_size" "$NGINX_KDS_CONF"; then
+# Dateiname ist NICHT garantiert "kds" (auf diesem Server z.B. "scl90s" — vermutlich
+# durch manuelles Setup/Rename entstanden). Daher über den tatsächlichen Proxy-Port
+# suchen statt einen festen Dateinamen anzunehmen.
+NGINX_KDS_CONF=$(grep -rl "proxy_pass http://127.0.0.1:${APP_PORT:-3000}" /etc/nginx/sites-available/ 2>/dev/null | head -1 || true)
+if [[ -n "$NGINX_KDS_CONF" ]] && ! grep -q "client_max_body_size" "$NGINX_KDS_CONF"; then
   sed -i '/proxy_cache_bypass \$http_upgrade;/a\        client_max_body_size 50M;' "$NGINX_KDS_CONF"
   if nginx -t 2>/dev/null; then
     systemctl reload nginx
-    success "client_max_body_size 50M ergänzt, nginx neu geladen"
+    success "client_max_body_size 50M ergänzt in $NGINX_KDS_CONF, nginx neu geladen"
   else
     warn "nginx-Konfig nach Ergänzung ungültig — bitte manuell prüfen: $NGINX_KDS_CONF"
   fi
-elif [[ -f "$NGINX_KDS_CONF" ]]; then
-  success "client_max_body_size bereits gesetzt"
+elif [[ -n "$NGINX_KDS_CONF" ]]; then
+  success "client_max_body_size bereits gesetzt ($NGINX_KDS_CONF)"
 else
-  warn "Nginx-Konfig $NGINX_KDS_CONF nicht gefunden — übersprungen"
+  warn "Keine nginx-Konfig mit proxy_pass auf Port ${APP_PORT:-3000} gefunden — client_max_body_size übersprungen, bitte manuell prüfen"
 fi
 
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
