@@ -355,15 +355,16 @@ export function renderInvoice(template: string, data: InvoiceData): string {
   return html
 }
 
-export async function getDefaultTemplate(templateId?: string | null): Promise<{ html: string; guiFields?: any }> {
+export async function getDefaultTemplate(templateId?: string | null, usePartnerTemplates?: boolean): Promise<{ html: string; guiFields?: any }> {
   try {
+    const model: any = usePartnerTemplates ? prisma.cooperationPartnerInvoiceTemplate : prisma.invoiceTemplate
     let template = templateId
-      ? await prisma.invoiceTemplate.findFirst({ where: { id: templateId, isActive: true } })
-        ?? await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
-      : await prisma.invoiceTemplate.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
+      ? await model.findFirst({ where: { id: templateId, isActive: true } })
+        ?? await model.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
+      : await model.findFirst({ where: { isDefault: true, isActive: true }, orderBy: { createdAt: 'desc' } })
     // Fallback: irgendeine aktive Vorlage nehmen wenn keine als Default gesetzt
     if (!template) {
-      template = await prisma.invoiceTemplate.findFirst({
+      template = await model.findFirst({
         where: { isActive: true },
         orderBy: { createdAt: 'asc' }
       })
@@ -414,6 +415,7 @@ export async function getDefaultTemplate(templateId?: string | null): Promise<{ 
 // dem Erstellen, noch nichts gespeichert) gemeinsam genutzt.
 interface InvoiceCoreInput {
   templateId: string | null
+  usePartnerTemplates?: boolean
   referenceNumber: string
   transactionDate: Date
   payerName: string
@@ -439,7 +441,7 @@ async function renderInvoiceCore(input: InvoiceCoreInput): Promise<string> {
   const { getBranding } = await import('@/lib/branding')
 
   const branding = await getBranding()
-  let { html: templateHtml, guiFields } = await getDefaultTemplate(input.templateId)
+  let { html: templateHtml, guiFields } = await getDefaultTemplate(input.templateId, input.usePartnerTemplates)
   if (!templateHtml || templateHtml.includes('badge-unpaid') || templateHtml.includes('badge-paid')) {
     templateHtml = DEFAULT_INVOICE_HTML
   }
@@ -528,12 +530,18 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
     include: {
       lineItems: { orderBy: { sortOrder: 'asc' } },
       patient: { select: { firstName: true, lastName: true, defaultInvoiceTemplateId: true } },
+      cooperationPartner: { select: { defaultInvoiceTemplateId: true } },
     },
   })
   if (!tx) throw new Error('Transaktion nicht gefunden')
 
+  const isPartner = !!(tx as any).cooperationPartnerId
+
   return renderInvoiceCore({
-    templateId: (tx as any).invoiceTemplateId ?? (tx.patient as any)?.defaultInvoiceTemplateId ?? null,
+    templateId: (tx as any).invoiceTemplateId
+      ?? (isPartner ? (tx as any).cooperationPartner?.defaultInvoiceTemplateId : (tx.patient as any)?.defaultInvoiceTemplateId)
+      ?? null,
+    usePartnerTemplates: isPartner,
     referenceNumber: tx.referenceNumber,
     transactionDate: tx.transactionDate,
     payerName: tx.payerName,
@@ -562,6 +570,7 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
 // tatsächlichen Erstellen reserviert wird (reserveReferenceNumber).
 export async function renderDraftInvoiceHtml(input: {
   templateId: string | null
+  usePartnerTemplates?: boolean
   payerName: string
   payerAddress?: string
   vatRate: number
@@ -581,6 +590,7 @@ export async function renderDraftInvoiceHtml(input: {
 
   return renderInvoiceCore({
     templateId: input.templateId,
+    usePartnerTemplates: input.usePartnerTemplates,
     referenceNumber: 'VORSCHAU',
     transactionDate: new Date(),
     payerName: input.payerName || 'Patient',

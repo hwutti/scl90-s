@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Handshake, Save, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Handshake, Save, Pencil, X, FileText } from 'lucide-react'
 
 interface Partner {
   id: string
@@ -83,9 +83,14 @@ export function KooperationspartnerDetailClient({
 
           {role === 'ADMIN' && (
             !editing ? (
-              <button onClick={() => setEditing(true)} className="btn-secondary" style={{ fontSize: 12 }}>
-                <Pencil style={{ width: 12, height: 12 }} /> Bearbeiten
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Link href={`/kooperationspartner/${partner.id}/rechnung/neu`} className="btn-primary" style={{ fontSize: 12 }}>
+                  <FileText style={{ width: 12, height: 12 }} /> Rechnung erstellen
+                </Link>
+                <button onClick={() => setEditing(true)} className="btn-secondary" style={{ fontSize: 12 }}>
+                  <Pencil style={{ width: 12, height: 12 }} /> Bearbeiten
+                </button>
+              </div>
             ) : (
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => setEditing(false)} className="btn-ghost" style={{ padding: 6 }}><X style={{ width: 14, height: 14 }} /></button>

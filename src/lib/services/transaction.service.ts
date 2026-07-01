@@ -253,6 +253,170 @@ export async function createTransactionFromSessions(params: {
   })
 }
 
+// ─── Transaktion für Kooperationspartner erstellen (frei editierbare Positionen) ──
+// Anders als createTransactionFromSessions: die Positionen werden NICHT starr aus
+// Sitzungspreisen abgeleitet, sondern kommen fertig editiert vom Aufrufer (siehe
+// KooperationspartnerRechnungClient.tsx). Jede Position kann optional eine
+// sessionId tragen (Sitzung wird dadurch korrekt als "verrechnet" markiert),
+// muss es aber nicht -- frei hinzugefügte Positionen ohne Sitzungsbezug fließen
+// nur in die Rechnungssumme ein, nicht in irgendeine Sitzungs-Abrechnungsstatistik.
+export async function createPartnerTransaction(params: {
+  cooperationPartnerId: string
+  payerName: string
+  payerAddress?: string
+  payeeName: string
+  payeeAddress?: string
+  vatRate?: number
+  markAsPaid?: boolean
+  paymentMethod?: string
+  notes?: string
+  createdByUserId: string
+  generateInvoiceDoc?: boolean
+  anonymizeInvoice?: boolean
+  invoiceTemplateId?: string | null
+  lineItems: {
+    description: string
+    quantity: number
+    unitPriceNet: number
+    vatRate?: number
+    sessionId?: string | null
+    lineDate?: string | null
+  }[]
+}): Promise<{ transactionId: string; referenceNumber: string; invoiceHtml?: string }> {
+
+  if (!params.lineItems || params.lineItems.length === 0) {
+    throw new Error('Mindestens eine Rechnungsposition erforderlich')
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Sitzungen, die über eine sessionId referenziert werden, validieren --
+    //    müssen zu einem Patienten DIESES Partners gehören und dürfen noch nicht
+    //    voll bezahlt sein (gleiche Regeln wie bei der normalen Patienten-Rechnung).
+    const sessionIds = [...new Set(params.lineItems.map(l => l.sessionId).filter(Boolean))] as string[]
+    if (sessionIds.length > 0) {
+      const sessions = await tx.therapySession.findMany({
+        where: { id: { in: sessionIds } },
+        include: { patient: { select: { cooperationPartnerId: true } } },
+      })
+      if (sessions.length !== sessionIds.length)
+        throw new Error('Nicht alle referenzierten Sitzungen gefunden')
+      for (const s of sessions) {
+        if ((s.patient as any)?.cooperationPartnerId !== params.cooperationPartnerId)
+          throw new Error(`Sitzung ${s.id} gehört nicht zu einem Patienten dieses Kooperationspartners`)
+        if (s.excludedFromFinances)
+          throw new Error(`Sitzung ${s.id} ist von Finanzen ausgeschlossen`)
+        if (s.billingStatus === 'PAID')
+          throw new Error(`Sitzung ${s.id} ist bereits vollständig verrechnet`)
+      }
+    }
+
+    // 2. Beträge berechnen (jede Zeile mit eigenem vatRate, Standard = Transaktions-vatRate)
+    const defaultVatRate = params.vatRate ?? 0
+    const computedLines = params.lineItems.map(l => {
+      const amountNet = l.quantity * l.unitPriceNet
+      const lineVatRate = l.vatRate ?? defaultVatRate
+      const vatAmount = amountNet * lineVatRate
+      return { ...l, amountNet, vatRate: lineVatRate, vatAmount, amountGross: amountNet + vatAmount }
+    })
+    const amountNet = computedLines.reduce((s, l) => s + l.amountNet, 0)
+    const vatAmount = computedLines.reduce((s, l) => s + l.vatAmount, 0)
+    const amountGross = amountNet + vatAmount
+
+    // 3. Referenznummer reservieren
+    const referenceNumber = await reserveReferenceNumber({ direction: 'INCOME' })
+    const now = new Date()
+
+    // 4. Transaktion erstellen (patientId bewusst leer -- kann mehrere Patienten umfassen)
+    const transaction = await tx.transaction.create({
+      data: {
+        cooperationPartnerId: params.cooperationPartnerId,
+        createdByUserId: params.createdByUserId,
+        direction: 'INCOME',
+        sourceType: sessionIds.length > 0 ? 'SESSION' : 'MANUAL',
+        referenceNumber,
+        transactionDate: now,
+        payerName: params.payerName,
+        payerAddress: params.payerAddress,
+        payeeName: params.payeeName,
+        payeeAddress: params.payeeAddress,
+        amountNet,
+        vatRate: defaultVatRate,
+        vatAmount,
+        amountGross,
+        paymentStatus: params.markAsPaid ? 'PAID' : 'UNPAID',
+        paidAt: params.markAsPaid ? now : null,
+        paymentMethod: params.markAsPaid ? (params.paymentMethod as any ?? 'UNBAR_BANK_TRANSFER') : null,
+        paymentUndoDeadline: params.markAsPaid ? new Date(now.getTime() + 5 * 60 * 1000) : null,
+        lifecycleStatus: 'ACTIVE',
+        notes: params.notes,
+        invoiceTemplateId: params.invoiceTemplateId || null,
+      },
+    })
+
+    // 5. LineItems + Allocations (nur für Zeilen mit sessionId)
+    for (let i = 0; i < computedLines.length; i++) {
+      const l = computedLines[i]
+      const lineItem = await tx.txLineItem.create({
+        data: {
+          transactionId: transaction.id,
+          sessionId: l.sessionId || null,
+          description: l.description,
+          quantity: l.quantity,
+          unitPriceNet: l.unitPriceNet,
+          amountNet: l.amountNet,
+          vatRate: l.vatRate,
+          vatAmount: l.vatAmount,
+          amountGross: l.amountGross,
+          lineDate: l.lineDate ? new Date(l.lineDate) : null,
+          sortOrder: i,
+        },
+      })
+
+      if (l.sessionId) {
+        await tx.txSessionAllocation.create({
+          data: {
+            transactionId: transaction.id,
+            lineItemId: lineItem.id,
+            sessionId: l.sessionId,
+            allocationPercentage: 1.0,
+            allocatedAmountNet: l.amountNet,
+            allocatedVatAmount: l.vatAmount,
+            allocatedAmountGross: l.amountGross,
+            isActive: true,
+          },
+        })
+      }
+    }
+
+    return { transactionId: transaction.id, referenceNumber, sessionIds }
+  }).then(async (result) => {
+    for (const id of result.sessionIds) {
+      await recalcSessionBillingStatus(id)
+    }
+
+    let invoiceHtml: string | undefined
+    if (params.generateInvoiceDoc !== false) {
+      try {
+        invoiceHtml = await renderInvoiceHtmlForTransaction(result.transactionId)
+        await prisma.invoiceDocument.create({
+          data: {
+            transactionId: result.transactionId,
+            documentType: 'INVOICE_PDF',
+            format: 'html',
+            anonymized: params.anonymizeInvoice ?? false,
+            data: Buffer.from(invoiceHtml, 'utf8'),
+            mimeType: 'text/html',
+          },
+        })
+      } catch (e) {
+        console.error('[invoice] Sofort-Generierung fehlgeschlagen (Partner):', e)
+      }
+    }
+
+    return { transactionId: result.transactionId, referenceNumber: result.referenceNumber, invoiceHtml }
+  })
+}
+
 // ─── Zahlung markieren ───────────────────────────────────────────────────────
 
 export async function markTransactionPaid(params: {
