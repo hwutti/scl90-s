@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, UserPlus, AlertCircle, CheckCircle,
@@ -27,135 +27,29 @@ interface Instrument { id: string; code: string; shortName: string; name: string
 interface Props { patients: PatientRow[]; instruments: Instrument[]; role: string }
 
 const GENDER_LABEL:  Record<string, string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
-const GENDER_SHORT:  Record<string, string> = { MALE: 'm', FEMALE: 'w', DIVERSE: 'd' }
 const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
-const GENDER_COLOR:  Record<string, string> = { MALE: '#3b82f6', FEMALE: '#ec4899', DIVERSE: '#8b5cf6' }
 
-// ── Figur-Teile je Geschlecht ──────────────────────────────────────────────────
-function FigureIcon({ gender, isKind, size }: { gender: string; isKind: boolean; size: number }) {
-  const s = size
-  if (gender === 'MALE') {
-    // Blau — kurze Haare
-    return (
-      <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-        <circle cx="36" cy="36" r="35" fill="#dbeafe"/>
-        <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="#93c5fd"/>
-        <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="#bfdbfe"/>
-        <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 8 : 10} ry={isKind ? 4 : 5} fill="#3b82f6"/>
-        <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".5"/>
-        <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".5"/>
-        <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#1d4ed8"/>
-        <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#1d4ed8"/>
-        <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="#1d4ed8" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      </svg>
-    )
-  }
-  if (gender === 'FEMALE') {
-    // Pink — lange Haare
-    return (
-      <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-        <circle cx="36" cy="36" r="35" fill="#fce7f3"/>
-        <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="#f9a8d4"/>
-        <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="#fbcfe8"/>
-        <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 9 : 11} ry={isKind ? 5 : 6} fill="#ec4899"/>
-        {!isKind && <><ellipse cx="23" cy="28" rx="4" ry="9" fill="#ec4899"/><ellipse cx="49" cy="28" rx="4" ry="9" fill="#ec4899"/></>}
-        <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".6"/>
-        <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="#fca5a5" opacity=".6"/>
-        <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#9d174d"/>
-        <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="#9d174d"/>
-        <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="#9d174d" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-        {isKind && <circle cx="36" cy="21" r="4" fill="#f97316" opacity=".9"/>}
-      </svg>
-    )
-  }
-  // DIVERSE — lila + Regenbogen
-  return (
-    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-      <circle cx="36" cy="36" r="35" fill="#ede9fe"/>
-      <ellipse cx="36" cy="54" rx="14" ry="10" fill="#c4b5fd"/>
-      <circle cx="36" cy="28" r="12" fill="#ddd6fe"/>
-      <ellipse cx="36" cy="18" rx="10" ry="5" fill="#8b5cf6"/>
-      <ellipse cx="24" cy="23" rx="3.5" ry="7" fill="#8b5cf6"/>
-      <ellipse cx="48" cy="23" rx="3.5" ry="7" fill="#8b5cf6"/>
-      <circle cx="28" cy="31" r="3" fill="#a78bfa" opacity=".5"/>
-      <circle cx="44" cy="31" r="3" fill="#a78bfa" opacity=".5"/>
-      <circle cx="31" cy="27" r="2" fill="#5b21b6"/>
-      <circle cx="41" cy="27" r="2" fill="#5b21b6"/>
-      <path d="M31 33 Q36 37 41 33" stroke="#5b21b6" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      <path d="M23 19 Q36 11 49 19" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity=".7"/>
-      <path d="M25 23 Q36 16 47 23" stroke="#ec4899" strokeWidth="2" strokeLinecap="round" fill="none" opacity=".5"/>
-    </svg>
-  )
+
+// Standard-Seeds, falls /api/settings/avatars noch nicht geladen ist (identisch
+// mit DEFAULT_AVATAR_SETTINGS in src/lib/avatarSettings.ts)
+const DEFAULT_AVATAR_SEEDS: Record<string, string> = {
+  MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+  PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+}
+function avatarGroupFor(gender: string, categoryType?: string | null): string {
+  if (categoryType === 'PAIR' || categoryType === 'FAMILY' || categoryType === 'GROUP') return categoryType
+  return gender === 'MALE' || gender === 'FEMALE' ? gender : 'DIVERSE'
 }
 
-// ── Paar/Familie/Gruppe Icons ───────────────────────────────────────────────
-function GroupIcon({ type, size }: { type: string; size: number }) {
-  const s = size
-  if (type === 'PAIR') return (
-    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-      <circle cx="36" cy="36" r="35" fill="#d1fae5"/>
-      <ellipse cx="24" cy="54" rx="9" ry="7" fill="#6ee7b7"/>
-      <ellipse cx="48" cy="54" rx="9" ry="7" fill="#5eead4"/>
-      <circle cx="24" cy="28" r="9" fill="#a7f3d0"/>
-      <circle cx="48" cy="28" r="9" fill="#99f6e4"/>
-      <ellipse cx="24" cy="20" rx="7" ry="4" fill="#10b981"/>
-      <ellipse cx="48" cy="20" rx="7" ry="4" fill="#0d9488"/>
-      <circle cx="20" cy="30" r="2" fill="#065f46"/><circle cx="28" cy="30" r="2" fill="#065f46"/>
-      <circle cx="44" cy="30" r="2" fill="#0f766e"/><circle cx="52" cy="30" r="2" fill="#0f766e"/>
-      <path d="M20 34 Q24 38 28 34" stroke="#065f46" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M44 34 Q48 38 52 34" stroke="#0f766e" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M31 40 Q36 45 41 40" stroke="#10b981" strokeWidth="2" strokeLinecap="round" fill="none"/>
-    </svg>
-  )
-  if (type === 'FAMILY') return (
-    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-      <circle cx="36" cy="36" r="35" fill="#ffedd5"/>
-      <ellipse cx="20" cy="56" rx="8" ry="6" fill="#fdba74"/>
-      <ellipse cx="52" cy="56" rx="8" ry="6" fill="#fb923c"/>
-      <ellipse cx="36" cy="58" rx="7" ry="5" fill="#fcd34d"/>
-      <circle cx="20" cy="26" r="9" fill="#fed7aa"/>
-      <circle cx="52" cy="26" r="9" fill="#fdba74"/>
-      <circle cx="36" cy="40" r="7" fill="#fde68a"/>
-      <ellipse cx="20" cy="18" rx="7" ry="4" fill="#f97316"/>
-      <ellipse cx="52" cy="18" rx="7" ry="4" fill="#ea580c"/>
-      <ellipse cx="36" cy="33" rx="5" ry="3" fill="#f59e0b"/>
-      <circle cx="17" cy="27" r="1.8" fill="#7c2d12"/><circle cx="23" cy="27" r="1.8" fill="#7c2d12"/>
-      <circle cx="49" cy="27" r="1.8" fill="#7c2d12"/><circle cx="55" cy="27" r="1.8" fill="#7c2d12"/>
-      <circle cx="33" cy="40" r="1.5" fill="#92400e"/><circle cx="39" cy="40" r="1.5" fill="#92400e"/>
-      <path d="M17 31 Q20 35 23 31" stroke="#7c2d12" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M49 31 Q52 35 55 31" stroke="#7c2d12" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M33 44 Q36 47 39 44" stroke="#92400e" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-    </svg>
-  )
-  // GROUP
-  return (
-    <svg width={s} height={s} viewBox="0 0 72 72" fill="none">
-      <circle cx="36" cy="36" r="35" fill="#e0e7ff"/>
-      <ellipse cx="12" cy="56" rx="7" ry="5" fill="#a5b4fc" opacity=".6"/>
-      <ellipse cx="36" cy="58" rx="9" ry="6" fill="#818cf8"/>
-      <ellipse cx="60" cy="56" rx="7" ry="5" fill="#a5b4fc" opacity=".6"/>
-      <circle cx="12" cy="27" r="7" fill="#c7d2fe" opacity=".7"/>
-      <circle cx="36" cy="25" r="9" fill="#c7d2fe"/>
-      <circle cx="60" cy="27" r="7" fill="#c7d2fe" opacity=".7"/>
-      <ellipse cx="12" cy="21" rx="5" ry="3" fill="#6366f1" opacity=".6"/>
-      <ellipse cx="36" cy="17" rx="7" ry="4" fill="#6366f1"/>
-      <ellipse cx="60" cy="21" rx="5" ry="3" fill="#6366f1" opacity=".6"/>
-      <circle cx="9" cy="28" r="1.5" fill="#312e81" opacity=".6"/><circle cx="15" cy="28" r="1.5" fill="#312e81" opacity=".6"/>
-      <circle cx="33" cy="26" r="2" fill="#312e81"/><circle cx="39" cy="26" r="2" fill="#312e81"/>
-      <circle cx="57" cy="28" r="1.5" fill="#312e81" opacity=".6"/><circle cx="63" cy="28" r="1.5" fill="#312e81" opacity=".6"/>
-      <path d="M33 31 Q36 34 39 31" stroke="#312e81" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-    </svg>
-  )
-}
-
-// ── PatientIcon: freundliche Figur + Pill ──────────────────────────────────
+// ── PatientIcon: globaler Avatar (unter Einstellungen → Avatare festgelegt) + Pill ──
 function PatientIcon({
-  gender, dob, categoryType, size = 52,
+  gender, dob, categoryType, size = 52, avatarSeeds = DEFAULT_AVATAR_SEEDS,
 }: {
   gender: string
   dob: string
   categoryType?: string | null
   size?: number
+  avatarSeeds?: Record<string, string>
 }) {
   const age    = calcAge(dob)
   const isKind = age !== null && age < 18
@@ -173,14 +67,13 @@ function PatientIcon({
                     ? (GENDER_SYMBOL[gender] ?? '?') + ' <18'
                     : (GENDER_LABEL[gender] ?? gender)
 
-  const icon = (categoryType === 'PAIR' || categoryType === 'FAMILY' || categoryType === 'GROUP')
-    ? <GroupIcon type={categoryType} size={size} />
-    : <FigureIcon gender={gender} isKind={isKind} size={size} />
+  const group = avatarGroupFor(gender, categoryType)
+  const seed  = avatarSeeds[group] ?? DEFAULT_AVATAR_SEEDS[group]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
       <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${color}` }}>
-        {icon}
+        <img src={`/api/avatar?seed=${encodeURIComponent(seed)}&bg=e3e3e3`} alt="" width={size} height={size} style={{ display: 'block' }} />
       </div>
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
@@ -228,6 +121,13 @@ function StatusDot({ clinical }: { clinical: boolean | null }) {
 export function PatientsListClient({ patients, instruments, role }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>(DEFAULT_AVATAR_SEEDS)
+
+  useEffect(() => {
+    fetch('/api/settings/avatars').then(r => r.json()).then(d => {
+      if (d?.seeds) setAvatarSeeds(d.seeds)
+    }).catch(() => {})
+  }, [])
   const [creating, setCreating] = useState(false)
   const [loading, setLoading] = useState(false)
   const [newPin, setNewPin] = useState<string | null>(null)
@@ -369,7 +269,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                 >
                   {/* Patient */}
                   <div className="flex items-center gap-3">
-                    <PatientIcon gender={p.gender} dob={p.dob} categoryType={(p as any).categoryType} size={44} />
+                    <PatientIcon gender={p.gender} dob={p.dob} categoryType={(p as any).categoryType} size={44} avatarSeeds={avatarSeeds} />
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--text-primary)] truncate">
                         {p.lastName}, {p.firstName}
