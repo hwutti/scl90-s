@@ -37,15 +37,18 @@ const DIAG_TYPE_LABEL: Record<string,string> = {
   PRIMARY: 'Hauptdiagnose', SECONDARY: 'Nebendiagnose', EXCLUSION: 'Ausschluss',
 }
 
-function calcAge(dob: string) {
+function calcAge(dob: string): number | null {
   const d = new Date(dob + 'T00:00:00')
+  if (isNaN(d.getTime())) return null
   let age = new Date().getFullYear() - d.getFullYear()
   const m = new Date().getMonth() - d.getMonth()
   if (m < 0 || (m === 0 && new Date().getDate() < d.getDate())) age--
   return age
 }
 function fmtDate(s: string | Date) {
-  return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(s))
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(d)
 }
 function fmtBytes(b: number) {
   if (b < 1024) return b + ' B'
@@ -394,11 +397,11 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                   <img src={photoSrc} alt="Foto" style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.5)' }} />
                   <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
                     {GENDER_SYMBOL[patient.gender] ?? ''} {GENDER_LABEL[patient.gender] ?? patient.gender}
-                    {calcAge(patient.dob) < 18 ? ' · <18' : ''}
+                    {age !== null && age < 18 ? ' · <18' : ''}
                   </span>
                 </div>
               ) : (() => {
-                const isKind = calcAge(patient.dob) < 18
+                const isKind = age !== null && age < 18
                 const gColor = patient.gender === 'MALE' ? '#3b82f6'
                              : patient.gender === 'FEMALE' ? '#ec4899' : '#8b5cf6'
                 const gSymbol = GENDER_SYMBOL[patient.gender] ?? '?'
@@ -475,7 +478,7 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                 )}
               </h1>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                <span>{age} Jahre · geb. {fmtDate(patient.dob)}</span>
+                <span>{age !== null ? `${age} Jahre · ` : ''}geb. {fmtDate(patient.dob)}</span>
                 {patient.therapists?.[0]?.user && <><span style={{ opacity: 0.4 }}>·</span><span>{patient.therapists[0].user.name}</span></>}
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
