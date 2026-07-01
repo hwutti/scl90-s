@@ -37,6 +37,9 @@ export interface TpInvoice {
   type: 'INCOME' | 'EXPENSE'
   date: string
   paidDate: string | null
+  /** Echter Zahlungsstatus aus Finanzexport-Gesamtübersicht (nicht aus der Einzel-Rechnung ableitbar).
+   *  Fehlt, wenn die Finanzexport-Datei nicht im Export enthalten war. */
+  status?: 'PAID' | 'PENDING' | 'CANCELLED'
   profilNr: number | null
   patientName: string | null
   amount: number
@@ -282,6 +285,58 @@ export async function sha256(buffer: Buffer): Promise<string> {
   return createHash('sha256').update(buffer).digest('hex')
 }
 
+// ── Finanzexport: echten Zahlungsstatus je Rechnungsnummer ermitteln ──────────
+// WICHTIG: Die einzelnen Rechnungs-xlsx (Alle_Rechnungen_Einnahmen/) enthalten
+// KEINEN echten Zahlungsstatus — Zeile 46-48 ist nur der wiederholte Zahlschein-
+// Footer (IBAN + Fälligkeitsdatum), kein Zahlungsnachweis. Der tatsächliche
+// Status/das Zahlungsdatum steht nur in der Finanzexport-Gesamtübersicht
+// ("Finanzen_<von>_bis_<bis>.xlsx"), in zwei nebeneinanderliegenden Blöcken:
+//   - "Abgeschlossene Transaktionen": Spalte J = Ref.Nr., Spalte E = Status
+//     ("Bezahlt am DD.MM.YYYY" | "Storniert am DD.MM.YYYY" | "Erstellt am DD.MM.YYYY")
+//   - "Offene Transaktionen": Spalte S = Ref.Nr., Spalte O = Status ("Nicht bezahlt")
+// Beide Blöcke sind unabhängige Listen (kein Zeilen-Zusammenhang zwischen J/E und S/O).
+interface TpFinanceStatus {
+  status: 'PAID' | 'PENDING' | 'CANCELLED'
+  paidDate: string | null
+}
+function parseFinanzexportStatus(exportDir: string): Map<string, TpFinanceStatus> {
+  const map = new Map<string, TpFinanceStatus>()
+  const file = fs.readdirSync(exportDir).find(f => /^Finanzen_.*\.xlsx$/i.test(f))
+  if (!file) return map
+
+  try {
+    const wb = XLSX.read(fs.readFileSync(path.join(exportDir, file)), { type: 'buffer', cellDates: true })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    // blankrows:true ist entscheidend — sonst verschieben sich die Zeilenindizes
+    // durch die Leerzeilen im Kopfbereich (gleicher Bug wie bei den Rechnungs-xlsx).
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: null, raw: false, blankrows: true }) as any[]
+
+    for (let i = 13; i < raw.length; i++) { // Header in Zeile 14 (Index 13), Daten ab Zeile 15
+      const r = raw[i]
+      if (!r) continue
+
+      const refLeft = (r['J'] ?? '').toString().trim()
+      if (refLeft) {
+        const statusLeft = (r['E'] ?? '').toString().trim()
+        const paidM = statusLeft.match(/^Bezahlt am (\d{2}\.\d{2}\.\d{4})/)
+        const cancelM = statusLeft.match(/^Storniert am (\d{2}\.\d{2}\.\d{4})/)
+        if (paidM) map.set(refLeft, { status: 'PAID', paidDate: paidM[1] })
+        else if (cancelM) map.set(refLeft, { status: 'CANCELLED', paidDate: cancelM[1] })
+        else map.set(refLeft, { status: 'PENDING', paidDate: null }) // z.B. "Erstellt am ..."
+      }
+
+      const refRight = (r['S'] ?? '').toString().trim()
+      if (refRight && !map.has(refRight)) {
+        map.set(refRight, { status: 'PENDING', paidDate: null })
+      }
+    }
+  } catch {
+    // Finanzexport nicht lesbar — Map bleibt leer, Aufrufer fällt auf alten Stand zurück
+  }
+
+  return map
+}
+
 // ── Haupt-Parse-Funktion ───────────────────────────────────────────────────────
 export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, 'sourceHash'> {
   // 1. Sessions
@@ -292,6 +347,17 @@ export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, '
 
   // 2. Rechnungen
   const { income: invoices, expensePdfs } = parseAllInvoices(exportDir)
+
+  // 2b. Echten Zahlungsstatus aus Finanzexport-Gesamtübersicht ergänzen
+  //     (die Einzel-Rechnungs-xlsx enthalten keinen verlässlichen Status, siehe oben)
+  const financeStatus = parseFinanzexportStatus(exportDir)
+  for (const inv of invoices) {
+    const fs2 = financeStatus.get(inv.invoiceNr)
+    if (fs2) {
+      inv.status = fs2.status
+      inv.paidDate = fs2.paidDate
+    }
+  }
 
   // 3. Patienten ableiten
   const patients = derivePatients(invoices, sessions)
