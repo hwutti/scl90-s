@@ -35,9 +35,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Sitzungen nicht gefunden' }, { status: 404 })
   }
 
-  const lineItems = sessions.map(s => {
+  // Zusatzleistungen je Sitzung laden — müssen in der Vorschau genauso auftauchen
+  // wie später in der tatsächlich erstellten Rechnung (siehe transaction.service.ts)
+  const serviceLines = await prisma.sessionServiceLine.findMany({
+    where: { sessionId: { in: sessionIds } },
+    orderBy: [{ sessionId: 'asc' }, { sortOrder: 'asc' }],
+  })
+  const serviceLinesBySession = new Map<string, typeof serviceLines>()
+  for (const line of serviceLines) {
+    const list = serviceLinesBySession.get(line.sessionId) ?? []
+    list.push(line)
+    serviceLinesBySession.set(line.sessionId, list)
+  }
+
+  const lineItems = sessions.flatMap(s => {
     const amountNet = parseFloat(s.calculatedPriceNet?.toString() ?? '0')
-    return {
+    const baseLine = {
       date: s.sessionDate,
       description: `Sitzung-${s.sessionNumber}`,
       serviceLabel: s.serviceLabel ?? null,
@@ -45,6 +58,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       unitPriceNet: amountNet,
       amountNet,
     }
+    const extraLines = (serviceLinesBySession.get(s.id) ?? []).map(l => ({
+      date: s.sessionDate,
+      description: l.description,
+      serviceLabel: l.catalogCode ?? null,
+      quantity: parseFloat(l.quantity.toString()),
+      unitPriceNet: parseFloat(l.unitPriceNet.toString()),
+      amountNet: parseFloat(l.amountNet.toString()),
+    }))
+    return [baseLine, ...extraLines]
   })
 
   const templateId = body.invoiceTemplateId || patient.defaultInvoiceTemplateId || null

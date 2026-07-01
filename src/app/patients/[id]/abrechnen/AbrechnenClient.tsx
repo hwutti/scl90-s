@@ -41,7 +41,8 @@ export function AbrechnenClient({
     new Set(initialSessions.map((s: any) => s.id))
   )
   const selected = allUnbilled.filter(s => selectedIds.has(s.id))
-  const totalNet = selected.reduce((sum, s) => sum + parseFloat(s.calculatedPriceNet ?? 0), 0)
+  const totalNet = selected.reduce((sum, s) =>
+    sum + parseFloat(s.calculatedPriceNet ?? 0) + parseFloat(s.serviceLinesTotalNet ?? 0), 0)
 
   // Formular — vorausgefüllt aus Patientenprofil
   const payerNameDefault = patient.billRecipientName
@@ -325,8 +326,13 @@ export function AbrechnenClient({
                         )}
                       </div>
                     </div>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: checked ? 'var(--color-primary)' : 'var(--text-secondary)', flexShrink: 0 }}>
-                      {fmtEUR(s.calculatedPriceNet)}
+                    <span style={{ fontSize: 14, fontWeight: 700, color: checked ? 'var(--color-primary)' : 'var(--text-secondary)', flexShrink: 0, textAlign: 'right' }}>
+                      {fmtEUR(parseFloat(s.calculatedPriceNet ?? 0) + parseFloat(s.serviceLinesTotalNet ?? 0))}
+                      {parseFloat(s.serviceLinesTotalNet ?? 0) > 0 && (
+                        <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
+                          inkl. {fmtEUR(s.serviceLinesTotalNet)} Zusatzleistungen
+                        </div>
+                      )}
                     </span>
                   </label>
                 )

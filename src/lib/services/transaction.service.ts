@@ -72,18 +72,34 @@ export async function createTransactionFromSessions(params: {
         throw new Error(`Session ${s.id} ist bereits vollständig verrechnet`)
     }
 
-    // 2. Beträge berechnen
-    const amountNet = sessions.reduce((sum, s) =>
+    // 2. Zusatzleistungen je Sitzung laden (bisher komplett ignoriert -> Bug:
+    //    unter der Sitzung erfasste Zusatzleistungen tauchten nie in der Rechnung auf)
+    const serviceLines = await tx.sessionServiceLine.findMany({
+      where: { sessionId: { in: params.sessionIds } },
+      orderBy: [{ sessionId: 'asc' }, { sortOrder: 'asc' }],
+    })
+    const serviceLinesBySession = new Map<string, typeof serviceLines>()
+    for (const line of serviceLines) {
+      const list = serviceLinesBySession.get(line.sessionId) ?? []
+      list.push(line)
+      serviceLinesBySession.set(line.sessionId, list)
+    }
+
+    // 3. Beträge berechnen (Sitzungs-Basispreise + Zusatzleistungen)
+    const sessionAmountNet = sessions.reduce((sum, s) =>
       sum + parseFloat(s.calculatedPriceNet?.toString() ?? '0'), 0)
+    const serviceLinesAmountNet = serviceLines.reduce((sum, l) =>
+      sum + parseFloat(l.amountNet?.toString() ?? '0'), 0)
+    const amountNet = sessionAmountNet + serviceLinesAmountNet
     const vatRate = params.vatRate ?? 0
     const vatAmount = amountNet * vatRate
     const amountGross = amountNet + vatAmount
 
-    // 3. Referenznummer reservieren
+    // 4. Referenznummer reservieren
     const referenceNumber = await reserveReferenceNumber({ direction: 'INCOME' })
     const now = new Date()
 
-    // 4. Transaktion erstellen
+    // 5. Transaktion erstellen
     const transaction = await tx.transaction.create({
       data: {
         patientId: params.patientId,
@@ -110,9 +126,9 @@ export async function createTransactionFromSessions(params: {
       },
     })
 
-    // 5. LineItems und Allocations erstellen
-    for (let i = 0; i < sessions.length; i++) {
-      const s = sessions[i]
+    // 6. LineItems und Allocations erstellen (Basispreis + Zusatzleistungen je Sitzung)
+    let sortOrder = 0
+    for (const s of sessions) {
       const lineAmountNet = parseFloat(s.calculatedPriceNet?.toString() ?? '0')
       const lineVatAmount = lineAmountNet * vatRate
       const lineAmountGross = lineAmountNet + lineVatAmount
@@ -132,7 +148,7 @@ export async function createTransactionFromSessions(params: {
           vatAmount: lineVatAmount,
           amountGross: lineAmountGross,
           lineDate: s.sessionDate,
-          sortOrder: i,
+          sortOrder: sortOrder++,
         },
       })
 
@@ -148,6 +164,45 @@ export async function createTransactionFromSessions(params: {
           isActive: true,
         },
       })
+
+      // Zusatzleistungen dieser Sitzung als eigene Rechnungspositionen übernehmen
+      // (eigener vatRate je Zeile beibehalten statt dem Sitzungs-vatRate zu erzwingen)
+      for (const line of serviceLinesBySession.get(s.id) ?? []) {
+        const lAmountNet = parseFloat(line.amountNet.toString())
+        const lVatRate = parseFloat(line.vatRate.toString())
+        const lVatAmount = lAmountNet * lVatRate
+        const lAmountGross = lAmountNet + lVatAmount
+
+        const extraLineItem = await tx.txLineItem.create({
+          data: {
+            transactionId: transaction.id,
+            sessionId: s.id,
+            description: line.description,
+            serviceLabel: line.catalogCode ?? undefined,
+            quantity: line.quantity,
+            unitPriceNet: line.unitPriceNet,
+            amountNet: lAmountNet,
+            vatRate: lVatRate,
+            vatAmount: lVatAmount,
+            amountGross: lAmountGross,
+            lineDate: s.sessionDate,
+            sortOrder: sortOrder++,
+          },
+        })
+
+        await tx.txSessionAllocation.create({
+          data: {
+            transactionId: transaction.id,
+            lineItemId: extraLineItem.id,
+            sessionId: s.id,
+            allocationPercentage: 1.0,
+            allocatedAmountNet: lAmountNet,
+            allocatedVatAmount: lVatAmount,
+            allocatedAmountGross: lAmountGross,
+            isActive: true,
+          },
+        })
+      }
     }
 
     // 6. Timeline

@@ -60,6 +60,21 @@ export default async function AbrechnenPage({
     orderBy: { sessionDate: 'asc' },
   })
 
+  // Zusatzleistungen-Summe je Sitzung dazuladen — sonst zeigt die Vorschau-Summe
+  // im UI einen niedrigeren Betrag als die tatsächlich erstellte Rechnung
+  const serviceLineTotals = await prisma.sessionServiceLine.groupBy({
+    by: ['sessionId'],
+    where: { sessionId: { in: allUnbilled.map(s => s.id) } },
+    _sum: { amountNet: true },
+  })
+  const serviceLineTotalBySession = new Map(
+    serviceLineTotals.map(t => [t.sessionId, parseFloat(t._sum.amountNet?.toString() ?? '0')])
+  )
+  const allUnbilledWithExtras = allUnbilled.map(s => ({
+    ...s,
+    serviceLinesTotalNet: serviceLineTotalBySession.get(s.id) ?? 0,
+  }))
+
   const invoiceTemplates = await prisma.invoiceTemplate.findMany({
     where: { isActive: true },
     select: { id: true, name: true, isDefault: true },
@@ -73,7 +88,7 @@ export default async function AbrechnenPage({
       <AbrechnenClient
         patient={patient as any}
         sessions={sessions as any}
-        allUnbilled={allUnbilled as any}
+        allUnbilled={allUnbilledWithExtras as any}
         invoiceTemplates={invoiceTemplates}
         therapistName={therapistName}
         role={role}
