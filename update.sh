@@ -133,6 +133,28 @@ chgrp kds-backup "$BACKUP_DIR"
 chmod 2775 "$BACKUP_DIR"
 success "Backup-Verzeichnis OK (Gruppe kds-backup, Setgid)"
 
+# ─── 5d. Nginx: client_max_body_size sicherstellen ────────────────────────────
+# Größere Migrations-Importe (Rechnungsanhänge etc.) können mehrere MB an
+# JSON-Payload erzeugen. install.sh setzt client_max_body_size 50M bei
+# Neuinstallation — bestehende Server (installiert vor dieser Zeile) haben das
+# u.U. nicht und lehnen den Request am Proxy mit 413 ab, bevor er überhaupt bei
+# Next.js ankommt (kein Log in journalctl -u kds). Idempotent nachrüsten.
+step "Nginx: client_max_body_size prüfen"
+NGINX_KDS_CONF="/etc/nginx/sites-available/kds"
+if [[ -f "$NGINX_KDS_CONF" ]] && ! grep -q "client_max_body_size" "$NGINX_KDS_CONF"; then
+  sed -i '/proxy_cache_bypass \$http_upgrade;/a\        client_max_body_size 50M;' "$NGINX_KDS_CONF"
+  if nginx -t 2>/dev/null; then
+    systemctl reload nginx
+    success "client_max_body_size 50M ergänzt, nginx neu geladen"
+  else
+    warn "nginx-Konfig nach Ergänzung ungültig — bitte manuell prüfen: $NGINX_KDS_CONF"
+  fi
+elif [[ -f "$NGINX_KDS_CONF" ]]; then
+  success "client_max_body_size bereits gesetzt"
+else
+  warn "Nginx-Konfig $NGINX_KDS_CONF nicht gefunden — übersprungen"
+fi
+
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
 step "Seed: Basisdaten prüfen"
 
