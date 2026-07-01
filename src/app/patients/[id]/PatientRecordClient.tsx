@@ -74,6 +74,15 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
 
   // Photo
   const [photoSrc, setPhotoSrc] = useState<string|null>(null)
+  const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>({
+    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+    PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+  })
+  useEffect(() => {
+    fetch('/api/settings/avatars').then(r => r.json()).then(d => {
+      if (d?.seeds) setAvatarSeeds(d.seeds)
+    }).catch(() => {})
+  }, [])
   useEffect(() => {
     fetch(`/api/patients/${patient.id}/photo`).then(r=>r.json()).then(d => {
       if (d?.data) setPhotoSrc(`data:${d.mimeType};base64,${d.data}`)
@@ -413,57 +422,18 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                 </div>
               ) : (() => {
                 const isKind = age !== null && age < 18
-                const gColor = patient.gender === 'MALE' ? '#3b82f6'
-                             : patient.gender === 'FEMALE' ? '#ec4899' : '#8b5cf6'
                 const gSymbol = GENDER_SYMBOL[patient.gender] ?? '?'
                 const pillText = isKind
                   ? gSymbol + ' <18'
                   : GENDER_LABEL[patient.gender] ?? patient.gender
-                // Figur-SVG je Geschlecht (Pastelfarben auf Banner sichtbar)
-                const FigureSVG = patient.gender === 'MALE' ? (
-                  <svg width="68" height="68" viewBox="0 0 72 72" fill="none">
-                    <circle cx="36" cy="36" r="35" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
-                    <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="rgba(147,197,253,0.7)"/>
-                    <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="rgba(191,219,254,0.8)"/>
-                    <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 8 : 10} ry={isKind ? 4 : 5} fill="rgba(255,255,255,0.7)"/>
-                    <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="rgba(252,165,165,0.6)"/>
-                    <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="rgba(252,165,165,0.6)"/>
-                    <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="white"/>
-                    <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="white"/>
-                    <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                  </svg>
-                ) : patient.gender === 'FEMALE' ? (
-                  <svg width="68" height="68" viewBox="0 0 72 72" fill="none">
-                    <circle cx="36" cy="36" r="35" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
-                    <ellipse cx="36" cy="54" rx={isKind ? 11 : 14} ry={isKind ? 8 : 10} fill="rgba(249,168,212,0.7)"/>
-                    <circle cx="36" cy={isKind ? 30 : 28} r={isKind ? 10 : 12} fill="rgba(251,207,232,0.8)"/>
-                    <ellipse cx="36" cy={isKind ? 21 : 18} rx={isKind ? 9 : 11} ry={isKind ? 5 : 6} fill="rgba(255,255,255,0.7)"/>
-                    {!isKind && <><ellipse cx="23" cy="28" rx="4" ry="9" fill="rgba(255,255,255,0.5)"/><ellipse cx="49" cy="28" rx="4" ry="9" fill="rgba(255,255,255,0.5)"/></>}
-                    <circle cx="28" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="rgba(252,165,165,0.7)"/>
-                    <circle cx="44" cy={isKind ? 33 : 31} r={isKind ? 2.5 : 3} fill="rgba(252,165,165,0.7)"/>
-                    <circle cx="31" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="white"/>
-                    <circle cx="41" cy={isKind ? 28 : 27} r={isKind ? 1.5 : 2} fill="white"/>
-                    <path d={isKind ? "M30 35 Q36 39 42 35" : "M31 33 Q36 37 41 33"} stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                  </svg>
-                ) : (
-                  <svg width="68" height="68" viewBox="0 0 72 72" fill="none">
-                    <circle cx="36" cy="36" r="35" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
-                    <ellipse cx="36" cy="54" rx="14" ry="10" fill="rgba(196,181,253,0.7)"/>
-                    <circle cx="36" cy="28" r="12" fill="rgba(221,214,254,0.8)"/>
-                    <ellipse cx="36" cy="18" rx="10" ry="5" fill="rgba(255,255,255,0.7)"/>
-                    <ellipse cx="24" cy="23" rx="3.5" ry="7" fill="rgba(255,255,255,0.5)"/>
-                    <ellipse cx="48" cy="23" rx="3.5" ry="7" fill="rgba(255,255,255,0.5)"/>
-                    <circle cx="28" cy="31" r="3" fill="rgba(167,139,250,0.5)"/>
-                    <circle cx="44" cy="31" r="3" fill="rgba(167,139,250,0.5)"/>
-                    <circle cx="31" cy="27" r="2" fill="white"/>
-                    <circle cx="41" cy="27" r="2" fill="white"/>
-                    <path d="M31 33 Q36 37 41 33" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                    <path d="M23 19 Q36 11 49 19" stroke="rgba(251,191,36,0.8)" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                  </svg>
-                )
+                const group = (patient as any).categoryType === 'PAIR' || (patient as any).categoryType === 'FAMILY' || (patient as any).categoryType === 'GROUP'
+                  ? (patient as any).categoryType
+                  : (patient.gender === 'MALE' || patient.gender === 'FEMALE' ? patient.gender : 'DIVERSE')
+                const seed = avatarSeeds[group] ?? `kds-${group.toLowerCase()}-default`
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    {FigureSVG}
+                    <img src={`/api/avatar?seed=${encodeURIComponent(seed)}`} alt="" width={68} height={68}
+                      style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)' }} />
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
                       {pillText}
                     </span>
