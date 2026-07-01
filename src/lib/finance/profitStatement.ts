@@ -15,19 +15,14 @@ export async function computeProfitStatement(userId: string, role: string, year:
   const dateRange = { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59) }
   const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
 
-  // Neue Transactions (Session-Transaktionen)
+  // Einzige Datenquelle für alle Geldbewegungen — siehe transactionJournal.ts für
+  // die Begründung, warum FinanceTransaction (Legacy) hier nicht mehr gelesen wird.
   const transactions = await prisma.transaction.findMany({
     where: { ...where, transactionDate: dateRange, lifecycleStatus: { in: ['ACTIVE'] } },
     select: {
-      direction: true, amountNet: true, amountGross: true,
+      direction: true, amountNet: true, amountGross: true, category: true,
       vatRate: true, vatAmount: true, paymentStatus: true, sourceType: true,
     },
-  })
-
-  // Alte FinanceTransactions (Legacy, solange noch genutzt)
-  const legacyTxs = await prisma.financeTransaction.findMany({
-    where: { createdBy: userId, date: dateRange },
-    select: { type: true, amount: true, incomeCategory: true, expenseCategory: true, paymentStatus: true },
   })
 
   // Fahrtenbuch
@@ -38,9 +33,8 @@ export async function computeProfitStatement(userId: string, role: string, year:
   const totalMileage = mileage.reduce((s, m) => s + Number(m.totalAmount), 0)
   const totalKm = mileage.reduce((s, m) => s + Number(m.kilometers), 0)
 
-  // ── Einnahmen aus neuen Transactions ─────────────────────────────────────
+  // ── Einnahmen ──────────────────────────────────────────────────────────────
   const incomeTxList = transactions.filter(t => t.direction === 'INCOME')
-  const incomeFromTx = incomeTxList.reduce((s, t) => s + Number(t.amountNet), 0)
 
   // USt-Aufteilung: Psychotherapeutische Behandlung ist gem. § 6 Abs 1 Z 19 UStG
   // unecht umsatzsteuerbefreit (vatRate = 0). Andere Leistungen (z.B. Supervision,
@@ -51,22 +45,18 @@ export async function computeProfitStatement(userId: string, role: string, year:
   const ustPflichtigNetto = ustPflichtigTx.reduce((s, t) => s + Number(t.amountNet), 0)
   const ustPflichtigUst   = ustPflichtigTx.reduce((s, t) => s + Number(t.vatAmount), 0)
 
-  // ── Ausgaben aus Legacy-Transaktionen nach Kategorie ─────────────────────
-  const expenseCats: Record<string, number> = {}
-  for (const t of legacyTxs.filter(t => t.type === 'EXPENSE')) {
-    const cat = t.expenseCategory ?? 'MISC_BUSINESS'
-    expenseCats[cat] = (expenseCats[cat] ?? 0) + Number(t.amount)
+  const incomeCats: Record<string, number> = {}
+  for (const t of incomeTxList) {
+    const cat = t.category ?? 'HONORAR'
+    incomeCats[cat] = (incomeCats[cat] ?? 0) + Number(t.amountNet)
   }
 
-  // ── Einnahmen aus Legacy nach Kategorie ──────────────────────────────────
-  const incomeCats: Record<string, number> = {}
-  const legacyIncome = legacyTxs.filter(t => t.type === 'INCOME')
-  for (const t of legacyIncome) {
-    const cat = t.incomeCategory ?? 'HONORAR'
-    incomeCats[cat] = (incomeCats[cat] ?? 0) + Number(t.amount)
+  // ── Ausgaben ───────────────────────────────────────────────────────────────
+  const expenseCats: Record<string, number> = {}
+  for (const t of transactions.filter(t => t.direction === 'EXPENSE')) {
+    const cat = t.category ?? 'MISC_BUSINESS'
+    expenseCats[cat] = (expenseCats[cat] ?? 0) + Number(t.amountNet)
   }
-  const legacyIncomeTotal = legacyIncome.reduce((s, t) => s + Number(t.amount), 0)
-  incomeCats['HONORAR'] = (incomeCats['HONORAR'] ?? 0) + incomeFromTx
 
   const totalIncome = Object.values(incomeCats).reduce((s, v) => s + v, 0)
   const totalExpenses = Object.values(expenseCats).reduce((s, v) => s + v, 0) + totalMileage
@@ -81,12 +71,12 @@ export async function computeProfitStatement(userId: string, role: string, year:
       befreitNetto: ustBefreitNetto,
       pflichtigNetto: ustPflichtigNetto,
       pflichtigUst: ustPflichtigUst,
-      legacyOhneZuordnung: legacyIncomeTotal,
+      legacyOhneZuordnung: 0,
     },
     expenses: { byCategory: expenseCats, mileage: totalMileage, mileageKm: totalKm, total: totalExpenses },
     profit, grundfreibetrag, einkuenfte,
     counts: {
-      incomeTransactions: transactions.filter(t => t.direction === 'INCOME').length,
+      incomeTransactions: incomeTxList.length,
       expenseTransactions: transactions.filter(t => t.direction === 'EXPENSE').length,
       mileageEntries: mileage.length,
     },
