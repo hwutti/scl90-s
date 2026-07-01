@@ -2,11 +2,6 @@ import { prisma } from '@/lib/prisma'
 import type { TpPatient, TpSession, TpInvoice, TpBmdRow } from './therapsyParser'
 
 export interface ExecuteOptions {
-  importProfiles: boolean
-  importSessions: boolean
-  importInvoices: boolean
-  importBmd: boolean
-  importSupervision: boolean
   userId: string
   selectedAreas: string[]
 }
@@ -26,16 +21,14 @@ export interface ExecuteResult {
 function parseDate(s: string | null | undefined): Date | null {
   if (!s) return null
   const cleaned = s.trim().split(' ')[0]
-  // DD.MM.YYYY
   const dmY = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(cleaned)
   if (dmY) return new Date(parseInt(dmY[3]), parseInt(dmY[2]) - 1, parseInt(dmY[1]))
-  // YYYY-MM-DD
   const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(cleaned)
   if (ymd) return new Date(parseInt(ymd[1]), parseInt(ymd[2]) - 1, parseInt(ymd[3]))
   return null
 }
 
-// ── ICD10-Labels (aus dem Parser, kleine Teilmenge) ───────────────────────────
+// ── ICD10-Labels (Teilmenge) ───────────────────────────────────────────────────
 const ICD10_LABELS: Record<string, string> = {
   'F32.0': 'Leichte depressive Episode',
   'F32.1': 'Mittelgradige depressive Episode',
@@ -62,17 +55,18 @@ export async function executeMigration(
     transactions: 0, diagnoses: 0, supervisions: 0,
     warnings: [],
   }
+  const { userId, selectedAreas } = opts
 
-  // Profil-Nr → KDS Patient-ID Mapping (wird schrittweise befüllt)
+  // Profil-Nr → KDS Patient-ID
   const patientIdByProfilNr = new Map<number, string>()
 
-  // ── 1. Klient:innen anlegen ──────────────────────────────────────────────────
-  if (opts.selectedAreas.includes('profiles')) {
+  // ── 1. Klient:innen ──────────────────────────────────────────────────────────
+  if (selectedAreas.includes('profiles')) {
     for (const tp of patients) {
-      // Doppelten Import verhindern: codeName als Eindeutigkeitsmerkmal
+      // Deduplizieren über codeName, sonst über fullName
       const existing = tp.codeName
-        ? await prisma.patient.findFirst({ where: { codeName: tp.codeName, createdByUserId: opts.userId } })
-        : null
+        ? await prisma.patient.findFirst({ where: { codeName: tp.codeName, createdByUserId: userId } })
+        : await prisma.patient.findFirst({ where: { createdByUserId: userId, firstName: tp.firstName, lastName: tp.lastName } })
 
       if (existing) {
         patientIdByProfilNr.set(tp.profilNr, existing.id)
@@ -80,31 +74,26 @@ export async function executeMigration(
         continue
       }
 
-      const nameParts = tp.fullName.trim().split(' ')
-      const firstName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
-      const lastName = nameParts[0]
-
       const patient = await prisma.patient.create({
         data: {
-          firstName, lastName,
-          dob: '0000-00-00',  // Pflichtfeld in KDS, nicht in TheraPsy vorhanden → Platzhalter
-          gender: 'DIVERSE',  // unbekannt → manuell nachzutragen
+          firstName: tp.firstName,
+          lastName: tp.lastName,
+          dob: '0000-00-00',      // Pflichtfeld; TheraPsy exportiert kein Geburtsdatum → Platzhalter
+          gender: 'DIVERSE',      // unbekannt → manuell nachzutragen
           codeName: tp.codeName || null,
           codeNameAuto: !tp.codeName,
-          defaultUnitPriceNet: tp.unitPriceNet ?? undefined,
           defaultUnitDuration: tp.unitDurationMinutes ?? 50,
-          createdByUserId: opts.userId,
-          // Notiz: importiert aus TheraPsy
-          importSource: `TheraPsy Profil-Nr. ${tp.profilNr}` as any,
-        } as any,
+          defaultUnitPriceNet: tp.unitPriceNet ?? undefined,
+          createdByUserId: userId,
+        },
       })
 
       patientIdByProfilNr.set(tp.profilNr, patient.id)
 
       // TherapistPatient-Verknüpfung
       await prisma.therapistPatient.upsert({
-        where: { therapistId_patientId: { therapistId: opts.userId, patientId: patient.id } },
-        create: { therapistId: opts.userId, patientId: patient.id, isPrimary: true },
+        where: { therapistId_patientId: { therapistId: userId, patientId: patient.id } },
+        create: { therapistId: userId, patientId: patient.id, isPrimary: true },
         update: {},
       })
 
@@ -112,9 +101,10 @@ export async function executeMigration(
       for (const code of tp.diagnoses) {
         await prisma.patientDiagnosis.create({
           data: {
-            patientId: patient.id, createdBy: opts.userId,
-            icdCode: code,
-            icdLabel: ICD10_LABELS[code] ?? code,
+            patientId: patient.id,
+            createdBy: userId,
+            icdCode: code.trim(),
+            icdLabel: ICD10_LABELS[code.trim()] ?? code.trim(),
             diagnosisType: 'PRIMARY',
           },
         })
@@ -125,12 +115,12 @@ export async function executeMigration(
     }
   }
 
-  // ── 2. Sitzungen anlegen ──────────────────────────────────────────────────────
-  if (opts.selectedAreas.includes('sessions')) {
+  // ── 2. Sitzungen ─────────────────────────────────────────────────────────────
+  if (selectedAreas.includes('sessions')) {
     for (const s of sessions) {
       const patientId = patientIdByProfilNr.get(s.profilNr)
       if (!patientId) {
-        result.warnings.push(`Sitzung ${s.sessionName}: Kein Patient für Profil-Nr. ${s.profilNr} gefunden — Sitzung übersprungen`)
+        result.warnings.push(`Sitzung ${s.sessionName}: Kein Patient für Profil-Nr. ${s.profilNr} — übersprungen`)
         result.sessionsSkipped++
         continue
       }
@@ -142,37 +132,40 @@ export async function executeMigration(
         continue
       }
 
-      // Doppelten Import verhindern
+      // Deduplizieren über name + patient
       const existing = await prisma.therapySession.findFirst({
-        where: { patientId, name: s.sessionName, therapistId: opts.userId },
+        where: { patientId, name: s.sessionName, therapistId: userId },
       })
       if (existing) { result.sessionsSkipped++; continue }
 
       const session = await prisma.therapySession.create({
         data: {
-          patientId, therapistId: opts.userId,
+          patientId,
+          therapistId: userId,
           name: s.sessionName,
           sessionNumber: s.sessionNumber,
           codeName: s.codeName || null,
+          source: 'MANUAL',
           sessionDate,
           durationMinutes: s.durationMinutes,
-          serviceLabel: s.serviceLabel,
           billingMode: 'time',
-          source: 'MANUAL',
+          serviceLabel: s.serviceLabel || null,
+          billingStatus: 'EXCLUDED',       // bereits in TheraPsy abgerechnet
+          excludedFromFinances: true,
         },
       })
       result.sessions++
 
       // Supervision
-      if (s.supervisionName && opts.selectedAreas.includes('supervision')) {
-        const svDate = parseDate(s.supervisionDate)
+      if (s.supervisionName && selectedAreas.includes('supervision')) {
+        const svDate = parseDate(s.supervisionDate) ?? sessionDate
         await prisma.supervisionEntry.create({
           data: {
-            superviseeId: opts.userId,
+            superviseeId: userId,
             sessionId: session.id,
             name: s.supervisionName,
             supervisorName: s.supervisorName ?? null,
-            date: svDate ?? new Date(),
+            date: svDate,
             durationMinutes: s.durationMinutes,
             supervisionType: 'INDIVIDUAL',
             fachspezifikum: true,
@@ -183,30 +176,35 @@ export async function executeMigration(
     }
   }
 
-  // ── 3. Einnahmen-Rechnungen als Legacy-Transaktionen ─────────────────────────
-  if (opts.selectedAreas.includes('rechnungen_einnahmen')) {
+  // ── 3. Honorarnoten/Einnahmen als Legacy-Transaktionen ───────────────────────
+  if (selectedAreas.includes('rechnungen_einnahmen')) {
     for (const inv of invoices) {
       if (inv.type !== 'INCOME') continue
       const invoiceDate = parseDate(inv.date)
-      if (!invoiceDate) { result.warnings.push(`Rechnung ${inv.invoiceNr}: Ungültiges Datum — übersprungen`); continue }
+      if (!invoiceDate) {
+        result.warnings.push(`Rechnung ${inv.invoiceNr}: Ungültiges Datum — übersprungen`)
+        continue
+      }
 
+      // Deduplizieren über invoiceNumber
       const existing = await prisma.financeTransaction.findFirst({
-        where: { invoiceNumber: inv.invoiceNr, createdBy: opts.userId },
+        where: { invoiceNumber: inv.invoiceNr, createdBy: userId },
       })
       if (existing) continue
 
       const patientId = inv.profilNr ? (patientIdByProfilNr.get(inv.profilNr) ?? null) : null
-      const paidDate = parseDate(inv.paidDate)
+      const isPaid = !!inv.paidDate
 
       await prisma.financeTransaction.create({
         data: {
-          createdBy: opts.userId,
+          createdBy: userId,
           patientId,
           type: 'INCOME',
           amount: inv.amount,
           date: invoiceDate,
-          paymentStatus: paidDate ? 'PAID' : 'PENDING',
-          description: `Importiert aus TheraPsy: ${inv.invoiceNr}${paidDate ? ` (bezahlt ${paidDate})` : ' (offen)'}`,
+          paymentStatus: isPaid ? 'PAID' : 'PENDING',
+          description: `Importiert aus TheraPsy: ${inv.invoiceNr}${isPaid ? ` (bezahlt ${inv.paidDate})` : ' (offen)'}`,
+          invoiceNumber: inv.invoiceNr,
           incomeCategory: 'HONORAR',
         },
       })
@@ -214,26 +212,27 @@ export async function executeMigration(
     }
   }
 
-  // ── 4. BMD-Buchungssätze als Legacy-Transaktionen ──────────────────────────
-  if (opts.selectedAreas.includes('finanzexport')) {
+  // ── 4. BMD-Buchungssätze als Legacy-Transaktionen ────────────────────────────
+  if (selectedAreas.includes('finanzexport')) {
     for (const row of bmdRows) {
       const belegDate = parseDate(row.belegdatum) ?? parseDate(row.buchdatum)
       if (!belegDate) continue
 
+      // Deduplizieren: gleicher Beleg + User
       const existing = await prisma.financeTransaction.findFirst({
-        where: { invoiceNumber: row.belegnr, createdBy: opts.userId },
+        where: { invoiceNumber: row.belegnr || undefined, createdBy: userId, date: belegDate },
       })
       if (existing) continue
 
       await prisma.financeTransaction.create({
         data: {
-          createdBy: opts.userId,
+          createdBy: userId,
           type: row.typ === 'E' ? 'INCOME' : 'EXPENSE',
           amount: Math.abs(row.betrag),
           date: belegDate,
           paymentStatus: 'PAID',
-          description: row.text,
-          invoiceNumber: row.belegnr,
+          description: row.text || `BMD-Buchung ${row.belegnr}`,
+          invoiceNumber: row.belegnr || null,
           incomeCategory: row.typ === 'E' ? 'HONORAR' : undefined,
           expenseCategory: row.typ === 'A' ? 'MISC_BUSINESS' : undefined,
         },

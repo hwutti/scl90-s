@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await executeMigration(
       patients ?? [], sessions ?? [], invoices ?? [], bmdRows ?? [],
-      { userId, selectedAreas, importProfiles: true, importSessions: true, importInvoices: true, importBmd: true, importSupervision: true },
+      { userId, selectedAreas },
     )
 
     // MigrationRun protokollieren (upsert damit zweiter Lauf die Stats aktualisiert)

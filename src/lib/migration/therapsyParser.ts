@@ -99,7 +99,7 @@ function parseDiagnoses(raw: string | null | undefined): string[] {
 
 // ── Excel lesen ────────────────────────────────────────────────────────────────
 function readXlsx(filePath: string): any[][] {
-  const wb = XLSX.readFile(filePath, { type: 'file', cellDates: true })
+  const wb = XLSX.read(fs.readFileSync(filePath), { type: 'buffer', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false }) as any[][]
 }
@@ -107,7 +107,7 @@ function readXlsx(filePath: string): any[][] {
 // ── Einzelrechnung parsen ──────────────────────────────────────────────────────
 function parseInvoiceXlsx(filePath: string, filename: string): TpInvoice | null {
   try {
-    const wb = XLSX.readFile(filePath, { type: 'file', cellDates: true })
+    const wb = XLSX.read(fs.readFileSync(filePath), { type: 'buffer', cellDates: true })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const raw = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: null, raw: false }) as any[]
 
