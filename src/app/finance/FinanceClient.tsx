@@ -30,9 +30,6 @@ const TX_PAYMENT_METHODS: Record<string,string> = {
   UNBAR_BANK_TRANSFER:'Überweisung', CASH:'Bar',
   CASH_HELLOCASH:'Bar (HelloCash)', CARD_BANKOMAT:'Karte/Bankomat', UNKNOWN:'Unbekannt',
 }
-const LEGACY_PAYMENT_METHODS: Record<string,string> = {
-  CASH:'Bar', BANK_TRANSFER:'Überweisung', CARD:'Karte', OTHER:'Sonstiges',
-}
 const TRIP_PURPOSE: Record<string,string> = {
   PATIENT_VISIT:'Hausbesuch', TRAINING:'Fortbildung', SUPERVISION:'Supervision',
   OFFICE:'Büro/Verwaltung', OTHER:'Sonstiges',
@@ -56,8 +53,7 @@ export function FinanceClient() {
   const [year, setYear] = useState(new Date().getFullYear())
 
   // Daten
-  const [newTxs,   setNewTxs]   = useState<any[]>([])   // Transaction-Tabelle
-  const [legacyTxs, setLegacyTxs] = useState<any[]>([]) // FinanceTransaction-Tabelle
+  const [allTxs,   setAllTxs]   = useState<any[]>([])   // Transaction-Tabelle — einzige Quelle für Einnahmen UND Ausgaben
   const [miles,    setMiles]    = useState<any[]>([])
   const [profit,   setProfit]   = useState<any>(null)
   const [loading,  setLoading]  = useState(false)
@@ -97,14 +93,12 @@ export function FinanceClient() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [txRes, legRes, mileRes, profitRes] = await Promise.all([
+    const [txRes, mileRes, profitRes] = await Promise.all([
       fetch(`/api/transactions?year=${year}`).then(r => r.json()),
-      fetch(`/api/finance/transactions?year=${year}`).then(r => r.json()),
       fetch(`/api/finance/mileage?year=${year}`).then(r => r.json()),
       fetch(`/api/finance/profit-statement?year=${year}`).then(r => r.json()),
     ])
-    setNewTxs(Array.isArray(txRes) ? txRes : [])
-    setLegacyTxs(Array.isArray(legRes) ? legRes : [])
+    setAllTxs(Array.isArray(txRes) ? txRes : [])
     setMiles(Array.isArray(mileRes) ? mileRes : [])
     setProfit(profitRes)
     setLoading(false)
@@ -114,37 +108,33 @@ export function FinanceClient() {
 
   // ── Berechnungen ───────────────────────────────────────────────────────────
 
-  // Einnahmen: neue Transactions (SESSION) + legacy INCOME
-  const incomeRows = [
-    ...newTxs.filter(t => t.direction === 'INCOME' && t.lifecycleStatus === 'ACTIVE').map(t => ({
-      id: t.id, source: 'new', date: t.transactionDate, amount: Number(t.amountGross),
-      type: 'Sitzungsrechnung', status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
+  // Einnahmen: alle Transaction mit direction INCOME
+  const incomeRows = allTxs
+    .filter(t => t.direction === 'INCOME' && t.lifecycleStatus === 'ACTIVE')
+    .map(t => ({
+      id: t.id, source: 'tx', date: t.transactionDate, amount: Number(t.amountGross),
+      type: INCOME_CATS[t.category] ?? t.category ?? 'Honorar',
+      status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
       statusClass: t.paymentStatus === 'PAID' ? 'badge-green' : 'badge-amber',
       ref: t.referenceNumber, payer: t.payerName,
       paymentMethod: TX_PAYMENT_METHODS[t.paymentMethod] ?? '—',
       raw: t,
-    })),
-    ...legacyTxs.filter(t => t.type === 'INCOME').map(t => ({
-      id: t.id, source: 'legacy', date: t.date, amount: Number(t.amount),
-      type: INCOME_CATS[t.incomeCategory] ?? t.incomeCategory ?? 'Einnahme',
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  // Ausgaben: alle Transaction mit direction EXPENSE
+  const expenseRows = allTxs
+    .filter(t => t.direction === 'EXPENSE' && t.lifecycleStatus === 'ACTIVE')
+    .map(t => ({
+      id: t.id, source: 'tx', date: t.transactionDate, amount: Number(t.amountGross),
+      type: EXPENSE_CATS[t.category] ?? t.category ?? 'Ausgabe',
       status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
       statusClass: t.paymentStatus === 'PAID' ? 'badge-green' : 'badge-amber',
-      ref: t.invoiceNumber ?? '—', payer: t.description ?? '—',
-      paymentMethod: LEGACY_PAYMENT_METHODS[t.paymentMethod] ?? '—',
+      ref: t.referenceNumber, payee: t.payeeName,
+      paymentMethod: TX_PAYMENT_METHODS[t.paymentMethod] ?? '—',
       raw: t,
-    })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-  // Ausgaben: legacy EXPENSE
-  const expenseRows = legacyTxs.filter(t => t.type === 'EXPENSE').map(t => ({
-    id: t.id, source: 'legacy', date: t.date, amount: Number(t.amount),
-    type: EXPENSE_CATS[t.expenseCategory] ?? t.expenseCategory ?? 'Ausgabe',
-    status: t.paymentStatus === 'PAID' ? 'Bezahlt' : 'Offen',
-    statusClass: t.paymentStatus === 'PAID' ? 'badge-green' : 'badge-amber',
-    ref: t.invoiceNumber ?? '—', payee: t.description ?? '—',
-    paymentMethod: LEGACY_PAYMENT_METHODS[t.paymentMethod] ?? '—',
-    raw: t,
-  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const totalIncome   = incomeRows.reduce((s, r) => s + r.amount, 0)
   const totalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0)
@@ -170,37 +160,22 @@ export function FinanceClient() {
     setSavingManual(true)
     const net = parseFloat(manualForm.amountNet || '0')
     const vat = manualForm.vatRate / 100
-    if (manualDir === 'EXPENSE') {
-      // Ausgabe → legacy FinanceTransaction
-      await fetch('/api/finance/transactions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'EXPENSE', amount: net, date: manualForm.date,
-          description: manualForm.payeeName || manualForm.notes || '',
-          paymentMethod: manualForm.paymentMethod === 'UNBAR_BANK_TRANSFER' ? 'BANK_TRANSFER'
-            : manualForm.paymentMethod === 'CASH' ? 'CASH' : 'OTHER',
-          paymentStatus: manualForm.paid ? 'PAID' : 'PENDING',
-          expenseCategory: manualForm.expenseCategory,
-          invoiceNumber: '', note: manualForm.notes,
-        }),
-      })
-    } else {
-      // Einnahme → neue Transaction-Tabelle
-      await fetch('/api/transactions/manual', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          direction: 'INCOME',
-          amountNet: net, vatRate: vat,
-          transactionDate: manualForm.date,
-          payerName: manualForm.payerName || 'Klient*in',
-          payerAddress: manualForm.payerAddress,
-          payeeName: manualForm.payeeName || 'Praxis',
-          paid: manualForm.paid,
-          paymentMethod: manualForm.paymentMethod,
-          notes: manualForm.notes,
-        }),
-      })
-    }
+    await fetch('/api/transactions/manual', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        direction: manualDir,
+        amountNet: net, vatRate: vat,
+        transactionDate: manualForm.date,
+        payerName: manualDir === 'INCOME' ? (manualForm.payerName || 'Klient*in') : 'Ich',
+        payerAddress: manualForm.payerAddress,
+        payeeName: manualDir === 'INCOME' ? (manualForm.payeeName || 'Praxis') : (manualForm.payeeName || 'Empfänger'),
+        category: manualDir === 'INCOME' ? manualForm.incomeCategory : manualForm.expenseCategory,
+        paid: manualForm.paid,
+        paidAt: manualForm.paidAt,
+        paymentMethod: manualForm.paymentMethod,
+        notes: manualForm.notes,
+      }),
+    })
     setSavingManual(false)
     setShowManualTx(false)
     setManualForm({ payerName:'', payerAddress:'', payeeName:'', payeeAddress:'',
@@ -232,14 +207,9 @@ export function FinanceClient() {
     load()
   }
 
-  async function deleteLegacyTx(id: string) {
-    if (!confirm('Rechnung löschen?')) return
-    await fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' })
-    load()
-  }
-
-  async function cancelNewTx(id: string) {
-    if (!confirm('Rechnung stornieren? Es wird eine Gegenbuchung erstellt.')) return
+  async function cancelTx(id: string, direction: 'INCOME' | 'EXPENSE') {
+    const label = direction === 'INCOME' ? 'Rechnung' : 'Ausgabe'
+    if (!confirm(`${label} stornieren? Es wird eine Gegenbuchung erstellt.`)) return
     await fetch(`/api/transactions/${id}/cancel`, { method: 'POST' })
     load()
   }
@@ -419,29 +389,23 @@ export function FinanceClient() {
                       <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.paymentMethod}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.ref}</td>
                       <td onClick={e => e.stopPropagation()}>
-                        {r.source === 'new' ? (
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            {r.raw.paymentStatus === 'UNPAID' && (
-                              <button onClick={() => markNewTxPaid(r.id)} className="btn-secondary" style={{ fontSize: 11, padding: '2px 6px' }}>
-                                <Check style={{ width: 11, height: 11 }} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => window.open(`/api/transactions/${r.id}/invoice`, '_blank')}
-                              className="btn-ghost" style={{ padding: '2px 4px' }} title="Drucken / PDF">
-                              <Download style={{ width: 12, height: 12 }} />
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {r.raw.paymentStatus === 'UNPAID' && (
+                            <button onClick={() => markNewTxPaid(r.id)} className="btn-secondary" style={{ fontSize: 11, padding: '2px 6px' }}>
+                              <Check style={{ width: 11, height: 11 }} />
                             </button>
-                            {r.raw.lifecycleStatus === 'ACTIVE' && (
-                              <button onClick={() => cancelNewTx(r.id)} className="btn-ghost" style={{ padding: '2px 4px', color: 'var(--red)' }}>
-                                <Ban style={{ width: 12, height: 12 }} />
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <button onClick={() => deleteLegacyTx(r.id)} className="btn-ghost" style={{ padding: '2px 4px' }}>
-                            <Trash2 style={{ width: 12, height: 12 }} />
+                          )}
+                          <button
+                            onClick={() => window.open(`/api/transactions/${r.id}/invoice`, '_blank')}
+                            className="btn-ghost" style={{ padding: '2px 4px' }} title="Drucken / PDF">
+                            <Download style={{ width: 12, height: 12 }} />
                           </button>
-                        )}
+                          {r.raw.lifecycleStatus === 'ACTIVE' && (
+                            <button onClick={() => cancelTx(r.id, 'INCOME')} className="btn-ghost" style={{ padding: '2px 4px', color: 'var(--red)' }}>
+                              <Ban style={{ width: 12, height: 12 }} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -480,12 +444,12 @@ export function FinanceClient() {
                     </div>
                   ))}
                 </div>
-                {detailTx.source === 'new' && detailTx.raw?.paymentStatus === 'UNPAID' && (
+                {detailTx.raw?.paymentStatus === 'UNPAID' && (
                   <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                     <button onClick={() => markNewTxPaid(detailTx.id)} className="btn-primary" style={{ fontSize: 12 }}>
                       <Check style={{ width: 12, height: 12 }} /> Als bezahlt markieren
                     </button>
-                    <button onClick={() => cancelNewTx(detailTx.id)} className="btn-danger" style={{ fontSize: 12 }}>
+                    <button onClick={() => cancelTx(detailTx.id, 'INCOME')} className="btn-danger" style={{ fontSize: 12 }}>
                       <Ban style={{ width: 12, height: 12 }} /> Stornieren
                     </button>
                   </div>
@@ -529,8 +493,8 @@ export function FinanceClient() {
                       <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.paymentMethod}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.ref}</td>
                       <td onClick={e => e.stopPropagation()}>
-                        <button onClick={() => deleteLegacyTx(r.id)} className="btn-ghost" style={{ padding: '2px 4px' }}>
-                          <Trash2 style={{ width: 12, height: 12 }} />
+                        <button onClick={() => cancelTx(r.id, 'EXPENSE')} className="btn-ghost" style={{ padding: '2px 4px' }}>
+                          <Ban style={{ width: 12, height: 12 }} />
                         </button>
                       </td>
                     </tr>
