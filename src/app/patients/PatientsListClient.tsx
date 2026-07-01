@@ -34,11 +34,22 @@ const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVE
 // mit DEFAULT_AVATAR_SETTINGS in src/lib/avatarSettings.ts)
 const DEFAULT_AVATAR_SEEDS: Record<string, string> = {
   MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
-  PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+  PAIR: 'kds-pair-default-a,kds-pair-default-b',
+  FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
+  GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
 }
 function avatarGroupFor(gender: string, categoryType?: string | null): string {
   if (categoryType === 'PAIR' || categoryType === 'FAMILY' || categoryType === 'GROUP') return categoryType
   return gender === 'MALE' || gender === 'FEMALE' ? gender : 'DIVERSE'
+}
+// Bei Paar/Familie/Gruppe ist der gespeicherte Wert eine kommagetrennte Liste
+// mehrerer Personen-Seeds (siehe src/lib/avatarSettings.ts) → ?seeds= statt ?seed=
+function avatarImgSrc(seedOrSeeds: string, bg?: string): string {
+  const bgParam = bg ? `&bg=${bg}` : ''
+  if (seedOrSeeds.includes(',')) {
+    return `/api/avatar?seeds=${encodeURIComponent(seedOrSeeds)}${bgParam}`
+  }
+  return `/api/avatar?seed=${encodeURIComponent(seedOrSeeds)}${bgParam}`
 }
 
 // ── PatientIcon: globaler Avatar (unter Einstellungen → Avatare festgelegt) + Pill ──
@@ -73,7 +84,7 @@ function PatientIcon({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
       <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${color}` }}>
-        <img src={`/api/avatar?seed=${encodeURIComponent(seed)}&bg=e3e3e3`} alt="" width={size} height={size} style={{ display: 'block' }} />
+        <img src={avatarImgSrc(seed, 'e3e3e3')} alt="" width={size} height={size} style={{ display: 'block' }} />
       </div>
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
