@@ -1,3 +1,160 @@
+KDS – Session-Log Teil 11 (1.7.2026)
+Letzter Commit: a1287834dc35424a92cdd5458221a27d5448fc7d
+
+STACK / INFRA (unverändert, siehe Teil 9/10)
+NEU: @dicebear/core@^10.2.0 + @dicebear/styles@^10.2.0 als Dependency
+  (Avatar-Feature, siehe unten). WICHTIG bei diesen Paketen: @dicebear/styles
+  ist NICHT immer versionsgleich zu @dicebear/core — vor jedem Update prüfen
+  (npm view @dicebear/styles dist-tags), ob "latest" wirklich zusammenpasst,
+  sonst schlägt pnpm install fehl (ETARGET). "next"-Tag ist ein Prerelease,
+  nicht verwenden.
+
+DIESE SESSION – FERTIG
+
+===== TEIL A: Finanz-Analyse, Bereinigung, Vereinheitlichung =====
+(vollständige technische Analyse auf Anfrage Herbert, dann Fixes + Umbau)
+
+1) Vollständige Code-Analyse der Finanzmigration ergab Doppelzählungs-Bug:
+   TheraPsy-Migration schrieb Honorarnoten in ZWEI parallele Modelle
+   (Transaction UND FinanceTransaction). computeTransactionJournal() summierte
+   beide ohne Belegnummern-Abgleich → BMD-Export + Steuerberater-PDF zeigten
+   Beträge doppelt.
+2) scripts/finance-diagnose.ts gebaut (rein lesend), am echten Server
+   verifiziert: 42 doppelt erfasste Belegnummern, 3.177,80€ zu hohe Reports,
+   Math.abs()-Bug bei Stornos bestätigt (Vorzeichen wurde vernichtet),
+   E26043-Kollision gefunden (echte Rechnung + Privateinlage zufällig gleiche
+   Belegnummer).
+3) Root-Cause-Fixes: Bug A (Konto-2xxx fälschlich als Einnahme klassifiziert,
+   therapsyParser.ts), Bug B (Math.abs() vernichtete Storno-Vorzeichen,
+   therapsyExecutor.ts).
+4) scripts/finance-cleanup.ts gebaut + am Server ausgeführt: 45 Duplikate
+   gelöscht, E26043 zu "E26043-PRIVATEINLAGE" umbenannt. Diagnose danach:
+   0 Überschneidungen, Summen stimmen.
+5) Herbert wollte "echte Vereinheitlichung" statt nur Bugfix → komplette
+   Konsolidierung von FinanceTransaction (Legacy) auf Transaction:
+   - Transaction bekam neues Feld `category` (additiv, via normalem
+     prisma db push in update.sh übernommen)
+   - therapsyExecutor.ts Schritt 4 (BMD-Import) schreibt jetzt Transaction+
+     TxLineItem statt FinanceTransaction
+   - transactionJournal.ts + profitStatement.ts: legacyTxs-Merge komplett
+     entfernt, Transaction ist einzige Quelle
+   - FinanceClient.tsx: Einnahmen UND Ausgaben laufen jetzt beide über
+     /api/transactions (+/api/transactions/manual), Hard-Delete bei Ausgaben
+     durch Storno ersetzt (cancelTransaction(), war schon direction-agnostisch)
+   - Tote Routen /api/finance/transactions + /api/finance/transactions/[id]
+     gelöscht
+   - scripts/legacy-financetransaction-migrate.ts gebaut + am Server
+     ausgeführt: verbleibende FinanceTransaction-Zeilen (16 Ausgaben + Reste)
+     nach Transaction übernommen. FinanceTransaction-Tabelle bleibt als
+     Sicherheitsnetz bestehen (nicht gelöscht), wird aber von keinem
+     Code-Pfad mehr aktiv beschrieben oder gelesen.
+   ✅ BESTÄTIGT von Herbert: Deploy + beide Scripts liefen erfolgreich durch.
+
+6) Nebenbei gefunden + gefixt: Patient-Bearbeiten-Button tat nichts bei
+   migrierten Patienten ohne Einheitenpreis. Ursache: parseFloat('') = NaN,
+   an Prisma-Decimal-Feld übergeben crashte den KOMPLETTEN PATCH-Request
+   (auch Vorname/Nachname wurden dadurch nicht gespeichert). Fix:
+   src/app/api/patients/[id]/route.ts (NaN→null statt Crash) +
+   PatientRecordClient.tsx saveStamm() zeigt jetzt Fehler an statt bei
+   Fehlschlag das Formular stillschweigend zu schließen.
+
+===== TEIL B: Avatar-Feature (komplett neu) =====
+
+Ausgangslage: handgezeichnete Cartoon-Gesichter (FigureIcon/GroupIcon in
+PatientsListClient.tsx + dritte Variante im Banner von PatientRecordClient.tsx)
+gefielen Herbert nicht (zu abstrakt/kühl bei ersten KI-generierten SVG-Versuchen,
+dann zu unpersönlich). Referenzbild zeigte den bekannten "DiceBear Avataaars"-
+Stil (flache Business-Avatare, grauer Kreis-Hintergrund) — das wurde umgesetzt.
+
+Architektur-Entscheidung: NICHT pro Patient automatisch generiert, sondern
+GLOBAL einmalig unter Einstellungen je Gruppe festgelegt (Männlich, Weiblich,
+Divers, Paar, Familie, Gruppe) — alle Patient:innen einer Gruppe zeigen
+denselben Avatar.
+
+Technisch:
+- @dicebear/core + @dicebear/styles (npm), NUR serverseitig verwendet (fs.
+  readFileSync statt ESM-JSON-Import mit "with {type:'json'}" — letzteres ist
+  zwar in Node 22 nativ ok, aber riskant bzgl. Next.js/Webpack-Bundler-
+  Kompatibilität; fs-Ansatz ist Modul-System-unabhängig und getestet stabil)
+- Prisma: PraxisConfig.avatarSettings (String?, JSON) — neues Feld, additiv
+- src/lib/avatarSettings.ts: parseAvatarSettings/DEFAULT_AVATAR_SETTINGS
+  (Muster wie bmdSettings/categoryLabels.ts), generateAvatarSvg (1 Person),
+  generateGroupAvatarSvg (2-4 Personen kombiniert, siehe unten)
+- GET /api/settings/avatars (+PATCH, admin-only, +DELETE) — Muster wie
+  /api/finance/bmd-settings
+- GET /api/avatar?seed=X (1 Person) oder ?seeds=a,b,c (mehrere Personen,
+  kombiniert) — liefert fertiges SVG, cachebar über die URL selbst
+- Einstellungen → neue Section "Avatare": pro Gruppe 12 Kachel-Optionen zum
+  Direkt-Anklicken (nicht "Würfeln" — war Herberts explizite Anforderung,
+  erst Würfeln-Button gebaut, dann auf Grid umgestellt weil "zu wenig"
+  Auswahl auf einmal sichtbar war), "Mehr laden" für weitere 12
+- PatientsListClient.tsx + PatientRecordClient.tsx: FigureIcon/GroupIcon/dritte
+  Banner-SVG-Variante komplett entfernt (toter Code), ersetzt durch
+  <img src="/api/avatar?...">, avatarSeeds per useEffect vom Server geholt
+
+WICHTIGER TEILSCHRITT — Mehrpersonen-Gruppen (Paar/Familie/Gruppe):
+DiceBear Avataaars zeichnet IMMER nur eine einzelne Person. Für Paar/Familie/
+Gruppe ist ein Einzelgesicht semantisch falsch (Herbert hat das im Screenshot
+bemerkt: "paar ist ein Problem" / "familie und gruppe auch"). Lösung:
+- Seed-Wert für diese 3 Gruppen ist eine KOMMAGETRENNTE LISTE mehrerer
+  Personen-Seeds (z.B. "seedA,seedB" für ein Paar) — landet in derselben
+  DB-Spalte (avatarSettings JSON), keine Schema-Änderung nötig
+- generateGroupAvatarSvg() nested mehrere einzelne Avataaars-SVGs per <g
+  transform="translate(x,y) scale(s)"> in ein gemeinsames SVG mit Kreis-
+  Clip-Path. KRITISCH: idRandomization:true beim Erzeugen jedes Einzel-
+  Avatars ist zwingend nötig — sonst haben alle Avatare dieselben internen
+  <defs>-IDs (Kleidung/Frisur/etc.) und überschreiben sich beim Verschachteln
+  gegenseitig (getestet und bestätigt, ohne die Option kollidieren die IDs).
+- Layout-Koordinaten für 2/3/4 Personen in GROUP_LAYOUTS (avatarSettings.ts)
+  — 280×280 Canvas passend zur nativen Avataaars-viewBox
+- /api/avatar erkennt automatisch seed vs. seeds Query-Param
+- Einstellungen-UI: bei Paar/Familie/Gruppe kein einzelnes 12er-Grid mehr,
+  sondern PRO PERSON ein eigenes Mini-Grid ("Person 1", "Person 2", ...) mit
+  eigenem "Mehr laden" + Live-Vorschau-Icon der fertigen Kombination oben
+  neben dem Gruppennamen
+- Ergebnis mit cairosvg lokal zu PNG gerendert und Herbert vor dem Einbau
+  gezeigt (3 Beispielbilder Paar/Familie/Gruppe) — bestätigt, dann umgesetzt
+✅ Von Herbert noch NICHT bestätigt ob nach Deploy alles wie gewünscht
+  aussieht (Umbau lief bis Sessionende ohne Rückmeldung durch).
+
+PENDING / OFFEN
+
+- Avatar-Feature: Herbert muss nach `update.sh` noch bestätigen, dass Paar/
+  Familie/Gruppe-Kombinationen in der Praxis gut aussehen (Layout ggf.
+  nachjustieren falls Überlappung/Anordnung nicht passt — GROUP_LAYOUTS in
+  src/lib/avatarSettings.ts ist der Ort dafür).
+- FinanceTransaction-Tabelle könnte langfristig (nach Beobachtungszeit) per
+  Schema-Migration ganz entfernt werden. Bewusst nicht in dieser Session
+  gemacht (Sicherheitsnetz).
+- Wie bisher: Audio-Feature-Fragen offen, SMTP-Verschlüsselung offen,
+  Dashboard verschachtelte $queryRaw-Template-Literals (Aktivitäts-Chart
+  liefert leere Daten, unkritisch, nicht gefixt).
+
+WICHTIGE PRISMA-FELDER / SCHEMA-GOTCHAS (Ergänzung, Stand a1287834)
+
+Transaction.category (aus Teil 10): String? — Kategorie-Code, ersetzt
+  FinanceTransaction.incomeCategory/expenseCategory funktional.
+PraxisConfig.avatarSettings (NEU): String? (JSON) — { seeds: { MALE, FEMALE,
+  DIVERSE, PAIR, FAMILY, GROUP } }. Bei PAIR/FAMILY/GROUP ist der Wert pro
+  Key KOMMAGETRENNT (mehrere Personen-Seeds), bei den anderen ein einzelner
+  Seed-String. Siehe src/lib/avatarSettings.ts für Parsing/Defaults.
+
+BEKANNTE FALLSTRICKE (Ergänzung)
+
+@dicebear/styles und @dicebear/core können unterschiedliche "latest"-Versionen
+  haben (Monorepo, aber nicht im Lockstep released) — vor jedem Versions-
+  Bump beide separat gegen npm-Registry prüfen, sonst pnpm install (ETARGET).
+DiceBear-SVGs NIEMALS mehrfach im selben Dokument verschachteln ohne
+  idRandomization:true — interne <defs>-IDs (Kleidung, Frisur, Accessoires)
+  sind sonst über mehrere Avatare hinweg identisch und überschreiben sich.
+ESM-JSON-Imports mit "with { type: 'json' }" funktionieren in Node 22 pur,
+  aber Kompatibilität mit Next.js/Webpack-Bundling ist nicht garantiert —
+  für serverseitigen JSON-Zugriff auf node_modules-Pakete lieber
+  fs.readFileSync(path.join(process.cwd(), 'node_modules', ...)) verwenden,
+  Modul-System-unabhängig und getestet stabil.
+
+--------------------------------------------------------------------
+
 KDS – Session-Log Teil 10 (1.7.2026)
 Letzter Commit: c91b889
 
@@ -321,4 +478,5 @@ unrar: nach Extraktion chmod -R u+rX nötig (Windows-Rechte im RAR)
 update.sh überschreibt sich selbst nach git pull → exec+KDS_UPDATED-Flag schützt
 PDF-Fonts: Unicode-Minus (−) wird nicht gerendert → einfachen Bindestrich (-) verwenden
 SMTP: hosttech-Passwort kann sich serverseitig ändern (Sicherheitsmaßnahme)
+
 
