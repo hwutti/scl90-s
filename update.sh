@@ -144,19 +144,49 @@ step "Nginx: client_max_body_size prüfen"
 # Dateiname ist NICHT garantiert "kds" (auf diesem Server z.B. "scl90s" — vermutlich
 # durch manuelles Setup/Rename entstanden). Daher über den tatsächlichen Proxy-Port
 # suchen statt einen festen Dateinamen anzunehmen.
-NGINX_KDS_CONF=$(grep -rl "proxy_pass http://127.0.0.1:${APP_PORT:-3000}" /etc/nginx/sites-available/ 2>/dev/null | head -1 || true)
-if [[ -n "$NGINX_KDS_CONF" ]] && ! grep -q "client_max_body_size" "$NGINX_KDS_CONF"; then
-  sed -i '/proxy_cache_bypass \$http_upgrade;/a\        client_max_body_size 50M;' "$NGINX_KDS_CONF"
-  if nginx -t 2>/dev/null; then
-    systemctl reload nginx
-    success "client_max_body_size 50M ergänzt in $NGINX_KDS_CONF, nginx neu geladen"
+# WICHTIG: sites-enabled/X ist NICHT zwingend ein Symlink auf sites-available/X —
+# auf diesem Server sind es zwei unabhängige Dateien. Beide Verzeichnisse durchsuchen
+# und JEDE Fundstelle patchen, sonst greift die Änderung nicht am tatsächlich aktiven VHost.
+NGINX_CONFS=$(grep -rl "proxy_pass http://127.0.0.1:${APP_PORT:-3000}" /etc/nginx/sites-available/ /etc/nginx/sites-enabled/ 2>/dev/null | sort -u || true)
+if [[ -n "$NGINX_CONFS" ]]; then
+  CHANGED=0
+  while IFS= read -r conf; do
+    # Bei echten Symlinks (sites-enabled -> sites-available) ist die Datei nach dem
+    # ersten Patch-Durchlauf schon geändert; der grep-Check hier überspringt sie dann
+    # beim zweiten Fund automatisch — kein doppeltes Einfügen.
+    if ! grep -q "client_max_body_size" "$conf"; then
+      sed -i '/proxy_cache_bypass \$http_upgrade;/a\        client_max_body_size 50M;' "$conf"
+      CHANGED=1
+      info "client_max_body_size 50M ergänzt in $conf"
+    fi
+  done <<< "$NGINX_CONFS"
+  if [[ "$CHANGED" == "1" ]]; then
+    if nginx -t 2>/dev/null; then
+      systemctl reload nginx
+      success "nginx neu geladen"
+    else
+      warn "nginx-Konfig nach Ergänzung ungültig — bitte manuell prüfen"
+    fi
   else
-    warn "nginx-Konfig nach Ergänzung ungültig — bitte manuell prüfen: $NGINX_KDS_CONF"
+    success "client_max_body_size bereits überall gesetzt"
   fi
-elif [[ -n "$NGINX_KDS_CONF" ]]; then
-  success "client_max_body_size bereits gesetzt ($NGINX_KDS_CONF)"
 else
   warn "Keine nginx-Konfig mit proxy_pass auf Port ${APP_PORT:-3000} gefunden — client_max_body_size übersprungen, bitte manuell prüfen"
+fi
+
+# ─── 5e. systemd: korrekten pnpm-Pfad sicherstellen ───────────────────────────
+# install.sh hat früher /usr/local/bin/pnpm fix angenommen — auf manchen Systemen
+# (je nach Node/pnpm-Installationsart) liegt pnpm woanders (z.B. /usr/bin/pnpm),
+# was den Service mit "203/EXEC" endlos crashen lässt. Idempotent korrigieren.
+step "systemd: pnpm-Pfad im kds.service prüfen"
+KDS_SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
+ACTUAL_PNPM_BIN=$(command -v pnpm || true)
+if [[ -f "$KDS_SERVICE_FILE" && -n "$ACTUAL_PNPM_BIN" ]] && ! grep -q "ExecStart=${ACTUAL_PNPM_BIN} start\|ExecStart=/usr/bin/env pnpm start" "$KDS_SERVICE_FILE"; then
+  sed -i "s|^ExecStart=.*pnpm start|ExecStart=${ACTUAL_PNPM_BIN} start|" "$KDS_SERVICE_FILE"
+  systemctl daemon-reload
+  success "ExecStart korrigiert auf ${ACTUAL_PNPM_BIN} (Service wird beim nächsten Schritt neu gestartet)"
+elif [[ -f "$KDS_SERVICE_FILE" ]]; then
+  success "pnpm-Pfad im Service bereits korrekt"
 fi
 
 # ─── 6. Seed ──────────────────────────────────────────────────────────────────
