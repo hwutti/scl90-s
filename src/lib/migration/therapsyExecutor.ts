@@ -193,7 +193,21 @@ export async function executeMigration(
       if (existing) continue
 
       const patientId = inv.profilNr ? (patientIdByProfilNr.get(inv.profilNr) ?? null) : null
-      const isPaid = !!inv.paidDate
+
+      // Echten Zahlungsstatus verwenden, falls aus Finanzexport ermittelt (siehe therapsyParser.ts).
+      // Fallback (Finanzexport nicht im Export enthalten): alte Heuristik + Warnhinweis.
+      let paymentStatus: 'PAID' | 'PENDING' | 'CANCELLED'
+      let statusNote: string
+      if (inv.status) {
+        paymentStatus = inv.status
+        statusNote = inv.status === 'PAID' ? `bezahlt am ${inv.paidDate}`
+                   : inv.status === 'CANCELLED' ? `storniert am ${inv.paidDate}`
+                   : 'offen'
+      } else {
+        paymentStatus = inv.paidDate ? 'PAID' : 'PENDING'
+        statusNote = inv.paidDate ? `bezahlt am ${inv.paidDate} (ungeprüft — Finanzexport fehlte)` : 'offen'
+        result.warnings.push(`Rechnung ${inv.invoiceNr}: Zahlungsstatus nicht verifizierbar (Finanzexport-Datei fehlte im Export) — als "${paymentStatus}" markiert, bitte manuell prüfen.`)
+      }
 
       await prisma.financeTransaction.create({
         data: {
@@ -202,8 +216,8 @@ export async function executeMigration(
           type: 'INCOME',
           amount: inv.amount,
           date: invoiceDate,
-          paymentStatus: isPaid ? 'PAID' : 'PENDING',
-          description: `Importiert aus TheraPsy: ${inv.invoiceNr}${isPaid ? ` (bezahlt ${inv.paidDate})` : ' (offen)'}`,
+          paymentStatus,
+          description: `Importiert aus TheraPsy: ${inv.invoiceNr} (${statusNote})`,
           invoiceNumber: inv.invoiceNr,
           incomeCategory: 'HONORAR',
         },
