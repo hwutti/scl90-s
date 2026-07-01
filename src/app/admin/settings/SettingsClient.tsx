@@ -825,41 +825,46 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                     <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{label}</h4>
                     {avatarStyle === 'dicebear' && isMulti && (
                       <img src={`/api/avatar?seeds=${encodeURIComponent(avatarSeeds[key as string] ?? '')}&bg=e3e3e3`} alt="Vorschau der Kombination"
-                        width={40} height={40} style={{ borderRadius: '50%' }} />
+                        width={40} height={40} style={{ width: 40, height: 40, minWidth: 40, maxWidth: 40, borderRadius: '50%' }} />
                     )}
                     {avatarStyle === 'illustrated' && (
                       <img src={`/avatars/illustrated/${pool}/${avatarIllustrated[key as string] ?? illustratedFiles[0]}`} alt="Aktuelle Auswahl"
-                        width={40} height={40} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                        width={40} height={40} style={{ width: 40, height: 40, minWidth: 40, maxWidth: 40, borderRadius: '50%', objectFit: 'cover' }} />
                     )}
                   </div>
 
                   {avatarStyle === 'illustrated' ? (
                     // ── Illustrierter Stil: feste Bilder aus dem jeweiligen Pool anklickbar ──
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+                    // flex-wrap statt CSS-Grid(auto-fill/1fr): bei vielen Kacheln (hier bis zu 39)
+                    // führte auto-fill+1fr zu inkonsistenten Spaltenbreiten (Bilder wurden auf einen
+                    // schmalen Streifen zusammengequetscht). Feste Pixelgrößen + flexShrink:0 verhindern das.
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       {illustratedFiles.map(file => (
                         <button key={file} onClick={() => setAvatarIllustrated(s => ({ ...s, [key as string]: file }))}
                           title="Als Avatar für diese Gruppe auswählen"
                           style={{
                             padding: 2, borderRadius: '50%', cursor: 'pointer', background: 'none',
+                            flexShrink: 0, width: 64, height: 64, boxSizing: 'border-box',
                             border: avatarIllustrated[key as string] === file ? '3px solid var(--color-primary)' : '3px solid transparent',
                           }}>
                           <img src={`/avatars/illustrated/${pool}/${file}`} alt=""
-                            width={60} height={60} style={{ borderRadius: '50%', display: 'block', objectFit: 'cover' }} />
+                            width={60} height={60} style={{ width: 60, height: 60, minWidth: 60, maxWidth: 60, borderRadius: '50%', display: 'block', objectFit: 'cover' }} />
                         </button>
                       ))}
                     </div>
                   ) : !isMulti ? (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                         {(avatarCandidates[key as string] ?? []).map(seed => (
                           <button key={seed} onClick={() => setAvatarSeeds(s => ({ ...s, [key as string]: seed }))}
                             title="Als Avatar für diese Gruppe auswählen"
                             style={{
                               padding: 2, borderRadius: '50%', cursor: 'pointer', background: 'none',
+                              flexShrink: 0, width: 64, height: 64, boxSizing: 'border-box',
                               border: avatarSeeds[key as string] === seed ? '3px solid var(--color-primary)' : '3px solid transparent',
                             }}>
                             <img src={`/api/avatar?seed=${encodeURIComponent(seed)}&bg=e3e3e3`} alt=""
-                              width={60} height={60} style={{ borderRadius: '50%', display: 'block' }} />
+                              width={60} height={60} style={{ width: 60, height: 60, minWidth: 60, maxWidth: 60, borderRadius: '50%', display: 'block' }} />
                           </button>
                         ))}
                       </div>
@@ -876,7 +881,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                         return (
                           <div key={slot} style={{ padding: 10, background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Person {slot + 1}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 8 }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                               {(avatarCandidates[candKey] ?? []).map(seed => (
                                 <button key={seed} onClick={() => {
                                   const next = [...slotSeeds]
@@ -886,10 +891,11 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                                   title={`Als Person ${slot + 1} auswählen`}
                                   style={{
                                     padding: 2, borderRadius: '50%', cursor: 'pointer', background: 'none',
+                                    flexShrink: 0, width: 52, height: 52, boxSizing: 'border-box',
                                     border: slotSeeds[slot] === seed ? '3px solid var(--color-primary)' : '3px solid transparent',
                                   }}>
                                   <img src={`/api/avatar?seed=${encodeURIComponent(seed)}&bg=e3e3e3`} alt=""
-                                    width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
+                                    width={48} height={48} style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, borderRadius: '50%', display: 'block' }} />
                                 </button>
                               ))}
                             </div>

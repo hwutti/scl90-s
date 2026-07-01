@@ -452,7 +452,7 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
                     <img src={src} alt="" width={68} height={68}
-                      style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', objectFit: 'cover' }} />
+                      style={{ width: 68, height: 68, minWidth: 68, maxWidth: 68, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', objectFit: 'cover' }} />
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
                       {pillText}
                     </span>

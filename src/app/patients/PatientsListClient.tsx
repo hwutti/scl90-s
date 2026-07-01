@@ -97,7 +97,7 @@ function PatientIcon({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
       <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${color}` }}>
-        <img src={src} alt="" width={size} height={size} style={{ display: 'block', objectFit: 'cover' }} />
+        <img src={src} alt="" width={size} height={size} style={{ width: size, height: size, minWidth: size, maxWidth: size, display: 'block', objectFit: 'cover' }} />
       </div>
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
