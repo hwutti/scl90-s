@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       paidAt: body.paid ? new Date(body.paidAt ?? new Date()) : null,
       paymentMethod: body.paid ? (body.paymentMethod ?? 'UNBAR_BANK_TRANSFER') : null,
       lifecycleStatus: 'ACTIVE',
+      category: body.category ?? null,
       notes: body.notes ?? null,
     },
   })
