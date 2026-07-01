@@ -1,3 +1,74 @@
+KDS – Session-Log Teil 10 (1.7.2026)
+Letzter Commit: c91b889
+
+STACK / INFRA (unverändert, siehe Teil 9)
+
+DIESE SESSION – FERTIG
+
+Vollständige Finanz-Analyse + Bereinigung + Vereinheitlichung (auf Anfrage Herbert:
+"Bitte führe eine vollständige technische Analyse der Finanzmigration durch")
+
+1) Analyse ergab: TheraPsy-Migration schrieb Honorarnoten in ZWEI parallele Modelle
+   (Transaction UND FinanceTransaction), computeTransactionJournal() summierte beide
+   ohne Abgleich → Doppelzählung in BMD-Export + Steuerberater-PDF.
+2) scripts/finance-diagnose.ts gebaut (rein lesend) → am echten Server verifiziert:
+   42 doppelt erfasste Belegnummern, 3.177,80€ zu hohe Reports, Math.abs()-Bug bei
+   Stornos bestätigt (E26023/E26025 von -110€ zu +110€ verfälscht), E26043-Kollision
+   (Privateinlage vs. echte Rechnung, zufällig gleiche Belegnummer) gefunden.
+3) Root-Cause-Fixes: Bug A (Konto-2xxx fälschlich als Einnahme klassifiziert,
+   therapsyParser.ts), Bug B (Math.abs() vernichtete Storno-Vorzeichen,
+   therapsyExecutor.ts), Cross-Dedup zwischen Schritt 3/4 ergänzt.
+4) scripts/finance-cleanup.ts gebaut + ausgeführt: 45 Duplikate gelöscht, E26043
+   umbenannt zu "E26043-PRIVATEINLAGE". Diagnose danach: 0 Überschneidungen.
+5) Herbert wollte "echte Vereinheitlichung" statt nur Bugfix → komplette
+   Konsolidierung von FinanceTransaction (Legacy) auf Transaction (neues Modell)
+   durchgeführt:
+   - Transaction bekam neues Feld `category` (additiv, via normalem
+     `prisma db push` in update.sh übernommen — keine manuelle Migration nötig)
+   - therapsyExecutor.ts Schritt 4 (BMD-Import) schreibt jetzt Transaction+
+     TxLineItem statt FinanceTransaction — kein Cross-Table-Dedup mehr nötig,
+     referenceNumber-@unique reicht allein
+   - transactionJournal.ts + profitStatement.ts: legacyTxs-Merge komplett entfernt,
+     Transaction ist einzige Quelle
+   - FinanceClient.tsx: Einnahmen UND Ausgaben laufen jetzt beide über
+     /api/transactions (+ /api/transactions/manual), Hard-Delete bei Ausgaben durch
+     Storno ersetzt (cancelTransaction(), war vorher schon direction-agnostisch,
+     keine Änderung dort nötig)
+   - Tote Routen /api/finance/transactions + /api/finance/transactions/[id] gelöscht
+   - scripts/legacy-financetransaction-migrate.ts gebaut: übernimmt die
+     verbleibenden FinanceTransaction-Zeilen (16 Ausgaben + Reste) nach Transaction.
+     FinanceTransaction-Tabelle bleibt danach als Sicherheitsnetz bestehen (nicht
+     gelöscht), wird aber von keinem Code-Pfad mehr aktiv beschrieben oder gelesen.
+
+WICHTIG — Deploy-Reihenfolge bei Herbert (noch nicht bestätigt, dass er das schon
+ausgeführt hat):
+  1. sudo bash /opt/kds/update.sh   (zieht Code + fügt category-Spalte per db push hinzu)
+  2. npx tsx scripts/legacy-financetransaction-migrate.ts --yes  (verbleibende
+     Legacy-Zeilen übernehmen — WICHTIG: erst danach sind BMD-Export/Gewinnermittlung
+     wieder vollständig, weil sie ab sofort NUR NOCH Transaction lesen)
+  3. npx tsx scripts/finance-diagnose.ts  (zur Kontrolle)
+
+PENDING / OFFEN
+
+- Deploy-Bestätigung von Herbert für die Vereinheitlichung (Schritt 1-3 oben) noch
+  ausständig — Zahlen nach Migration nochmal mit ihm gegenprüfen.
+- FinanceTransaction-Tabelle könnte langfristig (nach hinreichender Beobachtungszeit,
+  z.B. ein paar Wochen ohne Probleme) per Prisma-Schema-Migration ganz entfernt
+  werden. Bewusst NICHT in dieser Session gemacht (Sicherheitsnetz).
+- Wie bisher: Audio-Feature-Fragen offen, SMTP-Verschlüsselung offen, Dashboard
+  verschachtelte $queryRaw-Template-Literals (Aktivitäts-Chart liefert leere Daten,
+  unkritisch, nicht gefixt).
+
+WICHTIGE PRISMA-FELDER / SCHEMA-GOTCHAS (Ergänzung, Stand c91b889)
+
+Transaction.category (NEU): String? — freier Kategorie-Code (z.B. "HONORAR",
+  "MISC_BUSINESS", passend zu INCOME_CATS/EXPENSE_CATS in FinanceClient.tsx).
+  Ersetzt FinanceTransaction.incomeCategory/expenseCategory funktional.
+FinanceTransaction gilt ab sofort als eingefroren — kein Code-Pfad schreibt mehr
+  hinein. Nur noch als historisches Sicherheitsnetz in der DB, nicht gelöscht.
+
+--------------------------------------------------------------------
+
 KDS – Session-Log Teil 9 (1.7.2026)
 Letzter Commit: a90209d
 
@@ -250,3 +321,4 @@ unrar: nach Extraktion chmod -R u+rX nötig (Windows-Rechte im RAR)
 update.sh überschreibt sich selbst nach git pull → exec+KDS_UPDATED-Flag schützt
 PDF-Fonts: Unicode-Minus (−) wird nicht gerendert → einfachen Bindestrich (-) verwenden
 SMTP: hosttech-Passwort kann sich serverseitig ändern (Sicherheitsmaßnahme)
+
