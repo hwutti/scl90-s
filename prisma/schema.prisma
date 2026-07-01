@@ -307,6 +307,16 @@ model Patient {
   defaultMarkAsPaid      Boolean   @default(false)                   // sofort als bezahlt markieren?
   sessionStartNumber     Int       @default(0)        // Startzahl für Sessionzähler
 
+  // Kooperationspartner (KDS-KOOP-01): wenn gesetzt, ist dieser Patient komplett
+  // vom normalen Patientenstamm entkoppelt (eigene Liste unter "Kooperationspartner",
+  // taucht NICHT unter /patients auf). Abrechnung läuft über den Partner, nicht
+  // direkt über den Patienten -- Sitzungen werden trotzdem individuell bepreist
+  // (defaultBillingMode/defaultUnitPriceNet etc. bleiben relevant), aber die
+  // eigentliche Rechnung wird gesammelt an den Partner gestellt (siehe Transaction.
+  // cooperationPartnerId).
+  cooperationPartnerId   String?
+  cooperationPartner     CooperationPartner? @relation("PartnerPatients", fields: [cooperationPartnerId], references: [id])
+
   // Beziehungen zu Users
   createdByUserId String
   createdBy       User      @relation("CreatedByUser", fields: [createdByUserId], references: [id])
@@ -1200,6 +1210,13 @@ model Transaction {
   id                      String              @id @default(cuid())
   patientId               String?
   patient                 Patient?            @relation("PatientTransactions", fields: [patientId], references: [id])
+  // Wenn gesetzt: Rechnung geht an einen Kooperationspartner statt (nur) an den
+  // Patienten. payerName/payerAddress werden dann aus den Partner-Stammdaten
+  // befüllt. TxLineItems können trotzdem einzelne sessionId's tragen (siehe
+  // TxSessionAllocation), damit die Sitzungs-Abrechnungshistorie der einzelnen
+  // Partner-Patienten korrekt bleibt, auch wenn die Rechnung gesammelt läuft.
+  cooperationPartnerId    String?
+  cooperationPartner      CooperationPartner? @relation("PartnerTransactions", fields: [cooperationPartnerId], references: [id])
   createdByUserId         String
   createdBy               User                @relation("UserTransactions", fields: [createdByUserId], references: [id])
 
@@ -1396,6 +1413,83 @@ model InvoiceTemplate {
   customHtml      Boolean   @default(false)
 
   patients        Patient[] @relation("PatientInvoiceTemplate")
+}
+
+// ─── Kooperationspartner (KDS-KOOP-01) ─────────────────────────────────────────
+// Externe Partner (Institutionen/Organisationen), für die Herbert Patient:innen
+// behandelt, die Leistungen aber gesammelt an den Partner statt an den einzelnen
+// Patienten verrechnet werden. Patienten unter einem Partner sind komplett vom
+// normalen Patientenstamm entkoppelt (siehe Patient.cooperationPartnerId).
+model CooperationPartner {
+  id                       String    @id @default(cuid())
+  name                     String
+  address                  String?
+  postalCode               String?
+  city                     String?
+  contactPerson            String?
+  email                    String?
+  phone                    String?
+  uidNumber                String?   // UID-Nummer des Partners
+
+  defaultVatRate           Decimal?  @db.Decimal(5,4) @default(0)
+  defaultPaymentMethod     String?   @default("UNBAR_BANK_TRANSFER")
+  defaultInvoiceTemplateId String?
+  defaultInvoiceTemplate   CooperationPartnerInvoiceTemplate? @relation("PartnerInvoiceTemplate", fields: [defaultInvoiceTemplateId], references: [id])
+
+  notes                    String?
+  isActive                 Boolean   @default(true)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  patients                 Patient[]     @relation("PartnerPatients")
+  transactions             Transaction[] @relation("PartnerTransactions")
+}
+
+// Eigene, von den Patienten-Rechnungsvorlagen komplett getrennte Vorlagen-Verwaltung
+// für Kooperationspartner-Rechnungen (jeder Partner will oft ein anderes Layout).
+// Struktur bewusst identisch zu InvoiceTemplate gehalten, damit die bestehende
+// Rendering-Logik (renderInvoiceHtmlForTransaction) mit minimalen Anpassungen
+// für beide Vorlagentypen funktioniert.
+model CooperationPartnerInvoiceTemplate {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  htmlContent     String
+  cssContent      String?
+  isDefault       Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  invoiceTitle    String?   @default("Honorarnote")
+  primaryColor    String?   @default("#4f46e5")
+  paymentDays     Int       @default(14)
+  iban            String?
+  bic             String?
+  bankName        String?
+  taxNumber       String?
+  vatId           String?
+  praxisName      String?
+  praxisAddress   String?
+  praxisPhone     String?
+  praxisEmail     String?
+  footerText      String?
+  showQrCode      Boolean   @default(true)
+
+  headerImageBase64  String?
+  headerImageMime    String?
+  footerImageBase64  String?
+  footerImageMime    String?
+  bgImageBase64      String?
+  bgImageMime        String?
+  bgImageOpacity     Float     @default(0.08)
+  bgImageMode        String    @default("behind")
+  signatureImageBase64 String?
+  signatureImageMime   String?
+
+  customHtml      Boolean   @default(false)
+
+  partners        CooperationPartner[] @relation("PartnerInvoiceTemplate")
 }
 
 // ─── Transaktionstyp ─────────────────────────────────────────────────────────

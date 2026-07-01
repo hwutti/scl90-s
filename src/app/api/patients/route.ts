@@ -22,7 +22,7 @@ export async function GET() {
     if (mode === 'group' && !perms.seePatients) {
       return NextResponse.json([]) // Admin in Gruppenpraxis ohne Berechtigung
     }
-    where = { deletedAt: null }
+    where = { deletedAt: null, cooperationPartnerId: null }
   } else {
     // Therapeut: eigene Patienten + freigegebene
     const shares = await prisma.patientShare.findMany({
@@ -32,13 +32,14 @@ export async function GET() {
     if (shares.length > 0) {
       where = {
         deletedAt: null,
+        cooperationPartnerId: null,
         OR: [
           { therapists: { some: { therapistId: userId } } },
           { id: { in: shares.map((s: any) => s.patientId) } },
         ],
       }
     } else {
-      where = { deletedAt: null, therapists: { some: { therapistId: userId } } }
+      where = { deletedAt: null, cooperationPartnerId: null, therapists: { some: { therapistId: userId } } }
     }
   }
 
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
   const { firstName, lastName, dob, gender, svnr, phone, email,
           insuranceProvider, referralSource, createLogin,
           defaultBillingMode, defaultUnitDuration, defaultUnitPriceNet,
-          sessionStartNumber } = body
+          sessionStartNumber, cooperationPartnerId } = body
 
   if (!firstName || !lastName || !dob || !gender) {
     return NextResponse.json({ error: 'Pflichtfelder fehlen' }, { status: 400 })
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
       defaultUnitDuration: defaultUnitDuration ? parseInt(defaultUnitDuration) : 50,
       defaultUnitPriceNet: defaultUnitPriceNet ? parseFloat(defaultUnitPriceNet) : null,
       sessionStartNumber: sessionStartNumber ? parseInt(sessionStartNumber) : 0,
+      cooperationPartnerId: cooperationPartnerId || null,
       createdByUserId: userId,
       patientUserId: patientUserId,
       therapists: { create: { therapistId: userId, isPrimary: true } },

@@ -24,7 +24,16 @@ interface PatientRow {
 }
 
 interface Instrument { id: string; code: string; shortName: string; name: string }
-interface Props { patients: PatientRow[]; instruments: Instrument[]; role: string }
+interface Props {
+  patients: PatientRow[]
+  instruments: Instrument[]
+  role: string
+  /** Wenn gesetzt: diese Ansicht zeigt/erstellt NUR Patienten dieses Kooperationspartners
+   *  (siehe /kooperationspartner/[id]) statt der normalen, davon komplett entkoppelten
+   *  Patientenliste unter /patients. */
+  cooperationPartnerId?: string
+  cooperationPartnerName?: string
+}
 
 const GENDER_LABEL:  Record<string, string> = { MALE: 'männlich', FEMALE: 'weiblich', DIVERSE: 'divers' }
 const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVERSE: '⚧' }
@@ -142,7 +151,7 @@ function StatusDot({ clinical }: { clinical: boolean | null }) {
   return <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
 }
 
-export function PatientsListClient({ patients, instruments, role }: Props) {
+export function PatientsListClient({ patients, instruments, role, cooperationPartnerId, cooperationPartnerName }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>(DEFAULT_AVATAR_SEEDS)
@@ -187,7 +196,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
     const res = await fetch('/api/patients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(cooperationPartnerId ? { ...form, cooperationPartnerId } : form),
     })
     const data = await res.json()
     setLoading(false)
@@ -210,8 +219,15 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
       {/* Topbar */}
       <div className="topbar">
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Patienten</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{total} {total === 1 ? 'Patient' : 'Patienten'} in Ihrer Praxis</p>
+          <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            {cooperationPartnerId ? `Patienten · ${cooperationPartnerName ?? 'Kooperationspartner'}` : 'Patienten'}
+          </h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
+            {total} {total === 1 ? 'Patient' : 'Patienten'}
+            {cooperationPartnerId
+              ? ' · Abrechnung läuft gesammelt über den Kooperationspartner, nicht direkt hier.'
+              : ' in Ihrer Praxis'}
+          </p>
         </div>
         <button onClick={() => setCreating(true)} className="btn-primary">
           <UserPlus style={{ width: 14, height: 14 }} /> Neuer Patient

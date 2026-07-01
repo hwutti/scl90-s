@@ -13,8 +13,8 @@ export default async function PatientsPage() {
   if (!['ADMIN','THERAPIST'].includes(role)) redirect('/my')
 
   const where = role === 'ADMIN'
-    ? { deletedAt: null }
-    : { deletedAt: null, therapists: { some: { therapistId: userId } } }
+    ? { deletedAt: null, cooperationPartnerId: null }
+    : { deletedAt: null, cooperationPartnerId: null, therapists: { some: { therapistId: userId } } }
 
   const patients = await prisma.patient.findMany({
     where,

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro, Video, ClipboardList, GraduationCap , Settings2 } from 'lucide-react'
+import { Users, LogOut, Activity, Info, ChevronRight, User, Shield, CalendarDays, Bell, Sun, Moon, Euro, Video, ClipboardList, GraduationCap , Settings2, Handshake } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/app/providers'
 import type { BrandingConfig } from '@/lib/branding'
@@ -11,6 +11,7 @@ import type { BrandingConfig } from '@/lib/branding'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: Activity, roles: ['ADMIN','THERAPIST'] },
   { href: '/patients', label: 'Patienten', icon: Users, roles: ['ADMIN','THERAPIST'] },
+  { href: '/kooperationspartner', label: 'Kooperationspartner', icon: Handshake, roles: ['ADMIN','THERAPIST'] },
   { href: '/calendar', label: 'Kalender', icon: CalendarDays, roles: ['ADMIN','THERAPIST'],
     sub: [
       { href: '/calendar', label: 'Übersicht' },
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
       { href: '/admin/praxis-modus', label: 'Praxis-Modus' },
       { href: '/admin/rechnungsvorlage', label: 'Vorlagen', sub: [
           { href: '/admin/rechnungsvorlage', label: 'Rechnungsvorlagen' },
+          { href: '/admin/kooperationspartner-rechnungsvorlage', label: 'Kooperationspartner-Vorlagen' },
           { href: '/admin/berichtsvorlage', label: 'Berichtsvorlagen' },
           { href: '/admin/bestaetigungsvorlage', label: 'Bestätigungsvorlagen' },
         ]
