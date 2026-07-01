@@ -577,7 +577,7 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                       ['Vorname', patient.firstName],
                       ['Nachname', patient.lastName],
                       ['Geburtsdatum', fmtDate(patient.dob)],
-                      ['Alter', age + ' Jahre'],
+                      ['Alter', age !== null ? age + ' Jahre' : '—'],
                       ['Geschlecht', GENDER_LABEL[patient.gender] ?? patient.gender],
                       ['Telefon', patient.phone ?? '—'],
                       ['E-Mail', patient.email ?? '—'],
