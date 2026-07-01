@@ -599,6 +599,11 @@ model PraxisConfig {
   // { erinnerungDays, mahnung1Days, mahnung2Days }
   dunningSettings String?
 
+  // Avatar-Zuordnung je Gruppe (JSON) — global, einmalig unter Einstellungen
+  // festgelegt. { groups: { MALE: {seed}, FEMALE: {seed}, DIVERSE: {seed},
+  // PAIR: {seed}, FAMILY: {seed}, GROUP: {seed} }, backgroundColor }
+  avatarSettings  String?
+
   updatedAt       DateTime @updatedAt
   updatedBy       String?
 }
