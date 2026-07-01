@@ -95,7 +95,7 @@ async function main() {
   const sumDuplicatedFt = duplicates.reduce((s, d) => s + d.ftAmount, 0)
   console.log(`Einnahmen nur aus Transaction:                 ${fmtEur(sumTxIncome)}`)
   console.log(`Einnahmen nur aus FinanceTransaction:           ${fmtEur(sumFtIncome)}`)
-  console.log(`Summe aktuell in Reports (Transaction+FT):      ${fmtEur(sumTxIncome + sumFtIncome)}  ⚠ enthält Duplikate`)
+  console.log(`Summe aktuell in Reports (Transaction+FT):      ${fmtEur(sumTxIncome + sumFtIncome)}${duplicates.length > 0 ? '  ⚠ enthält Duplikate' : '  ✅ keine Duplikate'}`)
   console.log(`Summe bereinigt (Duplikate abgezogen):          ${fmtEur(sumTxIncome + sumFtIncome - sumDuplicatedFt)}`)
 
   // ── 4. Verdacht auf Vorzeichen-Bug bei Stornos ────────────────────────────
