@@ -89,6 +89,11 @@ fi
 node --version
 npm install -g pnpm@9
 pnpm --version
+# Tatsächlichen Installationspfad ermitteln — variiert je nach System/Node-Setup
+# (nicht immer /usr/local/bin/pnpm). Wird unten für den systemd-Service verwendet.
+PNPM_BIN=$(command -v pnpm)
+[[ -z "$PNPM_BIN" ]] && error "pnpm nach Installation nicht im PATH gefunden"
+info "pnpm gefunden unter: $PNPM_BIN"
 
 # =============================================================================
 step "PostgreSQL konfigurieren"
@@ -267,7 +272,7 @@ WorkingDirectory=$APP_DIR
 EnvironmentFile=$APP_DIR/.env
 Environment=LANG=C.UTF-8
 Environment=LC_ALL=C.UTF-8
-ExecStart=/usr/local/bin/pnpm start
+ExecStart=${PNPM_BIN} start
 Restart=always
 RestartSec=5
 StandardOutput=journal
