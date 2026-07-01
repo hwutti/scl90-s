@@ -40,10 +40,16 @@ export interface TpInvoice {
   /** Echter Zahlungsstatus aus Finanzexport-Gesamtübersicht (nicht aus der Einzel-Rechnung ableitbar).
    *  Fehlt, wenn die Finanzexport-Datei nicht im Export enthalten war. */
   status?: 'PAID' | 'PENDING' | 'CANCELLED'
+  /** Sitzungsnamen (z.B. "OsKu_1_31.01.2026"), aus dem Notiz-Feld des Finanzexports geparst —
+   *  zur Verknüpfung mit den bereits importierten TherapySession-Datensätzen. */
+  sessionNames?: string[]
   profilNr: number | null
   patientName: string | null
   amount: number
   pdfFile: string | null
+  /** Original-Rechnungsdatei (xlsx) als base64, für InvoiceDocument-Anlage beim Ausführen. */
+  xlsxBase64?: string
+  xlsxFilename?: string
 }
 
 export interface TpBmdRow {
@@ -110,7 +116,8 @@ function readXlsx(filePath: string): any[][] {
 // ── Einzelrechnung parsen ──────────────────────────────────────────────────────
 function parseInvoiceXlsx(filePath: string, filename: string): TpInvoice | null {
   try {
-    const wb = XLSX.read(fs.readFileSync(filePath), { type: 'buffer', cellDates: true })
+    const fileBuf = fs.readFileSync(filePath)
+    const wb = XLSX.read(fileBuf, { type: 'buffer', cellDates: true })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const raw = XLSX.utils.sheet_to_json(ws, { header: 'A', defval: null, raw: false, blankrows: true }) as any[]
 
@@ -141,6 +148,10 @@ function parseInvoiceXlsx(filePath: string, filename: string): TpInvoice | null 
       invoiceNr, type: 'INCOME',
       date: dateRaw, paidDate,
       profilNr, patientName, amount, pdfFile: null,
+      // Original-Datei mitschleusen, damit sie beim Ausführen (execute-Route, separater
+      // Request ohne Dateisystem-Zugriff mehr) als InvoiceDocument am Patienten hängt.
+      xlsxBase64: fileBuf.toString('base64'),
+      xlsxFilename: filename,
     }
   } catch {
     return null
@@ -298,6 +309,18 @@ export async function sha256(buffer: Buffer): Promise<string> {
 interface TpFinanceStatus {
   status: 'PAID' | 'PENDING' | 'CANCELLED'
   paidDate: string | null
+  sessionNames: string[]
+}
+// Extrahiert Sitzungsnamen aus Notiz-Text wie:
+// "Zu dieser Transaktionen gehören die Sessions mit den Namen:\n - OsKu_1_31.01.2026 [Einzeltherapie]\n - ..."
+function extractSessionNames(notiz: string | null | undefined): string[] {
+  if (!notiz) return []
+  const names: string[] = []
+  for (const line of notiz.split('\n')) {
+    const m = line.trim().match(/^-+\s*(\S+)/)
+    if (m) names.push(m[1])
+  }
+  return names
 }
 function parseFinanzexportStatus(exportDir: string): Map<string, TpFinanceStatus> {
   const map = new Map<string, TpFinanceStatus>()
@@ -318,16 +341,17 @@ function parseFinanzexportStatus(exportDir: string): Map<string, TpFinanceStatus
       const refLeft = (r['J'] ?? '').toString().trim()
       if (refLeft) {
         const statusLeft = (r['E'] ?? '').toString().trim()
+        const sessionNames = extractSessionNames(r['I'])
         const paidM = statusLeft.match(/^Bezahlt am (\d{2}\.\d{2}\.\d{4})/)
         const cancelM = statusLeft.match(/^Storniert am (\d{2}\.\d{2}\.\d{4})/)
-        if (paidM) map.set(refLeft, { status: 'PAID', paidDate: paidM[1] })
-        else if (cancelM) map.set(refLeft, { status: 'CANCELLED', paidDate: cancelM[1] })
-        else map.set(refLeft, { status: 'PENDING', paidDate: null }) // z.B. "Erstellt am ..."
+        if (paidM) map.set(refLeft, { status: 'PAID', paidDate: paidM[1], sessionNames })
+        else if (cancelM) map.set(refLeft, { status: 'CANCELLED', paidDate: cancelM[1], sessionNames })
+        else map.set(refLeft, { status: 'PENDING', paidDate: null, sessionNames }) // z.B. "Erstellt am ..."
       }
 
       const refRight = (r['S'] ?? '').toString().trim()
       if (refRight && !map.has(refRight)) {
-        map.set(refRight, { status: 'PENDING', paidDate: null })
+        map.set(refRight, { status: 'PENDING', paidDate: null, sessionNames: extractSessionNames(r['R']) })
       }
     }
   } catch {
@@ -356,6 +380,7 @@ export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, '
     if (fs2) {
       inv.status = fs2.status
       inv.paidDate = fs2.paidDate
+      inv.sessionNames = fs2.sessionNames
     }
   }
 
