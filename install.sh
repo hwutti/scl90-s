@@ -265,6 +265,8 @@ Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$APP_DIR/.env
+Environment=LANG=C.UTF-8
+Environment=LC_ALL=C.UTF-8
 ExecStart=/usr/local/bin/pnpm start
 Restart=always
 RestartSec=5
