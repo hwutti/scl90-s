@@ -33,6 +33,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const [k, v] of Object.entries(body)) {
     if (ALLOWED_FIELDS.has(k)) data[k] = v
   }
+  // Leerer String ist kein gültiger Fremdschlüssel -> als "nicht gesetzt" behandeln
+  if (data.defaultInvoiceTemplateId === '') data.defaultInvoiceTemplateId = null
 
   try {
     const partner = await prisma.cooperationPartner.update({ where: { id: params.id }, data })
