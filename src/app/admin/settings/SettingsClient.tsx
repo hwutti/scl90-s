@@ -38,6 +38,11 @@ function Section({ title, children, defaultOpen = false }: {
   )
 }
 
+// ── Zufällige Avatar-Seed-Kandidaten für die Kachel-Auswahl ────────────────────
+function genAvatarCandidates(key: string, count: number): string[] {
+  return Array.from({ length: count }, () => `${key}-${Math.random().toString(36).slice(2, 10)}`)
+}
+
 // ── Toggle ───────────────────────────────────────────────────────────────────
 function Toggle({ label, value, onChange, description }: {
   label: string; value: boolean; onChange: (v: boolean) => void; description?: string
@@ -131,6 +136,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
     MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
     PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
   })
+  const [avatarCandidates, setAvatarCandidates] = useState<Record<string, string[]>>({})
 
   // Visuelle Einstellungen, Telemetrie + Anamnese-Vorlage beim Laden aus DB holen
   useEffect(() => {
@@ -164,7 +170,17 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
       if (d && !d.error) setTelemetry(d.enabled ?? false)
     }).catch(() => {})
     fetch('/api/settings/avatars').then(r => r.json()).then(d => {
-      if (d?.seeds) setAvatarSeeds(d.seeds)
+      const seeds = d?.seeds ?? {
+        MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+        PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+      }
+      setAvatarSeeds(seeds)
+      // Kachel-Auswahl mit dem aktuell gespeicherten Avatar + 11 weiteren Optionen befüllen
+      const initial: Record<string, string[]> = {}
+      for (const key of Object.keys(seeds)) {
+        initial[key] = [seeds[key], ...genAvatarCandidates(key, 11)]
+      }
+      setAvatarCandidates(initial)
     }).catch(() => {})
   }, [])
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -741,32 +757,37 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
         {/* ── AVATARE ── */}
         <Section title="Avatare">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
               Ein Avatar gilt für alle Patient:innen einer Gruppe gleichzeitig — keine Einzelbilder pro Patient.
-              Auf "Würfeln" klicken bis der Avatar gefällt, dann unten speichern.
+              Einfach anklicken um auszuwählen. "Mehr laden" zeigt weitere Optionen.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
-              {[
-                ['MALE', 'Männlich'], ['FEMALE', 'Weiblich'], ['DIVERSE', 'Divers'],
-                ['PAIR', 'Paar'], ['FAMILY', 'Familie'], ['GROUP', 'Gruppe'],
-              ].map(([key, label]) => (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
-                  <img
-                    src={`/api/avatar?seed=${encodeURIComponent(avatarSeeds[key])}&bg=e3e3e3`}
-                    alt={`Avatar ${label}`}
-                    width={72} height={72}
-                    style={{ borderRadius: '50%', background: '#E3E3E3' }}
-                  />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
-                  <button
-                    onClick={() => setAvatarSeeds(s => ({ ...s, [key]: `${key}-${Math.random().toString(36).slice(2, 10)}` }))}
-                    className="btn-secondary" style={{ fontSize: 11, padding: '3px 10px', width: '100%' }}>
-                    Würfeln
-                  </button>
+            {[
+              ['MALE', 'Männlich'], ['FEMALE', 'Weiblich'], ['DIVERSE', 'Divers'],
+              ['PAIR', 'Paar'], ['FAMILY', 'Familie'], ['GROUP', 'Gruppe'],
+            ].map(([key, label]) => (
+              <div key={key}>
+                <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>{label}</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+                  {(avatarCandidates[key] ?? []).map(seed => (
+                    <button key={seed} onClick={() => setAvatarSeeds(s => ({ ...s, [key]: seed }))}
+                      title="Als Avatar für diese Gruppe auswählen"
+                      style={{
+                        padding: 2, borderRadius: '50%', cursor: 'pointer', background: 'none',
+                        border: avatarSeeds[key] === seed ? '3px solid var(--color-primary)' : '3px solid transparent',
+                      }}>
+                      <img src={`/api/avatar?seed=${encodeURIComponent(seed)}&bg=e3e3e3`} alt=""
+                        width={60} height={60} style={{ borderRadius: '50%', display: 'block' }} />
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <button
+                  onClick={() => setAvatarCandidates(c => ({ ...c, [key]: [...(c[key] ?? []), ...genAvatarCandidates(key, 12)] }))}
+                  className="btn-secondary" style={{ fontSize: 11, padding: '4px 12px', marginTop: 10 }}>
+                  Mehr laden
+                </button>
+              </div>
+            ))}
             <div>
               <button onClick={async () => {
                 await fetch('/api/settings/avatars', {
