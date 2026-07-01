@@ -183,15 +183,12 @@ export async function executeMigration(
     }
   }
 
-  // ── 3. Honorarnoten/Einnahmen als echte Transaktionen (neues Billing-Modell) ─
-  // Wichtig: NICHT mehr FinanceTransaction (Legacy) — die wird im Patienten-
-  // "Rechnungen"-Tab nicht angezeigt (der fragt /api/transactions ab, basiert auf
-  // dem `Transaction`-Modell). computeTransactionJournal() (BMD-Export, Steuer-
-  // berater-PDF) liest ohnehin BEIDE Modelle zusammen — hier also unbedenklich.
-  if (selectedAreas.includes('rechnungen_einnahmen')) {
-    const therapistUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
-    const payeeName = therapistUser?.name ?? 'Praxis'
+  // Einmalig für Schritt 3+4: Name der Praxis/des Therapeuten als payeeName/payerName
+  const therapistUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+  const praxisName = therapistUser?.name ?? 'Praxis'
 
+  // ── 3. Honorarnoten/Einnahmen als echte Transaktionen ────────────────────────
+  if (selectedAreas.includes('rechnungen_einnahmen')) {
     for (const inv of invoices) {
       if (inv.type !== 'INCOME') continue
       const invoiceDate = parseDate(inv.date)
@@ -246,11 +243,12 @@ export async function executeMigration(
           referenceNumber: inv.invoiceNr,
           transactionDate: invoiceDate,
           payerName,
-          payeeName,
+          payeeName: praxisName,
           amountNet: inv.amount,
           vatRate: 0,
           vatAmount: 0,
           amountGross: inv.amount,
+          category: 'HONORAR',
           paymentStatus,
           paidAt,
           paymentMethod: paymentStatus === 'PAID' ? 'UNBAR_BANK_TRANSFER' : null,
@@ -313,46 +311,69 @@ export async function executeMigration(
     }
   }
 
-  // ── 4. BMD-Buchungssätze als Legacy-Transaktionen ────────────────────────────
+  // ── 4. BMD-Buchungssätze als Transaktionen (vereinheitlicht, kein Legacy mehr) ─
+  // Schreibt jetzt ebenfalls in `Transaction` statt `FinanceTransaction` — ein
+  // einziges Modell für alle Geldbewegungen. Dedup läuft allein über die global
+  // eindeutige referenceNumber und deckt damit automatisch sowohl bereits über
+  // Schritt 3 importierte Honorarnoten als auch wiederholte BMD-Läufe ab; ein
+  // separater Cross-Check zwischen zwei Tabellen ist dadurch nicht mehr nötig.
   if (selectedAreas.includes('finanzexport')) {
+    let bmdFallbackSeq = 0
     for (const row of bmdRows) {
       const belegDate = parseDate(row.belegdatum) ?? parseDate(row.buchdatum)
       if (!belegDate) continue
 
-      // Deduplizieren: gleicher Beleg + User (innerhalb FinanceTransaction)
-      const existing = await prisma.financeTransaction.findFirst({
-        where: { invoiceNumber: row.belegnr || undefined, createdBy: userId, date: belegDate },
-      })
-      if (existing) continue
+      // Belegnummer wenn vorhanden übernehmen (matcht ggf. eine TheraPsy-Rechnung
+      // aus Schritt 3), sonst eine stabile Ersatznummer vergeben.
+      const refNum = row.belegnr || `BMD-${belegDate.getTime()}-${bmdFallbackSeq++}`
 
-      // WICHTIG: Cross-Check gegen Transaction (Schritt 3) — verhindert Doppel-
-      // zählung derselben Rechnung in zwei Tabellen. Die BMD-Sammelzeile ist
-      // nur eine grobe Buchhaltungszeile ohne Sitzungsverknüpfung/Originaldatei;
-      // wenn dieselbe Belegnummer bereits als vollständige Transaction importiert
-      // wurde (Honorarnoten/Einnahmen), ist die BMD-Zeile redundant und wird
-      // übersprungen statt ein zweites Mal gebucht zu werden.
-      if (row.belegnr) {
-        const existingTx = await prisma.transaction.findUnique({ where: { referenceNumber: row.belegnr } })
-        if (existingTx) continue
-      }
+      const existingTx = await prisma.transaction.findUnique({ where: { referenceNumber: refNum } })
+      if (existingTx) continue
 
-      await prisma.financeTransaction.create({
+      const direction: 'INCOME' | 'EXPENSE' = row.typ === 'E' ? 'INCOME' : 'EXPENSE'
+      const category = row.typ === 'E' ? 'HONORAR' : 'MISC_BUSINESS'
+      // Vorzeichen NICHT mit Math.abs() verwerfen — Stornos/Korrekturen sind in der
+      // BMD-CSV negativ codiert; sonst wird aus einer Korrektur eine zusätzliche
+      // positive Buchung (siehe Diagnose vom 1.7.2026: E26023/E26025 wurden dadurch
+      // von -110€ zu +110€).
+      const amount = row.betrag
+
+      const tx = await prisma.transaction.create({
         data: {
-          createdBy: userId,
-          type: row.typ === 'E' ? 'INCOME' : 'EXPENSE',
-          // Vorzeichen NICHT mit Math.abs() verwerfen — Stornos/Korrekturen sind in
-          // der BMD-CSV negativ codiert; sonst wird aus einer Korrektur eine
-          // zusätzliche positive Buchung (siehe Diagnose vom 1.7.2026: E26023/E26025
-          // wurden dadurch von -110€ zu +110€).
-          amount: row.betrag,
-          date: belegDate,
+          createdByUserId: userId,
+          direction,
+          sourceType: 'MANUAL',
+          referenceNumber: refNum,
+          transactionDate: belegDate,
+          payerName: direction === 'INCOME' ? (row.text || 'Unbekannt') : praxisName,
+          payeeName: direction === 'INCOME' ? praxisName : (row.text || 'Unbekannt'),
+          amountNet: amount,
+          vatRate: 0,
+          vatAmount: 0,
+          amountGross: amount,
+          category,
           paymentStatus: 'PAID',
-          description: row.text || `BMD-Buchung ${row.belegnr}`,
-          invoiceNumber: row.belegnr || null,
-          incomeCategory: row.typ === 'E' ? 'HONORAR' : undefined,
-          expenseCategory: row.typ === 'A' ? 'MISC_BUSINESS' : undefined,
+          paidAt: belegDate,
+          paymentMethod: 'UNBAR_BANK_TRANSFER',
+          lifecycleStatus: 'ACTIVE',
+          notes: row.text || `BMD-Buchung ${row.belegnr}`,
         },
       })
+
+      await prisma.txLineItem.create({
+        data: {
+          transactionId: tx.id,
+          description: row.text || `BMD-Buchung ${row.belegnr}`,
+          quantity: 1,
+          unitPriceNet: amount,
+          amountNet: amount,
+          vatRate: 0,
+          vatAmount: 0,
+          amountGross: amount,
+          lineDate: belegDate,
+        },
+      })
+
       result.transactions++
     }
   }
