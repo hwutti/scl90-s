@@ -163,6 +163,16 @@ sudo -u "$APP_USER" bash -c "
 
 # ─── 8. Restart ───────────────────────────────────────────────────────────────
 step "Service neu starten"
+
+# Locale-Override sicherstellen (UTF-8-Dateinamen bei RAR/ZIP-Extraktion, z.B. TheraPsy-Migration)
+# Idempotent: wird bei jedem Deploy geprüft/angelegt, übersteht daher auch VM-Snapshot-Rollbacks
+LOCALE_DROPIN="/etc/systemd/system/${SERVICE}.service.d/locale.conf"
+if [ ! -f "$LOCALE_DROPIN" ]; then
+  mkdir -p "$(dirname "$LOCALE_DROPIN")"
+  printf '[Service]\nEnvironment=LANG=C.UTF-8\nEnvironment=LC_ALL=C.UTF-8\n' > "$LOCALE_DROPIN"
+  systemctl daemon-reload
+fi
+
 systemctl restart "$SERVICE"
 sleep 3
 systemctl is-active --quiet "$SERVICE" && success "Service läuft" || fail "Service-Start fehlgeschlagen"
