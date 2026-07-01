@@ -126,6 +126,12 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
   })
   const [telemetry, setTelemetry] = useState(false)
 
+  // ── Avatare (global je Gruppe) ──
+  const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>({
+    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+    PAIR: 'kds-pair-default', FAMILY: 'kds-family-default', GROUP: 'kds-group-default',
+  })
+
   // Visuelle Einstellungen, Telemetrie + Anamnese-Vorlage beim Laden aus DB holen
   useEffect(() => {
     fetch('/api/settings/anamnesis-template').then(r => r.json()).then(d => {
@@ -156,6 +162,9 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
     }).catch(() => {})
     fetch('/api/settings/telemetry').then(r => r.json()).then(d => {
       if (d && !d.error) setTelemetry(d.enabled ?? false)
+    }).catch(() => {})
+    fetch('/api/settings/avatars').then(r => r.json()).then(d => {
+      if (d?.seeds) setAvatarSeeds(d.seeds)
     }).catch(() => {})
   }, [])
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -725,6 +734,48 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
                 setSaved(true); setTimeout(() => setSaved(false), 2500)
               }} className="btn-primary" style={{ fontSize: 12 }}>
                 <Save style={{ width: 12, height: 12 }} /> Visuelle Einstellungen speichern
+              </button>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── AVATARE ── */}
+        <Section title="Avatare">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+              Ein Avatar gilt für alle Patient:innen einer Gruppe gleichzeitig — keine Einzelbilder pro Patient.
+              Auf "Würfeln" klicken bis der Avatar gefällt, dann unten speichern.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+              {[
+                ['MALE', 'Männlich'], ['FEMALE', 'Weiblich'], ['DIVERSE', 'Divers'],
+                ['PAIR', 'Paar'], ['FAMILY', 'Familie'], ['GROUP', 'Gruppe'],
+              ].map(([key, label]) => (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
+                  <img
+                    src={`/api/avatar?seed=${encodeURIComponent(avatarSeeds[key])}&bg=e3e3e3`}
+                    alt={`Avatar ${label}`}
+                    width={72} height={72}
+                    style={{ borderRadius: '50%', background: '#E3E3E3' }}
+                  />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+                  <button
+                    onClick={() => setAvatarSeeds(s => ({ ...s, [key]: `${key}-${Math.random().toString(36).slice(2, 10)}` }))}
+                    className="btn-secondary" style={{ fontSize: 11, padding: '3px 10px', width: '100%' }}>
+                    Würfeln
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <button onClick={async () => {
+                await fetch('/api/settings/avatars', {
+                  method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ seeds: avatarSeeds }),
+                })
+                setSaved(true); setTimeout(() => setSaved(false), 2500)
+              }} className="btn-primary" style={{ fontSize: 12 }}>
+                <Save style={{ width: 12, height: 12 }} /> Avatare speichern
               </button>
             </div>
           </div>
