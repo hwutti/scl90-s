@@ -52,11 +52,16 @@ export async function computeTransactionJournal(
   const dateRange = { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31, 23, 59, 59) }
   const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
 
+  // Einzige Datenquelle für alle Geldbewegungen (Honorare, BMD-Import, manuelle
+  // Buchungen). FinanceTransaction (Legacy) wird nicht mehr geschrieben und hier
+  // bewusst nicht mehr gelesen — siehe scripts/legacy-financetransaction-migrate.ts
+  // für die einmalige Übernahme historischer Legacy-Daten.
   const transactions = await prisma.transaction.findMany({
     where: { ...where, transactionDate: dateRange, lifecycleStatus: { in: ['ACTIVE'] } },
     select: {
       id: true, patientId: true, payerName: true, referenceNumber: true, transactionDate: true,
-      direction: true, sourceType: true, amountNet: true, amountGross: true, vatRate: true, vatAmount: true,
+      direction: true, sourceType: true, category: true,
+      amountNet: true, amountGross: true, vatRate: true, vatAmount: true,
       paymentStatus: true, cancelsTxId: true,
       patient: { select: { firstName: true, lastName: true, codeName: true } },
       lineItems: { select: { description: true, serviceLabel: true }, orderBy: { sortOrder: 'asc' } },
@@ -71,19 +76,6 @@ export async function computeTransactionJournal(
     ? await prisma.transaction.findMany({ where: { id: { in: cancelsIds } }, select: { id: true, referenceNumber: true } })
     : []
   const refByTxId = new Map(referencedOriginals.map(t => [t.id, t.referenceNumber]))
-
-  // Alle Belegnummern aus Transaction — für den Doppelzählungs-Schutz gegen legacyTxs unten.
-  const txRefSet = new Set(transactions.map(t => t.referenceNumber))
-
-  const legacyTxs = await prisma.financeTransaction.findMany({
-    where: { createdBy: userId, date: dateRange },
-    select: {
-      type: true, amount: true, date: true, description: true, invoiceNumber: true,
-      incomeCategory: true, expenseCategory: true, patientId: true,
-      patient: { select: { firstName: true, lastName: true, codeName: true } },
-    },
-    orderBy: { date: 'asc' },
-  })
 
   if (anonymize) {
     const idSet: { [k: string]: true } = {}
@@ -117,32 +109,10 @@ export async function computeTransactionJournal(
       patientLabel: patientLabel(t.patientId, t.patient, t.payerName),
       description: desc,
       bezug,
-      category: 'HONORAR',
+      category: t.category ?? (t.direction === 'INCOME' ? 'HONORAR' : 'MISC_BUSINESS'),
       netto: Number(t.amountNet), ustSatz: Number(t.vatRate) * 100,
       ustBetrag: Number(t.vatAmount), brutto: Number(t.amountGross),
       paymentStatus: t.paymentStatus,
-    })
-  }
-
-  for (const t of legacyTxs) {
-    // Sicherheitsnetz gegen Doppelzählung: wenn dieselbe Belegnummer bereits als
-    // vollständige Transaction existiert (z.B. aus der TheraPsy-Migration, wo
-    // Honorarnoten/Einnahmen UND Finanz-Buchungssätze dieselbe Rechnung liefern
-    // können), NICHT nochmal als eigene Journal-Zeile zählen. Die Transaction-
-    // Zeile ist die vollständigere Quelle (Sitzungsverknüpfung, Originaldokument).
-    if (t.invoiceNumber && txRefSet.has(t.invoiceNumber)) continue
-
-    const amount = Number(t.amount)
-    entries.push({
-      date: t.date,
-      belegnummer: t.invoiceNumber ?? '—',
-      direction: t.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
-      patientLabel: patientLabel(t.patientId, t.patient, '—'),
-      description: t.description || (t.type === 'INCOME' ? (t.incomeCategory ?? 'Sonstige Einnahme') : (t.expenseCategory ?? 'Sonstige Ausgabe')),
-      bezug: null,
-      category: t.type === 'INCOME' ? (t.incomeCategory ?? 'HONORAR') : (t.expenseCategory ?? 'MISC_BUSINESS'),
-      netto: amount, ustSatz: 0, ustBetrag: 0, brutto: amount,
-      paymentStatus: 'PAID',
     })
   }
 
