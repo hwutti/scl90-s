@@ -30,6 +30,12 @@ export interface TpSession {
   supervisionName: string | null
   supervisorName: string | null
   supervisionDate: string | null
+  /** Zusätzliche Spalten ab Index 10 im Sessions-Export (z.B. mögliche
+   *  Kurz-/Langprotokoll-Felder), sofern die jeweilige Zelle für diese Session
+   *  nicht leer ist. label = Spaltenüberschrift aus Zeile 13, value = Zellinhalt.
+   *  Wird NICHT automatisch nach kurz/lang unterschieden — dafür fehlt bisher
+   *  ein echter Export mit befüllten Feldern zum Verifizieren des Spalten-Layouts. */
+  extraFields: { label: string; value: string }[]
 }
 
 export interface TpInvoice {
@@ -113,6 +119,17 @@ function readXlsx(filePath: string): any[][] {
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false, blankrows: true }) as any[][]
 }
 
+/** Liest ALLE Sheets einer xlsx (nicht nur das erste) — nötig, um zu prüfen, ob
+ *  z.B. Protokoll-Inhalte auf einem separaten Tab stehen statt in der Haupttabelle. */
+function readAllSheets(filePath: string): Record<string, any[][]> {
+  const wb = XLSX.read(fs.readFileSync(filePath), { type: 'buffer', cellDates: true })
+  const out: Record<string, any[][]> = {}
+  for (const name of wb.SheetNames) {
+    out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: false, blankrows: true }) as any[][]
+  }
+  return out
+}
+
 // ── Einzelrechnung parsen ──────────────────────────────────────────────────────
 function parseInvoiceXlsx(filePath: string, filename: string): TpInvoice | null {
   try {
@@ -159,11 +176,32 @@ function parseInvoiceXlsx(filePath: string, filename: string): TpInvoice | null 
 }
 
 // ── Sessions-Export parsen ─────────────────────────────────────────────────────
-function parseSessionsXlsx(filePath: string): TpSession[] {
-  const rows = readXlsx(filePath)
+/** Rückgabe zusätzlich zu den Sessions: welche Spalten-Überschriften über die
+ *  bekannten 10 Spalten hinaus existieren, und ob es weitere Sheets im Workbook
+ *  gibt (z.B. ein separates "Protokolle"-Tab). Wird gebraucht, um Kurz-/Lang-
+ *  protokoll-Status im Preview EHRLICH zu bestimmen statt hart zu behaupten,
+ *  dass diese Daten nie im Export enthalten sind. */
+function parseSessionsXlsx(filePath: string): {
+  sessions: TpSession[]
+  extraColumnLabels: string[]
+  otherSheetNames: string[]
+} {
+  const allSheets = readAllSheets(filePath)
+  const sheetNames = Object.keys(allSheets)
+  const rows = allSheets[sheetNames[0]]
   // Header ist Row 13 (index 12)
   const sessions: TpSession[] = []
   const HEADER_ROW = 12
+  const headerRow = rows[HEADER_ROW] ?? []
+
+  // Spalten ab Index 10 mit nicht-leerer Überschrift = unbekannte Zusatzfelder
+  // (z.B. mögliche Kurz-/Langprotokoll-Spalten, deren genaue Position/Beschriftung
+  // bisher nicht anhand eines echten befüllten Exports verifiziert werden konnte).
+  const extraColumns: { index: number; label: string }[] = []
+  for (let c = 10; c < headerRow.length; c++) {
+    const label = headerRow[c]?.toString().trim()
+    if (label) extraColumns.push({ index: c, label })
+  }
 
   for (let i = HEADER_ROW + 1; i < rows.length; i++) {
     const r = rows[i]
@@ -180,6 +218,10 @@ function parseSessionsXlsx(filePath: string): TpSession[] {
     const supervisorName = r[8]?.toString().trim() || null
     const supervisionDate = r[9]?.toString().trim() || null
 
+    const extraFields = extraColumns
+      .map(ec => ({ label: ec.label, value: r[ec.index]?.toString().trim() ?? '' }))
+      .filter(f => f.value !== '')
+
     // Sessionsnummer aus Sitzungsname extrahieren (z.B. "OsKu_3_26.02.2026" → 3)
     const numMatch = sessionName.match(/_(\d+)_/)
     const sessionNumber = numMatch ? parseInt(numMatch[1]) : i - HEADER_ROW
@@ -191,9 +233,15 @@ function parseSessionsXlsx(filePath: string): TpSession[] {
       serviceLabel,
       diagnoses: parseDiagnoses(rawDiag),
       supervisionName, supervisorName, supervisionDate,
+      extraFields,
     })
   }
-  return sessions
+
+  return {
+    sessions,
+    extraColumnLabels: extraColumns.map(ec => ec.label),
+    otherSheetNames: sheetNames.slice(1), // alles außer dem Haupt-Sheet
+  }
 }
 
 // ── Rechnungsverzeichnis scannen ───────────────────────────────────────────────
@@ -369,9 +417,16 @@ function parseFinanzexportStatus(exportDir: string): Map<string, TpFinanceStatus
 export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, 'sourceHash'> {
   // 1. Sessions
   const sessionsFile = fs.readdirSync(exportDir).find(f => f.startsWith('Sessions'))
-  const sessions = sessionsFile
+  const { sessions, extraColumnLabels, otherSheetNames } = sessionsFile
     ? parseSessionsXlsx(path.join(exportDir, sessionsFile))
-    : []
+    : { sessions: [] as TpSession[], extraColumnLabels: [] as string[], otherSheetNames: [] as string[] }
+
+  // 1b. Kurz-/Langprotokoll-Inhalte ehrlich prüfen statt pauschal als "nicht vorhanden"
+  //     zu behaupten: zählen, wie viele Sessions tatsächlich befüllte Zusatzspalten
+  //     haben, und ob es weitere Sheets im Sessions-Workbook gibt (z.B. ein separates
+  //     Protokoll-Tab), die bisher komplett ignoriert wurden.
+  const sessionsWithExtraData = sessions.filter(s => s.extraFields.length > 0)
+  const protocolDataFound = sessionsWithExtraData.length > 0 || otherSheetNames.length > 0
 
   // 2. Rechnungen
   const { income: invoices, expensePdfs } = parseAllInvoices(exportDir)
@@ -424,19 +479,26 @@ export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, '
       id: 'kurzprotokoll',
       label: 'Kurzprotokolle',
       emoji: '📝',
-      status: 'empty',
-      count: 0,
-      description: 'Kurzprotokoll-Inhalte (Thema, Hypothese, Intervention …) waren nicht eingegeben und sind daher nicht im Export enthalten.',
+      status: protocolDataFound ? 'found' : 'empty',
+      count: sessionsWithExtraData.length,
+      description: protocolDataFound
+        ? `Es wurden mögliche Protokoll-Inhalte im Export gefunden: ${sessionsWithExtraData.length} Session(s) mit befüllten Zusatzspalten` +
+          (extraColumnLabels.length ? ` (Spalten: ${extraColumnLabels.join(', ')})` : '') +
+          (otherSheetNames.length ? `, zusätzliche Sheets im Workbook: ${otherSheetNames.join(', ')}` : '') +
+          '. Automatischer Import ist noch NICHT implementiert — Spalten-/Sheet-Zuordnung zu Kurz- vs. Langprotokoll muss erst anhand eines echten befüllten Exports verifiziert werden, bevor Daten geschrieben werden.'
+        : 'Keine Kurzprotokoll-Inhalte im Export gefunden (weder in Zusatzspalten der Sessions-Tabelle noch in weiteren Sheets). Hinweis: Diese Prüfung erkennt nur Spalten/Sheets — falls TheraPsy Protokolle woanders exportiert, bitte Rückmeldung geben.',
       canImport: false,
-      items: [],
+      items: sessionsWithExtraData,
     },
     {
       id: 'langprotokoll',
       label: 'Langprotokolle',
       emoji: '📄',
-      status: 'empty',
-      count: 0,
-      description: 'Langprotokoll-Inhalte waren nicht eingegeben und sind daher nicht im Export enthalten.',
+      status: protocolDataFound ? 'found' : 'empty',
+      count: sessionsWithExtraData.length,
+      description: protocolDataFound
+        ? 'Möglicherweise in denselben Zusatzspalten/Sheets wie Kurzprotokoll enthalten (siehe dort) — bisher keine verlässliche Unterscheidung zwischen Kurz- und Langprotokoll anhand des Spalten-Layouts möglich.'
+        : 'Keine Langprotokoll-Inhalte im Export gefunden (siehe Kurzprotokoll-Prüfung).',
       canImport: false,
       items: [],
     },
