@@ -42,7 +42,7 @@ const GENDER_SYMBOL: Record<string, string> = { MALE: '♂', FEMALE: '♀', DIVE
 // Standard-Seeds, falls /api/settings/avatars noch nicht geladen ist (identisch
 // mit DEFAULT_AVATAR_SETTINGS in src/lib/avatarSettings.ts)
 const DEFAULT_AVATAR_SEEDS: Record<string, string> = {
-  MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+  MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default', CHILD: 'kds-child-default',
   PAIR: 'kds-pair-default-a,kds-pair-default-b',
   FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
   GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
@@ -54,12 +54,13 @@ function avatarGroupFor(gender: string, categoryType?: string | null, isKind?: b
 }
 // Bei Paar/Familie/Gruppe ist der gespeicherte Wert eine kommagetrennte Liste
 // mehrerer Personen-Seeds (siehe src/lib/avatarSettings.ts) → ?seeds= statt ?seed=
-function avatarImgSrc(seedOrSeeds: string, bg?: string): string {
+function avatarImgSrc(seedOrSeeds: string | undefined, bg?: string): string {
+  const seed = seedOrSeeds || 'kds-default'
   const bgParam = bg ? `&bg=${bg}` : ''
-  if (seedOrSeeds.includes(',')) {
-    return `/api/avatar?seeds=${encodeURIComponent(seedOrSeeds)}${bgParam}`
+  if (seed.includes(',')) {
+    return `/api/avatar?seeds=${encodeURIComponent(seed)}${bgParam}`
   }
-  return `/api/avatar?seed=${encodeURIComponent(seedOrSeeds)}${bgParam}`
+  return `/api/avatar?seed=${encodeURIComponent(seed)}${bgParam}`
 }
 // Ordner unter /public/avatars/illustrated je Gruppe (muss zu AVATAR_GROUP_POOL
 // in src/lib/avatarSettings.ts passen)
