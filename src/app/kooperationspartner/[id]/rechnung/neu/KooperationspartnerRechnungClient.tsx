@@ -88,16 +88,17 @@ export function KooperationspartnerRechnungClient({
   }
 
   // ── Freie Position hinzufügen ──
-  const [freeLine, setFreeLine] = useState({ description: '', quantity: 1, unitPriceNet: 0 })
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const [freeLine, setFreeLine] = useState({ description: '', quantity: 1, unitPriceNet: 0, lineDate: todayStr })
   function addFreeLine() {
-    if (!freeLine.description.trim()) return
     setLineItems(li => [...li, {
       tempId: newTempId(),
-      description: freeLine.description,
+      description: freeLine.description.trim() || 'Position',
       quantity: freeLine.quantity,
       unitPriceNet: freeLine.unitPriceNet,
+      lineDate: freeLine.lineDate || null,
     }])
-    setFreeLine({ description: '', quantity: 1, unitPriceNet: 0 })
+    setFreeLine({ description: '', quantity: 1, unitPriceNet: 0, lineDate: todayStr })
   }
 
   const totalNet = lineItems.reduce((s, l) => s + l.quantity * l.unitPriceNet, 0)
@@ -357,12 +358,17 @@ export function KooperationspartnerRechnungClient({
           {/* Freie Position */}
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: 'var(--text-primary)' }}>Freie Position hinzufügen</h2>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 12, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 12, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 160 }}>
                 <label style={labelStyle}>Beschreibung</label>
                 <input style={inputStyle} value={freeLine.description}
                   onChange={e => setFreeLine(f => ({ ...f, description: e.target.value }))}
                   placeholder="z.B. Pauschale Juni 2026" />
+              </div>
+              <div style={{ width: 140 }}>
+                <label style={labelStyle}>Datum</label>
+                <input type="date" style={inputStyle} value={freeLine.lineDate}
+                  onChange={e => setFreeLine(f => ({ ...f, lineDate: e.target.value }))} />
               </div>
               <div style={{ width: 70 }}>
                 <label style={labelStyle}>Menge</label>
@@ -374,7 +380,7 @@ export function KooperationspartnerRechnungClient({
                 <input type="number" step="0.01" style={inputStyle} value={freeLine.unitPriceNet}
                   onChange={e => setFreeLine(f => ({ ...f, unitPriceNet: parseFloat(e.target.value) || 0 }))} />
               </div>
-              <button onClick={addFreeLine} disabled={!freeLine.description.trim()} className="btn-primary" style={{ fontSize: 12, height: 36 }}>
+              <button onClick={addFreeLine} className="btn-primary" style={{ fontSize: 12, height: 36 }}>
                 <Plus style={{ width: 12, height: 12 }} />
               </button>
             </div>
@@ -394,6 +400,7 @@ export function KooperationspartnerRechnungClient({
                 <table className="data-table">
                   <thead><tr>
                     <th>Beschreibung</th>
+                    <th style={{ width: 130 }}>Datum</th>
                     <th style={{ width: 70 }}>Menge</th>
                     <th style={{ width: 100 }}>Preis/Einh.</th>
                     <th style={{ width: 100 }}>Gesamt</th>
@@ -405,6 +412,11 @@ export function KooperationspartnerRechnungClient({
                         <td>
                           <input style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px' }}
                             value={l.description} onChange={e => updateLine(l.tempId, { description: e.target.value })} />
+                        </td>
+                        <td>
+                          <input type="date" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px' }}
+                            value={l.lineDate ? l.lineDate.slice(0, 10) : ''}
+                            onChange={e => updateLine(l.tempId, { lineDate: e.target.value || null })} />
                         </td>
                         <td>
                           <input type="number" step="0.5" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px', textAlign: 'right' }}
