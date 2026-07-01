@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { generateAvatarSvg, generateGroupAvatarSvg } from '@/lib/avatarSettings'
+import { generateAvatarSvg, generateGroupAvatarSvg } from '@/lib/avatarDicebear'
 
 // GET /api/avatar?seed=xyz&bg=e3e3e3            → eine Person
 // GET /api/avatar?seeds=a,b,c&bg=e3e3e3          → mehrere Personen kombiniert (Paar/Familie/Gruppe)
