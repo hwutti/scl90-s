@@ -59,6 +59,8 @@ export async function executeMigration(
 
   // Profil-Nr → KDS Patient-ID
   const patientIdByProfilNr = new Map<number, string>()
+  // "patientId::sessionName" → TherapySession-ID (für Rechnungs-Zuordnung, Schritt 3)
+  const sessionIdByPatientAndName = new Map<string, string>()
 
   // ── 1. Klient:innen ──────────────────────────────────────────────────────────
   if (selectedAreas.includes('profiles')) {
@@ -136,7 +138,11 @@ export async function executeMigration(
       const existing = await prisma.therapySession.findFirst({
         where: { patientId, name: s.sessionName, therapistId: userId },
       })
-      if (existing) { result.sessionsSkipped++; continue }
+      if (existing) {
+        sessionIdByPatientAndName.set(`${patientId}::${s.sessionName}`, existing.id)
+        result.sessionsSkipped++
+        continue
+      }
 
       const session = await prisma.therapySession.create({
         data: {
@@ -154,6 +160,7 @@ export async function executeMigration(
           excludedFromFinances: true,
         },
       })
+      sessionIdByPatientAndName.set(`${patientId}::${s.sessionName}`, session.id)
       result.sessions++
 
       // Supervision
@@ -176,8 +183,15 @@ export async function executeMigration(
     }
   }
 
-  // ── 3. Honorarnoten/Einnahmen als Legacy-Transaktionen ───────────────────────
+  // ── 3. Honorarnoten/Einnahmen als echte Transaktionen (neues Billing-Modell) ─
+  // Wichtig: NICHT mehr FinanceTransaction (Legacy) — die wird im Patienten-
+  // "Rechnungen"-Tab nicht angezeigt (der fragt /api/transactions ab, basiert auf
+  // dem `Transaction`-Modell). computeTransactionJournal() (BMD-Export, Steuer-
+  // berater-PDF) liest ohnehin BEIDE Modelle zusammen — hier also unbedenklich.
   if (selectedAreas.includes('rechnungen_einnahmen')) {
+    const therapistUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+    const payeeName = therapistUser?.name ?? 'Praxis'
+
     for (const inv of invoices) {
       if (inv.type !== 'INCOME') continue
       const invoiceDate = parseDate(inv.date)
@@ -186,42 +200,115 @@ export async function executeMigration(
         continue
       }
 
-      // Deduplizieren über invoiceNumber
-      const existing = await prisma.financeTransaction.findFirst({
-        where: { invoiceNumber: inv.invoiceNr, createdBy: userId },
-      })
+      // Deduplizieren über referenceNumber (im neuen Modell eindeutig)
+      const existing = await prisma.transaction.findUnique({ where: { referenceNumber: inv.invoiceNr } })
       if (existing) continue
 
       const patientId = inv.profilNr ? (patientIdByProfilNr.get(inv.profilNr) ?? null) : null
 
+      // Echten Patientennamen als Zahler verwenden, falls schon importiert
+      let payerName = inv.patientName ?? 'Unbekannt'
+      if (patientId) {
+        const p = await prisma.patient.findUnique({ where: { id: patientId }, select: { firstName: true, lastName: true, codeName: true } })
+        if (p) payerName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.codeName || payerName
+      }
+
       // Echten Zahlungsstatus verwenden, falls aus Finanzexport ermittelt (siehe therapsyParser.ts).
-      // Fallback (Finanzexport nicht im Export enthalten): alte Heuristik + Warnhinweis.
-      let paymentStatus: 'PAID' | 'PENDING' | 'CANCELLED'
+      // TxPaymentStatus kennt nur PAID/UNPAID — "storniert" wird über lifecycleStatus abgebildet.
+      let paymentStatus: 'PAID' | 'UNPAID' = 'UNPAID'
+      let lifecycleStatus: 'ACTIVE' | 'CANCELLED_ORIGINAL' = 'ACTIVE'
+      let paidAt: Date | null = null
       let statusNote: string
-      if (inv.status) {
-        paymentStatus = inv.status
-        statusNote = inv.status === 'PAID' ? `bezahlt am ${inv.paidDate}`
-                   : inv.status === 'CANCELLED' ? `storniert am ${inv.paidDate}`
-                   : 'offen'
+      if (inv.status === 'PAID') {
+        paymentStatus = 'PAID'
+        paidAt = parseDate(inv.paidDate)
+        statusNote = `bezahlt am ${inv.paidDate}`
+      } else if (inv.status === 'CANCELLED') {
+        lifecycleStatus = 'CANCELLED_ORIGINAL'
+        statusNote = `storniert am ${inv.paidDate}`
+      } else if (inv.status === 'PENDING') {
+        statusNote = 'offen'
       } else {
-        paymentStatus = inv.paidDate ? 'PAID' : 'PENDING'
-        statusNote = inv.paidDate ? `bezahlt am ${inv.paidDate} (ungeprüft — Finanzexport fehlte)` : 'offen'
+        // Fallback, falls Finanzexport-Datei im Export fehlte: alte Heuristik + Warnhinweis
+        paymentStatus = inv.paidDate ? 'PAID' : 'UNPAID'
+        if (paymentStatus === 'PAID') paidAt = parseDate(inv.paidDate)
+        statusNote = (paymentStatus === 'PAID' ? `bezahlt am ${inv.paidDate}` : 'offen') + ' (ungeprüft — Finanzexport fehlte)'
         result.warnings.push(`Rechnung ${inv.invoiceNr}: Zahlungsstatus nicht verifizierbar (Finanzexport-Datei fehlte im Export) — als "${paymentStatus}" markiert, bitte manuell prüfen.`)
       }
 
-      await prisma.financeTransaction.create({
+      // Psychotherapie ist umsatzsteuerbefreit (§ 6 Abs. 1 Z 19 UStG)
+      const tx = await prisma.transaction.create({
         data: {
-          createdBy: userId,
           patientId,
-          type: 'INCOME',
-          amount: inv.amount,
-          date: invoiceDate,
+          createdByUserId: userId,
+          direction: 'INCOME',
+          sourceType: 'MANUAL',
+          referenceNumber: inv.invoiceNr,
+          transactionDate: invoiceDate,
+          payerName,
+          payeeName,
+          amountNet: inv.amount,
+          vatRate: 0,
+          vatAmount: 0,
+          amountGross: inv.amount,
           paymentStatus,
-          description: `Importiert aus TheraPsy: ${inv.invoiceNr} (${statusNote})`,
-          invoiceNumber: inv.invoiceNr,
-          incomeCategory: 'HONORAR',
+          paidAt,
+          paymentMethod: paymentStatus === 'PAID' ? 'UNBAR_BANK_TRANSFER' : null,
+          lifecycleStatus,
+          notes: `Importiert aus TheraPsy: ${inv.invoiceNr} (${statusNote})`,
         },
       })
+
+      const lineItem = await prisma.txLineItem.create({
+        data: {
+          transactionId: tx.id,
+          description: 'Einzeltherapie (importiert aus TheraPsy)',
+          quantity: 1,
+          unitPriceNet: inv.amount,
+          amountNet: inv.amount,
+          vatRate: 0,
+          vatAmount: 0,
+          amountGross: inv.amount,
+          lineDate: invoiceDate,
+        },
+      })
+
+      // Sitzungs-Zuordnung über die im Finanzexport genannten Sitzungsnamen
+      if (patientId && inv.sessionNames && inv.sessionNames.length > 0) {
+        const foundSessionIds = inv.sessionNames
+          .map(name => sessionIdByPatientAndName.get(`${patientId}::${name}`))
+          .filter((x): x is string => !!x)
+        if (foundSessionIds.length > 0) {
+          const share = inv.amount / foundSessionIds.length
+          for (const sid of foundSessionIds) {
+            await prisma.txSessionAllocation.create({
+              data: {
+                transactionId: tx.id,
+                lineItemId: lineItem.id,
+                sessionId: sid,
+                allocationPercentage: 1 / foundSessionIds.length,
+                allocatedAmountNet: share,
+                allocatedVatAmount: 0,
+                allocatedAmountGross: share,
+              },
+            })
+          }
+        }
+      }
+
+      // Original-Rechnungsdatei (xlsx) als Dokument anhängen
+      if (inv.xlsxBase64) {
+        await prisma.invoiceDocument.create({
+          data: {
+            transactionId: tx.id,
+            documentType: 'INVOICE_XLSX',
+            format: 'xlsx',
+            data: Buffer.from(inv.xlsxBase64, 'base64'),
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        })
+      }
+
       result.transactions++
     }
   }
