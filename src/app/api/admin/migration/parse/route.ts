@@ -67,7 +67,8 @@ export async function GET(req: NextRequest) {
     })
   } catch (err: any) {
     if (tmpDir) try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
-    return NextResponse.json({ error: err?.message ?? 'Fehler beim Parsen.' }, { status: 500 })
+    console.error('Migration GET parse error:', err)
+    return NextResponse.json({ error: err?.message ?? 'Fehler beim Parsen.', stack: err?.stack }, { status: 500 })
   }
 }
 
@@ -183,7 +184,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: any) {
     if (tmpDir) try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
-    console.error('Migration parse error:', err)
-    return NextResponse.json({ error: err?.message ?? 'Unbekannter Fehler beim Parsen.' }, { status: 500 })
+    console.error('Migration POST parse error:', err)
+    return NextResponse.json({ error: err?.message ?? 'Unbekannter Fehler beim Parsen.', stack: err?.stack }, { status: 500 })
   }
 }

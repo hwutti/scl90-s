@@ -99,7 +99,7 @@ export function MigrationClient() {
       const res = await fetch(`/api/admin/migration/parse?serverPath=${encodeURIComponent(serverPath)}`)
       let data: any
       try { data = await res.json() } catch { setError('Server-Fehler: Antwort war kein gültiges JSON.'); return }
-      if (!res.ok) { setError(data.error ?? 'Fehler beim Verarbeiten.'); return }
+      if (!res.ok) { setError((data.error ?? 'Fehler beim Verarbeiten.') + (data.stack ? '\n\n' + data.stack.split('\n').slice(0,3).join('\n') : '')); return }
       setPreview(data)
       setSelectedAreas(new Set(data.areas.filter((a: MigrationArea) => a.canImport).map((a: MigrationArea) => a.id)))
       setStep('preview')
