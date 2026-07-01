@@ -75,14 +75,18 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
   // Photo
   const [photoSrc, setPhotoSrc] = useState<string|null>(null)
   const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>({
-    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default', CHILD: 'kds-child-default',
     PAIR: 'kds-pair-default-a,kds-pair-default-b',
     FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
     GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
   })
+  const [avatarStyle, setAvatarStyle] = useState<string>('dicebear')
+  const [avatarIllustrated, setAvatarIllustrated] = useState<Record<string, string>>({})
   useEffect(() => {
     fetch('/api/settings/avatars').then(r => r.json()).then(d => {
       if (d?.seeds) setAvatarSeeds(d.seeds)
+      if (d?.style) setAvatarStyle(d.style)
+      if (d?.illustrated) setAvatarIllustrated(d.illustrated)
     }).catch(() => {})
   }, [])
   useEffect(() => {
@@ -430,15 +434,25 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
                   : GENDER_LABEL[patient.gender] ?? patient.gender
                 const group = (patient as any).categoryType === 'PAIR' || (patient as any).categoryType === 'FAMILY' || (patient as any).categoryType === 'GROUP'
                   ? (patient as any).categoryType
-                  : (patient.gender === 'MALE' || patient.gender === 'FEMALE' ? patient.gender : 'DIVERSE')
-                const seed = avatarSeeds[group] ?? `kds-${group.toLowerCase()}-default`
-                const src = seed.includes(',')
-                  ? `/api/avatar?seeds=${encodeURIComponent(seed)}`
-                  : `/api/avatar?seed=${encodeURIComponent(seed)}`
+                  : isKind
+                    ? 'CHILD'
+                    : (patient.gender === 'MALE' || patient.gender === 'FEMALE' ? patient.gender : 'DIVERSE')
+                const illustratedPool: Record<string, 'individuals' | 'kids' | 'groups'> = {
+                  MALE: 'individuals', FEMALE: 'individuals', DIVERSE: 'individuals',
+                  CHILD: 'kids', PAIR: 'groups', FAMILY: 'groups', GROUP: 'groups',
+                }
+                const src = avatarStyle === 'illustrated'
+                  ? `/avatars/illustrated/${illustratedPool[group] ?? 'individuals'}/${avatarIllustrated[group] ?? 'ind01.png'}`
+                  : (() => {
+                      const seed = avatarSeeds[group] ?? `kds-${group.toLowerCase()}-default`
+                      return seed.includes(',')
+                        ? `/api/avatar?seeds=${encodeURIComponent(seed)}`
+                        : `/api/avatar?seed=${encodeURIComponent(seed)}`
+                    })()
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
                     <img src={src} alt="" width={68} height={68}
-                      style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)' }} />
+                      style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', objectFit: 'cover' }} />
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.25)', color: 'white', whiteSpace: 'nowrap' }}>
                       {pillText}
                     </span>

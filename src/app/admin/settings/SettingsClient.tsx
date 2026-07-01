@@ -7,6 +7,7 @@ import {
   Palette, Settings, MoreHorizontal, Eye, EyeOff, Save, AlertTriangle
 } from 'lucide-react'
 import { INVOICE_PLACEHOLDERS } from '@/lib/invoice/template'
+import { AVATAR_ILLUSTRATED_POOLS, AVATAR_GROUP_POOL } from '@/lib/avatarSettings'
 
 // ── Akkordeon-Abschnitt ──────────────────────────────────────────────────────
 function Section({ title, children, defaultOpen = false }: {
@@ -133,12 +134,17 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
 
   // ── Avatare (global je Gruppe) ──
   const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>({
-    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+    MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default', CHILD: 'kds-child-default',
     PAIR: 'kds-pair-default-a,kds-pair-default-b',
     FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
     GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
   })
   const [avatarCandidates, setAvatarCandidates] = useState<Record<string, string[]>>({})
+  const [avatarStyle, setAvatarStyle] = useState<'dicebear' | 'illustrated'>('dicebear')
+  const [avatarIllustrated, setAvatarIllustrated] = useState<Record<string, string>>({
+    MALE: 'ind04.png', FEMALE: 'ind01.png', DIVERSE: 'ind13.png', CHILD: 'kid01.png',
+    PAIR: 'grp01.png', FAMILY: 'grp04.png', GROUP: 'grp05.png',
+  })
 
   // Visuelle Einstellungen, Telemetrie + Anamnese-Vorlage beim Laden aus DB holen
   useEffect(() => {
@@ -173,12 +179,14 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
     }).catch(() => {})
     fetch('/api/settings/avatars').then(r => r.json()).then(d => {
       const seeds = d?.seeds ?? {
-        MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default',
+        MALE: 'kds-male-default', FEMALE: 'kds-female-default', DIVERSE: 'kds-diverse-default', CHILD: 'kds-child-default',
         PAIR: 'kds-pair-default-a,kds-pair-default-b',
         FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
         GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
       }
       setAvatarSeeds(seeds)
+      if (d?.style === 'illustrated' || d?.style === 'dicebear') setAvatarStyle(d.style)
+      if (d?.illustrated) setAvatarIllustrated((prev) => ({ ...prev, ...d.illustrated }))
       // Kachel-Auswahl mit den aktuell gespeicherten Avataren + weiteren Optionen befüllen.
       // Bei Paar/Familie/Gruppe: pro Person ein eigenes Kandidaten-Set (Slot-Keys).
       const MULTI_COUNTS: Record<string, number> = { PAIR: 2, FAMILY: 3, GROUP: 4 }
@@ -775,26 +783,72 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
               Ein Avatar gilt für alle Patient:innen einer Gruppe gleichzeitig — keine Einzelbilder pro Patient.
-              Einfach anklicken um auszuwählen. "Mehr laden" zeigt weitere Optionen.
-              Bei Paar/Familie/Gruppe wird für jede Person einzeln ein Gesicht gewählt und zu einem Bild kombiniert.
+              Einfach anklicken um auszuwählen.
             </p>
+
+            {/* Stil-Umschalter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, background: 'var(--surface-card)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Avatar-Stil</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['dicebear', 'illustrated'] as const).map(s => (
+                  <button key={s} onClick={() => setAvatarStyle(s)}
+                    className={s === avatarStyle ? 'btn-primary' : 'btn-secondary'}
+                    style={{ fontSize: 11, padding: '5px 12px' }}>
+                    {s === 'dicebear' ? 'Dicebear (generiert)' : 'Illustriert (Zeichenstil)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {avatarStyle === 'dicebear' ? (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, marginTop: -12 }}>
+                "Mehr laden" zeigt weitere Optionen. Bei Paar/Familie/Gruppe wird für jede Person einzeln ein Gesicht gewählt und zu einem Bild kombiniert.
+              </p>
+            ) : (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, marginTop: -12 }}>
+                Bei Paar/Familie/Gruppe wird ein fertiges Bild ausgewählt (nicht aus Einzelpersonen kombiniert).
+              </p>
+            )}
+
             {[
-              ['MALE', 'Männlich', 1], ['FEMALE', 'Weiblich', 1], ['DIVERSE', 'Divers', 1],
+              ['MALE', 'Männlich', 1], ['FEMALE', 'Weiblich', 1], ['DIVERSE', 'Divers', 1], ['CHILD', 'Kind', 1],
               ['PAIR', 'Paar', 2], ['FAMILY', 'Familie', 3], ['GROUP', 'Gruppe', 4],
             ].map(([key, label, personCount]) => {
               const isMulti = (personCount as number) > 1
               const slotSeeds = isMulti ? (avatarSeeds[key as string] ?? '').split(',') : []
+              const pool = AVATAR_GROUP_POOL[key as keyof typeof AVATAR_GROUP_POOL] ?? 'individuals'
+              const illustratedFiles = AVATAR_ILLUSTRATED_POOLS[pool] ?? []
+
               return (
                 <div key={key as string}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                     <h4 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{label}</h4>
-                    {isMulti && (
+                    {avatarStyle === 'dicebear' && isMulti && (
                       <img src={`/api/avatar?seeds=${encodeURIComponent(avatarSeeds[key as string] ?? '')}&bg=e3e3e3`} alt="Vorschau der Kombination"
                         width={40} height={40} style={{ borderRadius: '50%' }} />
                     )}
+                    {avatarStyle === 'illustrated' && (
+                      <img src={`/avatars/illustrated/${pool}/${avatarIllustrated[key as string] ?? illustratedFiles[0]}`} alt="Aktuelle Auswahl"
+                        width={40} height={40} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                    )}
                   </div>
 
-                  {!isMulti ? (
+                  {avatarStyle === 'illustrated' ? (
+                    // ── Illustrierter Stil: feste Bilder aus dem jeweiligen Pool anklickbar ──
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
+                      {illustratedFiles.map(file => (
+                        <button key={file} onClick={() => setAvatarIllustrated(s => ({ ...s, [key as string]: file }))}
+                          title="Als Avatar für diese Gruppe auswählen"
+                          style={{
+                            padding: 2, borderRadius: '50%', cursor: 'pointer', background: 'none',
+                            border: avatarIllustrated[key as string] === file ? '3px solid var(--color-primary)' : '3px solid transparent',
+                          }}>
+                          <img src={`/avatars/illustrated/${pool}/${file}`} alt=""
+                            width={60} height={60} style={{ borderRadius: '50%', display: 'block', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                  ) : !isMulti ? (
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 10 }}>
                         {(avatarCandidates[key as string] ?? []).map(seed => (
@@ -856,7 +910,7 @@ export function SettingsClient({ googleCal, invoiceTemplates, txTypes }: any) {
               <button onClick={async () => {
                 await fetch('/api/settings/avatars', {
                   method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ seeds: avatarSeeds }),
+                  body: JSON.stringify({ style: avatarStyle, seeds: avatarSeeds, illustrated: avatarIllustrated }),
                 })
                 setSaved(true); setTimeout(() => setSaved(false), 2500)
               }} className="btn-primary" style={{ fontSize: 12 }}>

@@ -38,8 +38,9 @@ const DEFAULT_AVATAR_SEEDS: Record<string, string> = {
   FAMILY: 'kds-family-default-a,kds-family-default-b,kds-family-default-c',
   GROUP: 'kds-group-default-a,kds-group-default-b,kds-group-default-c,kds-group-default-d',
 }
-function avatarGroupFor(gender: string, categoryType?: string | null): string {
+function avatarGroupFor(gender: string, categoryType?: string | null, isKind?: boolean): string {
   if (categoryType === 'PAIR' || categoryType === 'FAMILY' || categoryType === 'GROUP') return categoryType
+  if (isKind) return 'CHILD'
   return gender === 'MALE' || gender === 'FEMALE' ? gender : 'DIVERSE'
 }
 // Bei Paar/Familie/Gruppe ist der gespeicherte Wert eine kommagetrennte Liste
@@ -51,22 +52,32 @@ function avatarImgSrc(seedOrSeeds: string, bg?: string): string {
   }
   return `/api/avatar?seed=${encodeURIComponent(seedOrSeeds)}${bgParam}`
 }
+// Ordner unter /public/avatars/illustrated je Gruppe (muss zu AVATAR_GROUP_POOL
+// in src/lib/avatarSettings.ts passen)
+const ILLUSTRATED_POOL: Record<string, 'individuals' | 'kids' | 'groups'> = {
+  MALE: 'individuals', FEMALE: 'individuals', DIVERSE: 'individuals',
+  CHILD: 'kids', PAIR: 'groups', FAMILY: 'groups', GROUP: 'groups',
+}
 
 // ── PatientIcon: globaler Avatar (unter Einstellungen → Avatare festgelegt) + Pill ──
 function PatientIcon({
   gender, dob, categoryType, size = 52, avatarSeeds = DEFAULT_AVATAR_SEEDS,
+  avatarStyle = 'dicebear', avatarIllustrated = {},
 }: {
   gender: string
   dob: string
   categoryType?: string | null
   size?: number
   avatarSeeds?: Record<string, string>
+  avatarStyle?: string
+  avatarIllustrated?: Record<string, string>
 }) {
   const age    = calcAge(dob)
   const isKind = age !== null && age < 18
   const color  = categoryType === 'PAIR'   ? '#10b981'
                : categoryType === 'FAMILY' ? '#f97316'
                : categoryType === 'GROUP'  ? '#6366f1'
+               : isKind ? '#f59e0b'
                : gender === 'MALE'   ? '#3b82f6'
                : gender === 'FEMALE' ? '#ec4899'
                : '#8b5cf6'
@@ -78,13 +89,15 @@ function PatientIcon({
                     ? (GENDER_SYMBOL[gender] ?? '?') + ' <18'
                     : (GENDER_LABEL[gender] ?? gender)
 
-  const group = avatarGroupFor(gender, categoryType)
-  const seed  = avatarSeeds[group] ?? DEFAULT_AVATAR_SEEDS[group]
+  const group = avatarGroupFor(gender, categoryType, isKind)
+  const src = avatarStyle === 'illustrated'
+    ? `/avatars/illustrated/${ILLUSTRATED_POOL[group] ?? 'individuals'}/${avatarIllustrated[group] ?? 'ind01.png'}`
+    : avatarImgSrc(avatarSeeds[group] ?? DEFAULT_AVATAR_SEEDS[group], 'e3e3e3')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
       <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${color}` }}>
-        <img src={avatarImgSrc(seed, 'e3e3e3')} alt="" width={size} height={size} style={{ display: 'block' }} />
+        <img src={src} alt="" width={size} height={size} style={{ display: 'block', objectFit: 'cover' }} />
       </div>
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
@@ -133,10 +146,14 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [avatarSeeds, setAvatarSeeds] = useState<Record<string, string>>(DEFAULT_AVATAR_SEEDS)
+  const [avatarStyle, setAvatarStyle] = useState<string>('dicebear')
+  const [avatarIllustrated, setAvatarIllustrated] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetch('/api/settings/avatars').then(r => r.json()).then(d => {
       if (d?.seeds) setAvatarSeeds(d.seeds)
+      if (d?.style) setAvatarStyle(d.style)
+      if (d?.illustrated) setAvatarIllustrated(d.illustrated)
     }).catch(() => {})
   }, [])
   const [creating, setCreating] = useState(false)
@@ -280,7 +297,7 @@ export function PatientsListClient({ patients, instruments, role }: Props) {
                 >
                   {/* Patient */}
                   <div className="flex items-center gap-3">
-                    <PatientIcon gender={p.gender} dob={p.dob} categoryType={(p as any).categoryType} size={44} avatarSeeds={avatarSeeds} />
+                    <PatientIcon gender={p.gender} dob={p.dob} categoryType={(p as any).categoryType} size={44} avatarSeeds={avatarSeeds} avatarStyle={avatarStyle} avatarIllustrated={avatarIllustrated} />
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--text-primary)] truncate">
                         {p.lastName}, {p.firstName}

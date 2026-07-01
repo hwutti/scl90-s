@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { parseAvatarSettings, DEFAULT_AVATAR_SETTINGS, AvatarGroup } from '@/lib/avatarSettings'
+import { parseAvatarSettings, DEFAULT_AVATAR_SETTINGS, AvatarGroup, AvatarStyle } from '@/lib/avatarSettings'
 
-const GROUPS: AvatarGroup[] = ['MALE', 'FEMALE', 'DIVERSE', 'PAIR', 'FAMILY', 'GROUP']
+const GROUPS: AvatarGroup[] = ['MALE', 'FEMALE', 'DIVERSE', 'CHILD', 'PAIR', 'FAMILY', 'GROUP']
 
 // GET /api/settings/avatars
 export async function GET() {
@@ -15,7 +15,7 @@ export async function GET() {
   return NextResponse.json(parseAvatarSettings(config?.avatarSettings))
 }
 
-// PATCH /api/settings/avatars — body: { seeds: { MALE, FEMALE, DIVERSE, PAIR, FAMILY, GROUP } }
+// PATCH /api/settings/avatars — body: { style?, seeds?: {...}, illustrated?: {...} }
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,13 +30,25 @@ export async function PATCH(req: NextRequest) {
   const current = await prisma.praxisConfig.findFirst({ where: { key: 'default' } })
   const currentParsed = parseAvatarSettings(current?.avatarSettings)
 
+  const newStyle: AvatarStyle = body.style === 'illustrated' || body.style === 'dicebear'
+    ? body.style
+    : currentParsed.style
+
   const newSeeds = { ...currentParsed.seeds }
   for (const g of GROUPS) {
     if (typeof body.seeds?.[g] === 'string' && body.seeds[g].trim()) {
       newSeeds[g] = body.seeds[g].trim()
     }
   }
-  const merged = { seeds: newSeeds }
+
+  const newIllustrated = { ...currentParsed.illustrated }
+  for (const g of GROUPS) {
+    if (typeof body.illustrated?.[g] === 'string' && body.illustrated[g].trim()) {
+      newIllustrated[g] = body.illustrated[g].trim()
+    }
+  }
+
+  const merged = { style: newStyle, seeds: newSeeds, illustrated: newIllustrated }
 
   await prisma.praxisConfig.upsert({
     where: { key: 'default' },
