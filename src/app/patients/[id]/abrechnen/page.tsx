@@ -11,7 +11,7 @@ export default async function AbrechnenPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { sessions?: string }
+  searchParams: { sessions?: string; draftId?: string }
 }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
@@ -77,6 +77,42 @@ export default async function AbrechnenPage({
   const branding = await getBranding()
   const therapistName = session.user?.name ?? ''
 
+  // Entwurf laden, falls über ?draftId= aufgerufen (Weiterbearbeiten)
+  let initialDraft: any = null
+  if (searchParams.draftId) {
+    const d = await prisma.invoiceDraft.findFirst({
+      where: { id: searchParams.draftId, patientId: params.id },
+    })
+    if (d) {
+      initialDraft = {
+        id: d.id,
+        sessionIds: d.sessionIds,
+        lineItemOverrides: d.lineItemOverrides,
+        manualLines: d.manualLines,
+        removedLineKeys: d.removedLineKeys,
+        customNoteHtml: d.customNoteHtml,
+        payerName: d.payerName,
+        payerAddress: d.payerAddress,
+        vatRate: d.vatRate ? parseFloat(d.vatRate.toString()) : null,
+        paymentMethod: d.paymentMethod,
+        markAsPaid: d.markAsPaid,
+        generateInvoiceDoc: d.generateInvoiceDoc,
+        anonymizeInvoice: d.anonymizeInvoice,
+        invoiceTemplateId: d.invoiceTemplateId,
+        notes: d.notes,
+      }
+    }
+  }
+
+  // Sonst: Hinweis auf vorhandene Entwürfe zum Weiterbearbeiten anzeigen
+  const existingDrafts = !initialDraft
+    ? await prisma.invoiceDraft.findMany({
+        where: { patientId: params.id },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true, updatedAt: true },
+      })
+    : []
+
   return (
     <PageShell>
       <AbrechnenClient
@@ -86,6 +122,8 @@ export default async function AbrechnenPage({
         invoiceTemplates={invoiceTemplates}
         therapistName={therapistName}
         role={role}
+        initialDraft={initialDraft}
+        existingDrafts={existingDrafts as any}
         branding={{
           praxisName: branding.praxisName,
           address: branding.address,
