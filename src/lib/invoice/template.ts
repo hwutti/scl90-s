@@ -591,9 +591,11 @@ export async function renderDraftInvoiceHtml(input: {
   payerAddress?: string
   vatRate: number
   notes?: string
+  customNoteHtml?: string
   lineItems: Array<{
     date: Date | null
     description: string
+    descriptionHtml?: string | null
     serviceLabel: string | null
     quantity: number
     unitPriceNet: number
@@ -614,6 +616,7 @@ export async function renderDraftInvoiceHtml(input: {
     amountNet, vatRate: input.vatRate, vatAmount, amountGross,
     isPaid: false,
     notes: input.notes ?? '',
+    customNoteHtml: input.customNoteHtml ?? '',
     lineItems: input.lineItems,
   })
 }
