@@ -63,6 +63,10 @@ export async function createTransactionFromSessions(params: {
   }>
   // Freitext, der unter den Positionen auf der Honorarnote erscheint
   customNoteHtml?: string
+  // Keys ("session:<id>" / "service:<id>") von automatisch generierten Positionen,
+  // die der Nutzer in der Abrechnen-Ansicht explizit gelöscht hat -- die Sitzung
+  // selbst bleibt trotzdem korrekt verbucht, nur diese Position entfällt.
+  removedLineKeys?: string[]
   // Frei hinzugefügte Positionen ohne Sitzungsbezug (z.B. Sonderleistungen),
   // direkt in der Abrechnen-Ansicht per "+ Position hinzufügen" erstellt
   manualLines?: {
@@ -109,6 +113,7 @@ export async function createTransactionFromSessions(params: {
     //    manuelle Überschreibungen aus der Abrechnen-Ansicht anwenden falls vorhanden
     const vatRate = params.vatRate ?? 0
     const overrides = params.lineItemOverrides ?? {}
+    const removedKeys = new Set(params.removedLineKeys ?? [])
 
     interface ResolvedLine {
       sessionId: string | null
@@ -123,24 +128,29 @@ export async function createTransactionFromSessions(params: {
     const resolvedLines: ResolvedLine[] = []
 
     for (const s of sessions) {
-      const baseOverride = overrides[`session:${s.id}`]
-      resolvedLines.push({
-        sessionId: s.id,
-        // "Sitzung-N" statt vollem Session-Namen (der bereits das Datum enthält,
-        // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
-        description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
-        descriptionHtml: baseOverride?.descriptionHtml ?? null,
-        serviceLabel: s.serviceLabel ?? params.serviceLabel,
-        quantity: baseOverride?.quantity ?? 1,
-        unitPriceNet: baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0'),
-        vatRate,
-        lineDate: s.sessionDate,
-      })
+      const baseKey = `session:${s.id}`
+      const baseOverride = overrides[baseKey]
+      if (!removedKeys.has(baseKey)) {
+        resolvedLines.push({
+          sessionId: s.id,
+          // "Sitzung-N" statt vollem Session-Namen (der bereits das Datum enthält,
+          // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
+          description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
+          descriptionHtml: baseOverride?.descriptionHtml ?? null,
+          serviceLabel: s.serviceLabel ?? params.serviceLabel,
+          quantity: baseOverride?.quantity ?? 1,
+          unitPriceNet: baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0'),
+          vatRate,
+          lineDate: s.sessionDate,
+        })
+      }
 
       // Zusatzleistungen dieser Sitzung als eigene Rechnungspositionen übernehmen
       // (eigener vatRate je Zeile beibehalten statt dem Sitzungs-vatRate zu erzwingen)
       for (const line of serviceLinesBySession.get(s.id) ?? []) {
-        const lineOverride = overrides[`service:${line.id}`]
+        const lineKey = `service:${line.id}`
+        if (removedKeys.has(lineKey)) continue
+        const lineOverride = overrides[lineKey]
         resolvedLines.push({
           sessionId: s.id,
           description: lineOverride?.description ?? line.description,
@@ -168,6 +178,10 @@ export async function createTransactionFromSessions(params: {
         vatRate,
         lineDate: ml.lineDate ? new Date(ml.lineDate) : nowForManualLines,
       })
+    }
+
+    if (resolvedLines.length === 0) {
+      throw new Error('Mindestens eine Rechnungsposition erforderlich (alle Positionen wurden entfernt)')
     }
 
     const amountNet = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
