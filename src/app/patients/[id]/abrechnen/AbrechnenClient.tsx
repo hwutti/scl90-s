@@ -45,6 +45,9 @@ interface LineEdit {
   quantity?: number
   unitPriceNet?: number
   lineDate?: string | null
+  // Kleine graue Unterzeile unter der Beschreibung im fertigen Dokument
+  // (z.B. "Psychotherapeutische Behandlung 45") -- leerer String blendet sie aus.
+  serviceLabel?: string
 }
 interface ResolvedLine {
   key: string
@@ -56,6 +59,7 @@ interface ResolvedLine {
   quantity: number
   unitPriceNet: number
   lineDate: string | null
+  serviceLabel: string
 }
 
 interface Branding {
@@ -132,6 +136,7 @@ export function AbrechnenClient({
       quantity: baseEdit.quantity ?? 1,
       unitPriceNet: baseEdit.unitPriceNet ?? parseFloat(s.calculatedPriceNet ?? 0),
       lineDate: baseEdit.lineDate ?? toDateInputValue(s.sessionDate),
+      serviceLabel: baseEdit.serviceLabel ?? s.serviceLabel ?? '',
     })
     for (const l of s.serviceLines ?? []) {
       const key = `service:${l.id}`
@@ -146,6 +151,7 @@ export function AbrechnenClient({
         quantity: edit.quantity ?? parseFloat(l.quantity),
         unitPriceNet: edit.unitPriceNet ?? parseFloat(l.unitPriceNet),
         lineDate: edit.lineDate ?? toDateInputValue(s.sessionDate),
+        serviceLabel: edit.serviceLabel ?? l.catalogCode ?? '',
       })
     }
     return lines
@@ -610,6 +616,12 @@ export function AbrechnenClient({
                               minHeight={22}
                               compact
                             />
+                            <input
+                              value={line.serviceLabel}
+                              onChange={e => updateLineEdit(line.key, { serviceLabel: e.target.value })}
+                              placeholder="Zusatzbezeichnung (optional, erscheint klein darunter)"
+                              style={{ ...cellInputBase, width: '100%', fontSize: 10.5, color: '#888', marginTop: 2 }}
+                              {...cellFocusHandlers} />
                           </td>
                           <td style={{ padding: '6px', verticalAlign: 'top' }}>
                             <input type="number" step="0.5"
