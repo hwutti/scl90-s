@@ -13,7 +13,12 @@ export default async function SettingsPage() {
 
   const userId = (session.user as any).id
   const googleCal = await prisma.googleCalendarConnection.findUnique({ where: { userId } })
-  const invoiceTemplates = await prisma.invoiceTemplate.findMany({ where: { isActive: true } })
+  // Volle Vorlagen-Datensätze (HTML, Signatur, IBAN etc.) sind admin-only zu
+  // bearbeiten -- Therapeut:innen bekommen daher nur minimale Referenzdaten,
+  // keine vollständigen Admin-Only-Datensätze.
+  const invoiceTemplates = role === 'ADMIN'
+    ? await prisma.invoiceTemplate.findMany({ where: { isActive: true } })
+    : await prisma.invoiceTemplate.findMany({ where: { isActive: true }, select: { id: true, name: true, isDefault: true } })
   const txTypes = await prisma.txType.findMany({ where: { active: true } })
 
   return (
