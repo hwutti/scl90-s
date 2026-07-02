@@ -48,26 +48,53 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     serviceLinesBySession.set(line.sessionId, list)
   }
 
+  const overrides: Record<string, any> = body.lineItemOverrides ?? {}
+
   const lineItems = sessions.flatMap(s => {
-    const amountNet = parseFloat(s.calculatedPriceNet?.toString() ?? '0')
+    const baseOverride = overrides[`session:${s.id}`]
+    const baseAmountNet = baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0')
+    const baseQuantity = baseOverride?.quantity ?? 1
     const baseLine = {
       date: s.sessionDate,
-      description: `Sitzung-${s.sessionNumber}`,
+      description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
+      descriptionHtml: baseOverride?.descriptionHtml ?? null,
       serviceLabel: s.serviceLabel ?? null,
-      quantity: 1,
-      unitPriceNet: amountNet,
-      amountNet,
+      quantity: baseQuantity,
+      unitPriceNet: baseAmountNet,
+      amountNet: baseQuantity * baseAmountNet,
     }
-    const extraLines = (serviceLinesBySession.get(s.id) ?? []).map(l => ({
-      date: s.sessionDate,
-      description: l.description,
-      serviceLabel: l.catalogCode ?? null,
-      quantity: parseFloat(l.quantity.toString()),
-      unitPriceNet: parseFloat(l.unitPriceNet.toString()),
-      amountNet: parseFloat(l.amountNet.toString()),
-    }))
+    const extraLines = (serviceLinesBySession.get(s.id) ?? []).map(l => {
+      const lineOverride = overrides[`service:${l.id}`]
+      const qty = lineOverride?.quantity ?? parseFloat(l.quantity.toString())
+      const unitPrice = lineOverride?.unitPriceNet ?? parseFloat(l.unitPriceNet.toString())
+      return {
+        date: s.sessionDate,
+        description: lineOverride?.description ?? l.description,
+        descriptionHtml: lineOverride?.descriptionHtml ?? null,
+        serviceLabel: l.catalogCode ?? null,
+        quantity: qty,
+        unitPriceNet: unitPrice,
+        amountNet: qty * unitPrice,
+      }
+    })
     return [baseLine, ...extraLines]
   })
+
+  // Frei hinzugefügte Positionen ohne Sitzungsbezug ebenfalls in der Vorschau zeigen
+  const manualLines = Array.isArray(body.manualLines) ? body.manualLines : []
+  for (const ml of manualLines) {
+    const qty = ml.quantity ?? 1
+    const unitPrice = ml.unitPriceNet ?? 0
+    lineItems.push({
+      date: ml.lineDate ? new Date(ml.lineDate) : new Date(),
+      description: ml.description?.trim() || 'Position',
+      descriptionHtml: ml.descriptionHtml ?? null,
+      serviceLabel: null,
+      quantity: qty,
+      unitPriceNet: unitPrice,
+      amountNet: qty * unitPrice,
+    })
+  }
 
   const templateId = body.invoiceTemplateId || patient.defaultInvoiceTemplateId || null
   const vatRate = typeof body.vatRate === 'number' ? body.vatRate : 0
@@ -79,6 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       payerAddress: body.payerAddress || '',
       vatRate,
       notes: body.notes || '',
+      customNoteHtml: body.customNoteHtml || '',
       lineItems,
     })
     return NextResponse.json({ html })
