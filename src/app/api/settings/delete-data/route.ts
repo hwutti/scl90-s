@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
       prisma.invoiceDocument.deleteMany({}),
       prisma.transaction.deleteMany({}),
       prisma.referenceNumberLedger.deleteMany({}),
-      prisma.financeTransaction.deleteMany({}),
       prisma.mileageLog.deleteMany({}),
       prisma.travelLogEntry.deleteMany({}),
     ])
@@ -69,7 +68,6 @@ export async function POST(req: NextRequest) {
       prisma.invoiceDocument.deleteMany({}),
       prisma.transaction.deleteMany({}),
       prisma.referenceNumberLedger.deleteMany({}),
-      prisma.financeTransaction.deleteMany({}),
       prisma.mileageLog.deleteMany({}),
       prisma.travelLogEntry.deleteMany({}),
       prisma.sessionAssessmentValue.deleteMany({}),

@@ -16,7 +16,8 @@ export async function computeProfitStatement(userId: string, role: string, year:
   const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
 
   // Einzige Datenquelle für alle Geldbewegungen — siehe transactionJournal.ts für
-  // die Begründung, warum FinanceTransaction (Legacy) hier nicht mehr gelesen wird.
+  // die Begründung. Das alte FinanceTransaction-Modell (Legacy) wurde nach
+  // erfolgreicher Migration + Verifikation (siehe Git-Historie) entfernt.
   const transactions = await prisma.transaction.findMany({
     where: { ...where, transactionDate: dateRange, lifecycleStatus: { in: ['ACTIVE'] } },
     select: {

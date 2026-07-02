@@ -312,8 +312,8 @@ export async function executeMigration(
   }
 
   // ── 4. BMD-Buchungssätze als Transaktionen (vereinheitlicht, kein Legacy mehr) ─
-  // Schreibt jetzt ebenfalls in `Transaction` statt `FinanceTransaction` — ein
-  // einziges Modell für alle Geldbewegungen. Dedup läuft allein über die global
+  // Schreibt in `Transaction` — das alte FinanceTransaction-Modell existiert
+  // nicht mehr. Dedup läuft allein über die global
   // eindeutige referenceNumber und deckt damit automatisch sowohl bereits über
   // Schritt 3 importierte Honorarnoten als auch wiederholte BMD-Läufe ab; ein
   // separater Cross-Check zwischen zwei Tabellen ist dadurch nicht mehr nötig.

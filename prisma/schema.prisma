@@ -347,7 +347,6 @@ model Patient {
   documents       PatientDocument[]
   therapyGoals    TherapyGoal[]
   diagnoses       PatientDiagnosis[]
-  transactions    FinanceTransaction[]
   mileageLogs     MileageLog[]
 
   // Neue KDS-Relationen
@@ -950,89 +949,6 @@ model PatientDiagnosis {
 
   @@index([patientId])
   @@index([icdCode])
-}
-
-// ─── Finanzen ────────────────────────────────────────────────────────────────
-
-enum TransactionType {
-  INCOME      // Einnahme
-  EXPENSE     // Ausgabe
-}
-
-enum PaymentMethod {
-  CASH
-  BANK_TRANSFER
-  CARD
-  OTHER
-}
-
-enum PaymentStatus {
-  PENDING     // Noch nicht bezahlt
-  PAID        // Bezahlt
-  OVERDUE     // Überfällig
-  CANCELLED   // Storniert
-}
-
-enum IncomeCategory {
-  HONORAR           // Honorare (Therapiesitzungen)
-  OTHER_INCOME      // Sonstige Einnahmen
-}
-
-enum ExpenseCategory {
-  MISC_BUSINESS     // Sonstiger betr. Aufwand
-  GENERAL           // Allg. Ausgabe
-  SESSION_TRANS     // Sessiontransaktion
-  CANCELLATION      // Storno
-  CONTINUING_ED     // Fortbildung
-  THERAPY_TRAINING  // Lehrtherapie
-  TRAVEL            // Reisekosten
-  OFFICE            // Büroartikel
-  MARKETING         // Werbung
-  LITERATURE        // Literatur
-  FEES_TAXES        // Gebühren und Abgaben
-  SVA               // SVA
-  RENT              // Miete
-  INSURANCE         // Versicherung
-  CAR               // Aufwand PKW
-  OPERATIONS        // Betriebskosten
-  ELECTRICITY       // Strom
-  PHONE_INTERNET    // Telefon/Internet
-  CLEANING          // Reinigung/Verbrauchsmaterial
-  PERSONNEL         // Personal
-  SUPERVISION       // Supervision
-  DAILY_ALLOWANCE   // Taggeld
-  ACCOMMODATION     // Nächtigungsgeld
-  MILEAGE           // Kilometergeld
-  DECOR             // Deko
-}
-
-model FinanceTransaction {
-  id            String          @id @default(cuid())
-  createdBy     String          // userId (Therapeut/Admin)
-  type          TransactionType
-  amount        Decimal         @db.Decimal(10, 2)
-  date          DateTime        // Bezahldatum
-  createdAt     DateTime        @default(now())  // Erstellungsdatum
-  description   String?
-  paymentMethod PaymentMethod   @default(BANK_TRANSFER)
-  paymentStatus PaymentStatus   @default(PAID)
-
-  // Kategorie — entweder income oder expense, nicht beide
-  incomeCategory  IncomeCategory?
-  expenseCategory ExpenseCategory?
-
-  // Verknüpfungen (optional)
-  patientId     String?
-  patient       Patient?        @relation(fields: [patientId], references: [id])
-  appointmentId String?         // Verknüpfung mit Termin
-
-  note          String?
-  invoiceNumber String?         // Belegnummer
-
-  @@index([createdBy])
-  @@index([date])
-  @@index([type])
-  @@index([patientId])
 }
 
 // ─── Fahrtenbuch ─────────────────────────────────────────────────────────────

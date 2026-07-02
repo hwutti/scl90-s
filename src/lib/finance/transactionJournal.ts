@@ -53,9 +53,9 @@ export async function computeTransactionJournal(
   const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
 
   // Einzige Datenquelle für alle Geldbewegungen (Honorare, BMD-Import, manuelle
-  // Buchungen). FinanceTransaction (Legacy) wird nicht mehr geschrieben und hier
-  // bewusst nicht mehr gelesen — siehe scripts/legacy-financetransaction-migrate.ts
-  // für die einmalige Übernahme historischer Legacy-Daten.
+  // Buchungen). Das frühere Legacy-Modell FinanceTransaction wurde nach
+  // erfolgreicher Migration + Verifikation entfernt (Belege waren zu 100%
+  // bereits als Transaction dupliziert, siehe Git-Historie).
   const transactions = await prisma.transaction.findMany({
     where: { ...where, transactionDate: dateRange, lifecycleStatus: { in: ['ACTIVE'] } },
     select: {
