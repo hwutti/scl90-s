@@ -9,7 +9,7 @@ import {
 
 const RichTextEditor = dynamic(
   () => import('@/components/editor/RichTextEditor').then(m => m.RichTextEditor),
-  { ssr: false, loading: () => <div style={{ height: 40, background: 'var(--surface-page)', borderRadius: 8 }} /> }
+  { ssr: false, loading: () => <div style={{ height: 24, background: 'transparent' }} /> }
 )
 
 function fmtEUR(n: any) {
@@ -49,6 +49,8 @@ interface LineEdit {
 interface ResolvedLine {
   key: string
   sessionId: string
+  sessionLabel: string
+  isFirstOfSession: boolean
   description: string
   descriptionHtml?: string
   quantity: number
@@ -56,9 +58,19 @@ interface ResolvedLine {
   lineDate: string | null
 }
 
+interface Branding {
+  praxisName: string
+  address: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  logoBase64: string | null
+  logoMimeType: string | null
+  colorPrimary: string
+}
+
 export function AbrechnenClient({
   patient, sessions: initialSessions, allUnbilled,
-  invoiceTemplates, therapistName, role,
+  invoiceTemplates, therapistName, role, branding,
 }: {
   patient: any
   sessions: any[]
@@ -66,6 +78,7 @@ export function AbrechnenClient({
   invoiceTemplates: any[]
   therapistName: string
   role: string
+  branding: Branding
 }) {
   const router = useRouter()
 
@@ -74,6 +87,10 @@ export function AbrechnenClient({
     new Set(initialSessions.map((s: any) => s.id))
   )
   const selected = allUnbilled.filter(s => selectedIds.has(s.id))
+
+  function removeSession(sessionId: string) {
+    const next = new Set(selectedIds); next.delete(sessionId); setSelectedIds(next)
+  }
 
   // Manuelle Überschreibungen einzelner Positionen (Beschreibung/Menge/Preis/Datum)
   // Key: "session:<id>" für die Sitzungs-Grundposition, "service:<id>" für Zusatzleistungen
@@ -93,6 +110,8 @@ export function AbrechnenClient({
     lines.push({
       key: baseKey,
       sessionId: s.id,
+      sessionLabel: `${s.name} · ${fmtDate(s.sessionDate)}`,
+      isFirstOfSession: true,
       description: baseEdit.description ?? `Sitzung-${s.sessionNumber}`,
       descriptionHtml: baseEdit.descriptionHtml,
       quantity: baseEdit.quantity ?? 1,
@@ -105,6 +124,8 @@ export function AbrechnenClient({
       lines.push({
         key,
         sessionId: s.id,
+        sessionLabel: `${s.name} · ${fmtDate(s.sessionDate)}`,
+        isFirstOfSession: false,
         description: edit.description ?? l.description,
         descriptionHtml: edit.descriptionHtml,
         quantity: edit.quantity ?? parseFloat(l.quantity),
@@ -116,6 +137,8 @@ export function AbrechnenClient({
   }
 
   const allResolvedLines = selected.flatMap(resolveLinesForSession)
+  // Verrechnung: Summe wird IMMER direkt aus Menge × Einzelpreis der tatsächlichen
+  // Positions-Daten berechnet — nie aus Freitext o.ä. — damit sie zwingend korrekt bleibt.
   const totalNet = allResolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
 
   // Formular — vorausgefüllt aus Patientenprofil
@@ -215,14 +238,22 @@ export function AbrechnenClient({
     background: 'var(--surface-page)', color: 'var(--text-primary)',
     boxSizing: 'border-box' as const,
   }
-  const smallInputStyle = {
-    padding: '5px 7px', fontSize: 12.5,
-    border: '0.5px solid var(--border)', borderRadius: 6,
-    background: 'var(--surface-page)', color: 'var(--text-primary)',
-    boxSizing: 'border-box' as const,
-  }
   const labelStyle = { fontSize: 11, fontWeight: 500 as const, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }
   const sectionStyle = { fontSize: 12, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 10, paddingBottom: 6, borderBottom: '0.5px solid var(--border)' }
+
+  // Borderloses "Zellen"-Eingabefeld, das erst bei Fokus/Hover als Feld erkennbar
+  // wird — für das Word/Excel-artige Gefühl direkt im Rechnungs-Papier.
+  const cellInputBase: React.CSSProperties = {
+    border: '1px solid transparent', borderRadius: 5, background: 'transparent',
+    font: 'inherit', color: 'inherit', padding: '3px 5px', boxSizing: 'border-box',
+    outline: 'none',
+  }
+  const cellFocusHandlers = {
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid var(--color-primary)'; e.target.style.background = '#fff' },
+    onBlur:  (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' },
+    onMouseEnter: (e: React.MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid #d8dce3' },
+    onMouseLeave: (e: React.MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid transparent' },
+  }
 
   // ── Erfolgsseite ──────────────────────────────────────────────────────────────
   if (done) {
@@ -334,7 +365,7 @@ export function AbrechnenClient({
       {/* Body: zwei Spalten */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Linke Spalte: Auswahl + direkt editierbare Positionen */}
+        {/* Linke Spalte: Auswahl + editierbare Honorarnote im Original-Look */}
         <div style={{ overflowY: 'auto', padding: 24, background: 'var(--surface-page)' }}>
 
           {/* Schritt 1: Sitzungen auswählen (kompakt) */}
@@ -399,97 +430,152 @@ export function AbrechnenClient({
             </div>
           )}
 
-          {/* Schritt 2: Positionen — direkt editierbar, keine Tabelle, keine separate Vorschau nötig */}
+          {/* Schritt 2: Die Honorarnote selbst — direkt darin editieren, wie in Word/Excel */}
           {selected.length > 0 && (
             <div>
               <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
-                Positionen
+                Honorarnote
               </h2>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                So erscheint es auf der Honorarnote — Beschreibung, Menge und Preis direkt bearbeitbar.
+                Direkt bearbeitbar — Beschreibung, Menge, Preis und Freitext klicken und ändern. Die Summe unten wird automatisch korrekt berechnet.
               </div>
 
-              {selected.map(s => {
-                const lines = resolveLinesForSession(s)
-                return (
-                  <div key={s.id} style={{
-                    marginBottom: 14, borderRadius: 12, border: '0.5px solid var(--border)',
-                    background: 'var(--surface-card)', overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
-                      background: 'var(--surface-page)', borderBottom: '0.5px solid var(--border)',
-                    }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)' }}>{s.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· {fmtDate(s.sessionDate)}</span>
-                      <button
-                        onClick={() => {
-                          const next = new Set(selectedIds); next.delete(s.id); setSelectedIds(next)
-                        }}
-                        className="btn-ghost" style={{ marginLeft: 'auto', padding: 4, color: 'var(--text-muted)' }}
-                        title="Sitzung entfernen">
-                        <X style={{ width: 13, height: 13 }} />
-                      </button>
-                    </div>
+              {/* "Papier" im echten Rechnungs-Look */}
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '0.5px solid var(--border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)', padding: '30px 34px', color: '#1a1a1a',
+              }}>
+                {/* Header: Logo/Praxis links, Kontakt rechts */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                  <div>
+                    {branding.logoBase64 && (
+                      <img src={`data:${branding.logoMimeType || 'image/png'};base64,${branding.logoBase64}`}
+                        alt="Logo" style={{ height: 42, marginBottom: 6, display: 'block' }} />
+                    )}
+                    <div style={{ fontSize: 17, fontWeight: 700, color: branding.colorPrimary }}>{branding.praxisName}</div>
+                    {branding.address && <div style={{ fontSize: 11.5, color: '#666', marginTop: 2 }}>{branding.address}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11.5, color: '#666' }}>
+                    {branding.contactEmail && <div>{branding.contactEmail}</div>}
+                    {branding.contactPhone && <div>{branding.contactPhone}</div>}
+                  </div>
+                </div>
+                <div style={{ borderTop: `2px solid ${branding.colorPrimary}`, marginBottom: 20 }} />
 
-                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {lines.map(line => (
-                        <div key={line.key} style={{
-                          border: '0.5px solid var(--border)', borderRadius: 9, padding: 10,
-                          background: 'var(--surface-page)',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, flexWrap: 'wrap' }}>
-                            <input type="date" style={{ ...smallInputStyle, width: 128 }}
+                {/* Empfänger + Meta */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 22, gap: 20 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, letterSpacing: 0.5, color: '#999', marginBottom: 4 }}>RECHNUNG AN</div>
+                    <input value={form.payerName}
+                      onChange={e => setForm(f => ({ ...f, payerName: e.target.value }))}
+                      style={{ ...cellInputBase, fontSize: 14, fontWeight: 600, width: '100%', marginBottom: 2 }}
+                      {...cellFocusHandlers} placeholder="Name des Empfängers" />
+                    <input value={form.payerAddress}
+                      onChange={e => setForm(f => ({ ...f, payerAddress: e.target.value }))}
+                      style={{ ...cellInputBase, fontSize: 12, color: '#555', width: '100%' }}
+                      {...cellFocusHandlers} placeholder="Adresse (optional)" />
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11.5, color: '#555', flexShrink: 0, lineHeight: 1.7 }}>
+                    <div>Rechnungsnummer&nbsp; <strong>VORSCHAU</strong></div>
+                    <div>Rechnungsdatum&nbsp; <strong>{fmtDate(new Date())}</strong></div>
+                  </div>
+                </div>
+
+                <h1 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 14px', color: '#1a1a1a' }}>Honorarnote</h1>
+
+                {/* Positions-Tabelle — jede Zelle direkt editierbar */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1.5px solid ${branding.colorPrimary}` }}>
+                      <th style={{ textAlign: 'left', padding: '0 6px 8px 4px', fontSize: 11, color: '#888', fontWeight: 600, width: 108 }}>Datum</th>
+                      <th style={{ textAlign: 'left', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600 }}>Beschreibung</th>
+                      <th style={{ textAlign: 'center', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 54 }}>Anz.</th>
+                      <th style={{ textAlign: 'right', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 84 }}>Einzel €</th>
+                      <th style={{ textAlign: 'right', padding: '0 4px 8px 6px', fontSize: 11, color: '#888', fontWeight: 600, width: 84 }}>Gesamt €</th>
+                      <th style={{ width: 26 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selected.map(s => {
+                      const lines = resolveLinesForSession(s)
+                      return lines.map(line => (
+                        <tr key={line.key} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '6px 6px 6px 4px', verticalAlign: 'top' }}>
+                            <input type="date"
                               value={line.lineDate ? line.lineDate.slice(0, 10) : ''}
-                              onChange={e => updateLineEdit(line.key, { lineDate: e.target.value || null })} />
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-                              <input type="number" step="0.5" style={{ ...smallInputStyle, width: 46, textAlign: 'right' }}
-                                value={line.quantity}
-                                onChange={e => updateLineEdit(line.key, { quantity: parseFloat(e.target.value) || 0 })} />
-                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>×</span>
-                              <input type="number" step="0.01" style={{ ...smallInputStyle, width: 76, textAlign: 'right' }}
-                                value={line.unitPriceNet}
-                                onChange={e => updateLineEdit(line.key, { unitPriceNet: parseFloat(e.target.value) || 0 })} />
-                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', minWidth: 68, textAlign: 'right' }}>
-                                {fmtEUR(line.quantity * line.unitPriceNet)}
-                              </span>
-                            </div>
-                          </div>
-                          <RichTextEditor
-                            value={line.descriptionHtml || line.description}
-                            onChange={html => updateLineEdit(line.key, { descriptionHtml: html })}
-                            placeholder="Beschreibung…"
-                            minHeight={36}
-                            compact
-                          />
-                        </div>
-                      ))}
+                              onChange={e => updateLineEdit(line.key, { lineDate: e.target.value || null })}
+                              style={{ ...cellInputBase, width: '100%' }} {...cellFocusHandlers} />
+                            {line.isFirstOfSession && (
+                              <div style={{ fontSize: 9.5, color: '#aaa', marginTop: 2, paddingLeft: 5 }}>{s.name}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                            <RichTextEditor
+                              value={line.descriptionHtml || line.description}
+                              onChange={html => updateLineEdit(line.key, { descriptionHtml: html })}
+                              placeholder="Beschreibung…"
+                              minHeight={22}
+                              compact
+                            />
+                          </td>
+                          <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                            <input type="number" step="0.5"
+                              value={line.quantity}
+                              onChange={e => updateLineEdit(line.key, { quantity: parseFloat(e.target.value) || 0 })}
+                              style={{ ...cellInputBase, width: '100%', textAlign: 'center' }} {...cellFocusHandlers} />
+                          </td>
+                          <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                            <input type="number" step="0.01"
+                              value={line.unitPriceNet}
+                              onChange={e => updateLineEdit(line.key, { unitPriceNet: parseFloat(e.target.value) || 0 })}
+                              style={{ ...cellInputBase, width: '100%', textAlign: 'right' }} {...cellFocusHandlers} />
+                          </td>
+                          <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, verticalAlign: 'top', paddingTop: 12 }}>
+                            {fmtEUR(line.quantity * line.unitPriceNet)}
+                          </td>
+                          <td style={{ verticalAlign: 'top', paddingTop: 8 }}>
+                            {line.isFirstOfSession && (
+                              <button onClick={() => removeSession(line.sessionId)} className="btn-ghost"
+                                style={{ padding: 3, color: 'var(--text-muted)' }} title="Sitzung entfernen">
+                                <X style={{ width: 12, height: 12 }} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Summenblock */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                  <div style={{ width: 230 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                      <span style={{ color: '#666' }}>Nettobetrag</span>
+                      <span>{fmtEUR(totalNet)}</span>
+                    </div>
+                    {form.vatRate > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                        <span style={{ color: '#666' }}>MwSt. {Math.round(form.vatRate * 100)}%</span>
+                        <span>{fmtEUR(vatAmount)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', marginTop: 4, borderTop: '1.5px solid #1a1a1a', fontSize: 15, fontWeight: 700 }}>
+                      <span>Gesamtbetrag</span>
+                      <span>{fmtEUR(totalGross)}</span>
                     </div>
                   </div>
-                )
-              })}
+                </div>
 
-              {/* Freitext-Bereich, erscheint unter den Positionen auf der Honorarnote */}
-              <div style={{ marginTop: 4, marginBottom: 20 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-primary)' }}>Freitext / Anmerkungen</h2>
-                <RichTextEditor
-                  value={customNoteHtml}
-                  onChange={setCustomNoteHtml}
-                  placeholder="Optionaler Freitext, der unter den Positionen auf der Honorarnote erscheint (Fettdruck, Listen, Farben…)"
-                  minHeight={90}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Summe */}
-          {selected.length > 0 && (
-            <div style={{ padding: '12px 16px', background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {allResolvedLines.length} Position{allResolvedLines.length !== 1 ? 'en' : ''}</span>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Netto: {fmtEUR(totalNet)}</div>
-                {form.vatRate > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>MwSt. {Math.round(form.vatRate * 100)}%: {fmtEUR(vatAmount)}</div>}
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>Gesamt: {fmtEUR(totalGross)}</div>
+                {/* Freitext — erscheint unter den Positionen auf der echten Honorarnote */}
+                <div style={{ marginTop: 22, paddingTop: 14, borderTop: '0.5px solid #eee' }}>
+                  <RichTextEditor
+                    value={customNoteHtml}
+                    onChange={setCustomNoteHtml}
+                    placeholder="Optionaler Freitext, der unter den Positionen erscheint (Fettdruck, Listen, Farben…)"
+                    minHeight={60}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -497,23 +583,6 @@ export function AbrechnenClient({
 
         {/* Rechte Spalte: Formular */}
         <div style={{ overflowY: 'auto', padding: 24, background: 'var(--surface-card)', borderLeft: '0.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Rechnungsempfänger */}
-          <div>
-            <div style={sectionStyle}>Rechnungsempfänger</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div>
-                <label style={labelStyle}>Name *</label>
-                <input style={inputStyle} value={form.payerName}
-                  onChange={e => setForm(f => ({ ...f, payerName: e.target.value }))} />
-              </div>
-              <div>
-                <label style={labelStyle}>Adresse</label>
-                <input style={inputStyle} value={form.payerAddress}
-                  onChange={e => setForm(f => ({ ...f, payerAddress: e.target.value }))} />
-              </div>
-            </div>
-          </div>
 
           {/* MwSt. & Zahlung */}
           <div>
@@ -547,7 +616,7 @@ export function AbrechnenClient({
 
           {/* Honorarnote */}
           <div>
-            <div style={sectionStyle}>Honorarnote</div>
+            <div style={sectionStyle}>Honorarnote-Dokument</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '6px 10px', background: 'var(--surface-page)', borderRadius: 7 }}>
                 <input type="checkbox" checked={form.generateInvoiceDoc}
@@ -589,7 +658,7 @@ export function AbrechnenClient({
             <div style={{ padding: '12px 14px', background: 'var(--color-primary-light)', borderRadius: 10, fontSize: 13, lineHeight: 1.8 }}>
               <div style={{ fontWeight: 600, color: 'var(--color-primary)', marginBottom: 4 }}>Zusammenfassung</div>
               <div style={{ color: 'var(--text-primary)' }}>
-                <div>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {fmtEUR(totalGross)}</div>
+                <div>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {allResolvedLines.length} Position{allResolvedLines.length !== 1 ? 'en' : ''} · {fmtEUR(totalGross)}</div>
                 <div>{form.generateInvoiceDoc ? '✓ Mit Honorarnote' : '– Ohne Honorarnote'}</div>
                 <div>{form.markAsPaid ? `✓ Sofort bezahlt (${PAYMENT_LABELS[form.paymentMethod]})` : '⏳ Zahlung ausstehend'}</div>
                 <div>Empfänger: {form.payerName || <span style={{ color: 'var(--red)' }}>fehlt!</span>}</div>
