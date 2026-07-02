@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireStaffSession } from '@/lib/access'
 
 const DEFAULT_TEMPLATE = [
   { title: 'Somatische Anamnese',           prefilledText: '' },
@@ -14,8 +13,8 @@ const DEFAULT_TEMPLATE = [
 const KEY = 'anamnesis_template'
 
 export async function GET(_: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   const config = await prisma.praxisConfig.findFirst({ where: { key: KEY } })
   if (!config?.anamnesisTemplate) return NextResponse.json(DEFAULT_TEMPLATE)
@@ -28,8 +27,8 @@ export async function GET(_: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
   const body = await req.json()
   const fields = body.fields ?? []
 
