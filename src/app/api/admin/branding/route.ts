@@ -54,6 +54,13 @@ export async function PATCH(req: NextRequest) {
     loginBgColor:       body.loginBgColor       ?? null,
     loginBoxPosition:   body.loginBoxPosition   ?? 'center',
     loginBgOverlay:     body.loginBgOverlay     ?? 0,
+    loginLogoSize:      body.loginLogoSize      ?? 64,
+    loginBoxOffsetX:    body.loginBoxOffsetX    ?? 0,
+    loginBoxOffsetY:    body.loginBoxOffsetY    ?? 0,
+    loginCardBg:        body.loginCardBg        ?? 'rgba(255,255,255,0.92)',
+    loginCardBlur:      body.loginCardBlur      ?? 12,
+    loginCardRadius:    body.loginCardRadius    ?? 20,
+    loginCardShadow:    body.loginCardShadow    ?? true,
     // App-Typografie
     appFontFamily:      body.appFontFamily      ?? 'system',
     appFontSize:        body.appFontSize        ?? 14,

@@ -589,8 +589,15 @@ model PraxisConfig {
   loginBgImageBase64  String?   // Hintergrundbild der Login-Seite (Base64)
   loginBgImageMime    String?   // MIME-Type des Hintergrundbilds
   loginBgColor        String?   // Fallback-Hintergrundfarbe wenn kein Bild (Hex)
-  loginBoxPosition    String    @default("center")  // "top-left"|"top-center"|"top-right"|"middle-left"|"center"|"middle-right"|"bottom-left"|"bottom-center"|"bottom-right"
-  loginBgOverlay      Float     @default(0.0)        // Overlay-Opacity 0-0.7 (abdunkeln/aufhellen)
+  loginBoxPosition    String    @default("center")
+  loginBgOverlay      Float     @default(0.0)
+  loginLogoSize       Int       @default(64)        // Logo-Größe in px (32-120)
+  loginBoxOffsetX     Int       @default(0)         // Feinpositionierung X in % (-40 bis +40)
+  loginBoxOffsetY     Int       @default(0)         // Feinpositionierung Y in % (-40 bis +40)
+  loginCardBg         String    @default("rgba(255,255,255,0.92)")
+  loginCardBlur       Int       @default(12)        // Glasmorphism blur in px (0-24)
+  loginCardRadius     Int       @default(20)        // Border-radius der Card in px (0-32)
+  loginCardShadow     Boolean   @default(true)      // Schatten an/aus
 
   // Bankverbindung (für Rechnungen, Honorarnoten)
   iban            String?

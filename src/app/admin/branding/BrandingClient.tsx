@@ -37,6 +37,13 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
     loginBgColor:       (initial as any).loginBgColor       ?? null,
     loginBoxPosition:   (initial as any).loginBoxPosition   ?? 'center',
     loginBgOverlay:     (initial as any).loginBgOverlay     ?? 0,
+    loginLogoSize:      (initial as any).loginLogoSize      ?? 64,
+    loginBoxOffsetX:    (initial as any).loginBoxOffsetX    ?? 0,
+    loginBoxOffsetY:    (initial as any).loginBoxOffsetY    ?? 0,
+    loginCardBg:        (initial as any).loginCardBg        ?? 'rgba(255,255,255,0.92)',
+    loginCardBlur:      (initial as any).loginCardBlur      ?? 12,
+    loginCardRadius:    (initial as any).loginCardRadius    ?? 20,
+    loginCardShadow:    (initial as any).loginCardShadow    ?? true,
     appFontFamily:      (initial as any).appFontFamily      ?? 'system',
     appFontSize:        (initial as any).appFontSize        ?? 14,
   })
@@ -345,77 +352,213 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
               <Monitor className="w-4 h-4" style={{ color: form.colorPrimary }} />
               <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Login-Seite Design</h2>
             </div>
-            <div className="space-y-4">
 
-              {/* Hintergrundbild Upload */}
-              <div>
-                <label className="label">Hintergrundbild</label>
-                <div className="flex items-start gap-3">
-                  <div style={{ width: 120, height: 70, borderRadius: 8, border: '0.5px solid var(--border)', overflow: 'hidden', background: (form as any).loginBgColor ?? 'var(--surface-page)', flexShrink: 0, position: 'relative' }}>
-                    {(form as any).loginBgImageBase64 && (
-                      <img src={`data:${(form as any).loginBgImageMime};base64,${(form as any).loginBgImageBase64}`}
-                        alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    )}
-                    {!(form as any).loginBgImageBase64 && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 10, color: 'var(--text-muted)' }}>Kein Bild</div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                    <input ref={loginBgRef} type="file" accept="image/*" style={{ display: 'none' }}
-                      onChange={handleLoginBgUpload} />
-                    <button onClick={() => loginBgRef.current?.click()} className="btn-secondary" style={{ fontSize: 12 }}>
-                      <Upload className="w-3 h-3" /> Bild hochladen
-                    </button>
-                    {(form as any).loginBgImageBase64 && (
-                      <button onClick={() => setForm(f => ({ ...f, loginBgImageBase64: null, loginBgImageMime: null } as any))} className="btn-ghost" style={{ fontSize: 12 }}>
-                        <X className="w-3 h-3" /> Entfernen
-                      </button>
-                    )}
-                    <div>
-                      <label className="label" style={{ marginBottom: 2 }}>Fallback-Hintergrundfarbe</label>
-                      <input type="color" value={(form as any).loginBgColor ?? '#f0f2f7'}
-                        onChange={e => setForm(f => ({ ...f, loginBgColor: e.target.value } as any))}
-                        style={{ width: 40, height: 28, border: 'none', padding: 2, cursor: 'pointer', borderRadius: 6 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 24, alignItems: 'start' }}>
+              {/* Linke Spalte: Controls */}
+              <div className="space-y-4">
+
+                {/* Hintergrundbild */}
+                <div>
+                  <label className="label">Hintergrundbild</label>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ width: 100, height: 60, borderRadius: 8, border: '0.5px solid var(--border)', overflow: 'hidden', background: (form as any).loginBgColor ?? '#f0f2f7', flexShrink: 0 }}>
+                      {(form as any).loginBgImageBase64 && (
+                        <img src={`data:${(form as any).loginBgImageMime};base64,${(form as any).loginBgImageBase64}`}
+                          alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      )}
+                      {!(form as any).loginBgImageBase64 && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 10, color: 'var(--text-muted)' }}>Kein Bild</div>
+                      )}
                     </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
+                      <input ref={loginBgRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLoginBgUpload} />
+                      <button onClick={() => loginBgRef.current?.click()} className="btn-secondary" style={{ fontSize: 12 }}>
+                        <Upload className="w-3 h-3" /> Bild hochladen
+                      </button>
+                      {(form as any).loginBgImageBase64 && (
+                        <button onClick={() => setForm(f => ({ ...f, loginBgImageBase64: null, loginBgImageMime: null } as any))} className="btn-ghost" style={{ fontSize: 12 }}>
+                          <X className="w-3 h-3" /> Entfernen
+                        </button>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <label style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Fallback-Farbe</label>
+                        <input type="color" value={(form as any).loginBgColor ?? '#f0f2f7'}
+                          onChange={e => setForm(f => ({ ...f, loginBgColor: e.target.value } as any))}
+                          style={{ width: 32, height: 24, border: 'none', padding: 2, cursor: 'pointer', borderRadius: 6 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overlay */}
+                {(form as any).loginBgImageBase64 && (
+                  <div>
+                    <label className="label">Bild abdunkeln — {Math.round(((form as any).loginBgOverlay ?? 0) * 100)}%</label>
+                    <input type="range" min={0} max={0.7} step={0.05}
+                      value={(form as any).loginBgOverlay ?? 0}
+                      onChange={e => setForm(f => ({ ...f, loginBgOverlay: parseFloat(e.target.value) } as any))}
+                      style={{ width: '100%', accentColor: form.colorPrimary }} />
+                  </div>
+                )}
+
+                {/* Position 3x3 */}
+                <div>
+                  <label className="label">Position des Login-Felds</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 5, maxWidth: 160 }}>
+                    {([
+                      ['top-left','↖'],['top-center','↑'],['top-right','↗'],
+                      ['middle-left','←'],['center','·'],['middle-right','→'],
+                      ['bottom-left','↙'],['bottom-center','↓'],['bottom-right','↘'],
+                    ] as [string,string][]).map(([pos, icon]) => (
+                      <button key={pos} onClick={() => setForm(f => ({ ...f, loginBoxPosition: pos } as any))}
+                        style={{
+                          padding: '8px 0', borderRadius: 8, fontSize: 16, cursor: 'pointer',
+                          border: '1.5px solid',
+                          borderColor: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--border)',
+                          background: (form as any).loginBoxPosition === pos ? form.colorPrimaryLight : 'var(--surface-page)',
+                          color: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--text-muted)',
+                        }}>
+                        {icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Feinpositionierung X/Y */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label className="label">Offset X — {(form as any).loginBoxOffsetX ?? 0}%</label>
+                    <input type="range" min={-40} max={40} step={2}
+                      value={(form as any).loginBoxOffsetX ?? 0}
+                      onChange={e => setForm(f => ({ ...f, loginBoxOffsetX: parseInt(e.target.value) } as any))}
+                      style={{ width: '100%', accentColor: form.colorPrimary }} />
+                  </div>
+                  <div>
+                    <label className="label">Offset Y — {(form as any).loginBoxOffsetY ?? 0}%</label>
+                    <input type="range" min={-40} max={40} step={2}
+                      value={(form as any).loginBoxOffsetY ?? 0}
+                      onChange={e => setForm(f => ({ ...f, loginBoxOffsetY: parseInt(e.target.value) } as any))}
+                      style={{ width: '100%', accentColor: form.colorPrimary }} />
+                  </div>
+                </div>
+
+                {/* Logo-Größe */}
+                <div>
+                  <label className="label">Logo-Größe — {(form as any).loginLogoSize ?? 64}px</label>
+                  <input type="range" min={32} max={120} step={4}
+                    value={(form as any).loginLogoSize ?? 64}
+                    onChange={e => setForm(f => ({ ...f, loginLogoSize: parseInt(e.target.value) } as any))}
+                    style={{ width: '100%', accentColor: form.colorPrimary }} />
+                </div>
+
+                {/* Card-Design */}
+                <div style={{ paddingTop: 6, borderTop: '0.5px solid var(--border)' }}>
+                  <label className="label" style={{ marginBottom: 10 }}>Login-Box Design</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                      <label className="label">Hintergrundfarbe / Transparenz</label>
+                      <input type="text" className="input" style={{ fontSize: 12, fontFamily: 'monospace' }}
+                        value={(form as any).loginCardBg ?? 'rgba(255,255,255,0.92)'}
+                        onChange={e => setForm(f => ({ ...f, loginCardBg: e.target.value } as any))}
+                        placeholder="rgba(255,255,255,0.92)" />
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>CSS-Farbe: rgba(R,G,B,Transparenz) oder #Hex</p>
+                    </div>
+                    <div>
+                      <label className="label">Glasmorphism Blur — {(form as any).loginCardBlur ?? 12}px</label>
+                      <input type="range" min={0} max={24} step={2}
+                        value={(form as any).loginCardBlur ?? 12}
+                        onChange={e => setForm(f => ({ ...f, loginCardBlur: parseInt(e.target.value) } as any))}
+                        style={{ width: '100%', accentColor: form.colorPrimary }} />
+                    </div>
+                    <div>
+                      <label className="label">Eck-Radius — {(form as any).loginCardRadius ?? 20}px</label>
+                      <input type="range" min={0} max={32} step={2}
+                        value={(form as any).loginCardRadius ?? 20}
+                        onChange={e => setForm(f => ({ ...f, loginCardRadius: parseInt(e.target.value) } as any))}
+                        style={{ width: '100%', accentColor: form.colorPrimary }} />
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={(form as any).loginCardShadow ?? true}
+                        onChange={e => setForm(f => ({ ...f, loginCardShadow: e.target.checked } as any))} />
+                      Schatten anzeigen
+                    </label>
                   </div>
                 </div>
               </div>
 
-              {/* Overlay */}
-              {(form as any).loginBgImageBase64 && (
-                <div>
-                  <label className="label">Bild abdunkeln (Overlay) — {Math.round(((form as any).loginBgOverlay ?? 0) * 100)}%</label>
-                  <input type="range" min={0} max={0.7} step={0.05}
-                    value={(form as any).loginBgOverlay ?? 0}
-                    onChange={e => setForm(f => ({ ...f, loginBgOverlay: parseFloat(e.target.value) } as any))}
-                    style={{ width: '100%', accentColor: form.colorPrimary }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
-                    <span>Kein Overlay</span><span>Stark abgedunkelt</span>
-                  </div>
+              {/* Rechte Spalte: Live-Vorschau */}
+              <div style={{ position: 'sticky', top: 20 }}>
+                <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Live-Vorschau</p>
+                <div style={{ width: 260, height: 380, borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--border)', position: 'relative', background: (form as any).loginBgColor ?? '#f0f2f7' }}>
+                  {/* BG */}
+                  {(form as any).loginBgImageBase64 && (
+                    <>
+                      <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(data:${(form as any).loginBgImageMime};base64,${(form as any).loginBgImageBase64})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                      {((form as any).loginBgOverlay ?? 0) > 0 && (
+                        <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${(form as any).loginBgOverlay})` }} />
+                      )}
+                    </>
+                  )}
+                  {/* Login-Box (skaliert auf 65%) */}
+                  {(() => {
+                    const POSITIONS: Record<string, {j:string,a:string}> = {
+                      'top-left': {j:'flex-start',a:'flex-start'}, 'top-center': {j:'center',a:'flex-start'}, 'top-right': {j:'flex-end',a:'flex-start'},
+                      'middle-left': {j:'flex-start',a:'center'}, 'center': {j:'center',a:'center'}, 'middle-right': {j:'flex-end',a:'center'},
+                      'bottom-left': {j:'flex-start',a:'flex-end'}, 'bottom-center': {j:'center',a:'flex-end'}, 'bottom-right': {j:'flex-end',a:'flex-end'},
+                    }
+                    const p = POSITIONS[(form as any).loginBoxPosition ?? 'center'] ?? {j:'center',a:'center'}
+                    const logoSrcPrev = form.logoBase64 ? `data:${form.logoMimeType};base64,${form.logoBase64}` : null
+                    const logoSz = Math.round(((form as any).loginLogoSize ?? 64) * 0.55)
+                    const cardBgPrev = (form as any).loginCardBg ?? 'rgba(255,255,255,0.92)'
+                    const cardBlurPrev = (form as any).loginCardBlur ?? 12
+                    const cardRadiusPrev = Math.round(((form as any).loginCardRadius ?? 20) * 0.65)
+                    const cardShadowPrev = (form as any).loginCardShadow ?? true
+                    const hasBgPrev = !!(form as any).loginBgImageBase64
+                    const offX = (form as any).loginBoxOffsetX ?? 0
+                    const offY = (form as any).loginBoxOffsetY ?? 0
+                    return (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: p.j, alignItems: p.a, padding: 16 }}>
+                        <div style={{ transform: `translate(${offX*0.4}px, ${offY*0.4}px)`, width: 140 }}>
+                          <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                            {logoSrcPrev ? (
+                              <img src={logoSrcPrev} alt="" style={{ width: logoSz, height: logoSz, objectFit: 'contain', display: 'block', margin: '0 auto 5px' }} />
+                            ) : (
+                              <div style={{ width: logoSz, height: logoSz, borderRadius: logoSz * 0.22, background: form.colorPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 5px' }}>
+                                <span style={{ color: 'white', fontSize: logoSz * 0.4, fontWeight: 700 }}>P</span>
+                              </div>
+                            )}
+                            <div style={{ fontSize: 8, fontWeight: 700, color: hasBgPrev ? '#fff' : '#1e293b', textShadow: hasBgPrev ? '0 1px 3px rgba(0,0,0,0.4)' : 'none' }}>{form.praxisName}</div>
+                            {form.slogan && <div style={{ fontSize: 6, color: hasBgPrev ? 'rgba(255,255,255,0.8)' : '#94a3b8' }}>{form.slogan}</div>}
+                          </div>
+                          <div style={{
+                            background: cardBgPrev,
+                            backdropFilter: cardBlurPrev > 0 ? `blur(${cardBlurPrev}px)` : undefined,
+                            borderRadius: cardRadiusPrev,
+                            padding: '10px 10px 8px',
+                            boxShadow: cardShadowPrev ? '0 4px 20px rgba(0,0,0,0.15)' : 'none',
+                            border: '0.5px solid rgba(255,255,255,0.5)',
+                          }}>
+                            {/* Tab */}
+                            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.05)', borderRadius: 6, padding: 2, marginBottom: 8, gap: 2 }}>
+                              <div style={{ flex: 1, padding: '3px 0', borderRadius: 5, background: '#fff', fontSize: 5, textAlign: 'center', color: form.colorPrimary, fontWeight: 600, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>E-Mail</div>
+                              <div style={{ flex: 1, padding: '3px 0', fontSize: 5, textAlign: 'center', color: '#94a3b8' }}>PIN</div>
+                            </div>
+                            {['E-Mail-Adresse', 'Passwort'].map(lbl => (
+                              <div key={lbl} style={{ marginBottom: 5 }}>
+                                <div style={{ fontSize: 5, fontWeight: 600, color: '#475569', marginBottom: 2 }}>{lbl}</div>
+                                <div style={{ height: 14, background: 'rgba(255,255,255,0.9)', borderRadius: 4, border: '0.5px solid rgba(0,0,0,0.12)' }} />
+                              </div>
+                            ))}
+                            <div style={{ marginTop: 6, padding: '5px 0', borderRadius: 6, background: `linear-gradient(135deg, ${form.colorPrimary}, ${form.colorAccent})`, textAlign: 'center', fontSize: 5, color: 'white', fontWeight: 600 }}>
+                              Anmelden
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
-              )}
-
-              {/* Login-Box-Position */}
-              <div>
-                <label className="label">Position des Login-Felds</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, maxWidth: 180 }}>
-                  {([
-                    ['top-left','↖'],['top-center','↑'],['top-right','↗'],
-                    ['middle-left','←'],['center','·'],['middle-right','→'],
-                    ['bottom-left','↙'],['bottom-center','↓'],['bottom-right','↘'],
-                  ] as [string,string][]).map(([pos, icon]) => (
-                    <button key={pos} onClick={() => setForm(f => ({ ...f, loginBoxPosition: pos } as any))}
-                      style={{
-                        padding: '8px 4px', borderRadius: 8, fontSize: 16, cursor: 'pointer',
-                        border: '1.5px solid',
-                        borderColor: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--border)',
-                        background: (form as any).loginBoxPosition === pos ? form.colorPrimaryLight : 'var(--surface-page)',
-                        color: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--text-muted)',
-                      }}>
-                      {icon}
-                    </button>
-                  ))}
-                </div>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>Wird nach dem Speichern auf der Login-Seite sichtbar</p>
               </div>
             </div>
           </div>

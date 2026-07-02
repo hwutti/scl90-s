@@ -62,6 +62,13 @@ export interface BrandingConfig {
   loginBgColor: string | null
   loginBoxPosition: LoginBoxPosition
   loginBgOverlay: number
+  loginLogoSize: number
+  loginBoxOffsetX: number
+  loginBoxOffsetY: number
+  loginCardBg: string
+  loginCardBlur: number
+  loginCardRadius: number
+  loginCardShadow: boolean
   // App-Typografie
   appFontFamily: AppFontFamily
   appFontSize: number
@@ -91,6 +98,13 @@ export const DEFAULT_BRANDING: BrandingConfig = {
   loginBgColor: null,
   loginBoxPosition: 'center',
   loginBgOverlay: 0,
+  loginLogoSize: 64,
+  loginBoxOffsetX: 0,
+  loginBoxOffsetY: 0,
+  loginCardBg: 'rgba(255,255,255,0.92)',
+  loginCardBlur: 12,
+  loginCardRadius: 20,
+  loginCardShadow: true,
   appFontFamily: 'system',
   appFontSize: 14,
 }
@@ -104,6 +118,13 @@ export async function getBranding(): Promise<BrandingConfig> {
       ...(config as any),
       loginBoxPosition: (config as any).loginBoxPosition ?? 'center',
       loginBgOverlay: parseFloat((config as any).loginBgOverlay ?? 0),
+      loginLogoSize: parseInt((config as any).loginLogoSize ?? 64),
+      loginBoxOffsetX: parseInt((config as any).loginBoxOffsetX ?? 0),
+      loginBoxOffsetY: parseInt((config as any).loginBoxOffsetY ?? 0),
+      loginCardBg: (config as any).loginCardBg ?? 'rgba(255,255,255,0.92)',
+      loginCardBlur: parseInt((config as any).loginCardBlur ?? 12),
+      loginCardRadius: parseInt((config as any).loginCardRadius ?? 20),
+      loginCardShadow: (config as any).loginCardShadow ?? true,
       appFontFamily: (config as any).appFontFamily ?? 'system',
       appFontSize: parseInt((config as any).appFontSize ?? 14),
     } as BrandingConfig
