@@ -1,10 +1,10 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
   ArrowLeft, ChevronRight, Calendar, Clock,
-  Check, AlertCircle, FileText, Loader, Printer, Mail, X, Eye, RefreshCw, Plus, Trash2,
+  Check, AlertCircle, FileText, Loader, Printer, Mail, X, Eye, RefreshCw, Plus,
 } from 'lucide-react'
 
 const RichTextEditor = dynamic(
@@ -49,12 +49,21 @@ let tempIdCounter = 0
 function newTempId() { return `tmp-${Date.now()}-${tempIdCounter++}` }
 
 export function KooperationspartnerRechnungClient({
-  partner, unbilledSessions, invoiceTemplates, therapistName,
+  partner, unbilledSessions, invoiceTemplates, therapistName, branding,
 }: {
   partner: any
   unbilledSessions: any[]
   invoiceTemplates: { id: string; name: string; isDefault: boolean }[]
   therapistName: string
+  branding: {
+    praxisName: string
+    address: string | null
+    contactEmail: string | null
+    contactPhone: string | null
+    logoBase64: string | null
+    logoMimeType: string | null
+    colorPrimary: string
+  }
 }) {
   const router = useRouter()
   const backUrl = `/kooperationspartner/${partner.id}`
@@ -232,6 +241,20 @@ export function KooperationspartnerRechnungClient({
   const labelStyle = { fontSize: 11, fontWeight: 500 as const, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }
   const sectionStyle = { fontSize: 12, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 10, paddingBottom: 6, borderBottom: '0.5px solid var(--border)' }
 
+  // Borderloses "Zellen"-Eingabefeld, das erst bei Fokus/Hover als Feld erkennbar
+  // wird — für das Word/Excel-artige Gefühl direkt im Rechnungs-Papier.
+  const cellInputBase: CSSProperties = {
+    border: '1px solid transparent', borderRadius: 5, background: 'transparent',
+    font: 'inherit', color: 'inherit', padding: '3px 5px', boxSizing: 'border-box',
+    outline: 'none',
+  }
+  const cellFocusHandlers = {
+    onFocus: (e: FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid var(--color-primary)'; e.target.style.background = '#fff' },
+    onBlur:  (e: FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' },
+    onMouseEnter: (e: MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid #d8dce3' },
+    onMouseLeave: (e: MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid transparent' },
+  }
+
   // ── Erfolgsseite ──
   if (done) {
     return (
@@ -405,30 +428,83 @@ export function KooperationspartnerRechnungClient({
             </div>
           </div>
 
-          {/* Positionsliste */}
+          {/* Die Rechnung selbst — direkt darin editieren, wie in Word/Excel */}
           <div>
-            <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: 'var(--text-primary)' }}>
-              Rechnungspositionen {lineItems.length > 0 && `(${lineItems.length})`}
+            <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
+              Rechnung {lineItems.length > 0 && `(${lineItems.length} Position${lineItems.length !== 1 ? 'en' : ''})`}
             </h2>
             {lineItems.length === 0 ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
                 Noch keine Positionen — Sitzung hinzufügen oder freie Position eintragen.
               </div>
             ) : (
-              <div className="card" style={{ overflow: 'hidden' }}>
-                <table className="data-table">
-                  <thead><tr>
-                    <th>Beschreibung</th>
-                    <th style={{ width: 130 }}>Datum</th>
-                    <th style={{ width: 70 }}>Menge</th>
-                    <th style={{ width: 100 }}>Preis/Einh.</th>
-                    <th style={{ width: 100 }}>Gesamt</th>
-                    <th style={{ width: 36 }}></th>
-                  </tr></thead>
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '0.5px solid var(--border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.05)', padding: '30px 34px', color: '#1a1a1a',
+              }}>
+                {/* Header: Logo/Praxis links, Kontakt rechts */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                  <div>
+                    {branding.logoBase64 && (
+                      <img src={`data:${branding.logoMimeType || 'image/png'};base64,${branding.logoBase64}`}
+                        alt="Logo" style={{ height: 42, marginBottom: 6, display: 'block' }} />
+                    )}
+                    <div style={{ fontSize: 17, fontWeight: 700, color: branding.colorPrimary }}>{branding.praxisName}</div>
+                    {branding.address && <div style={{ fontSize: 11.5, color: '#666', marginTop: 2 }}>{branding.address}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11.5, color: '#666' }}>
+                    {branding.contactEmail && <div>{branding.contactEmail}</div>}
+                    {branding.contactPhone && <div>{branding.contactPhone}</div>}
+                  </div>
+                </div>
+                <div style={{ borderTop: `2px solid ${branding.colorPrimary}`, marginBottom: 20 }} />
+
+                {/* Empfänger + Meta */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 22, gap: 20 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, letterSpacing: 0.5, color: '#999', marginBottom: 4 }}>RECHNUNG AN</div>
+                    <input value={form.payerName}
+                      onChange={e => setForm(f => ({ ...f, payerName: e.target.value }))}
+                      style={{ ...cellInputBase, fontSize: 14, fontWeight: 600, width: '100%', marginBottom: 2 }}
+                      {...cellFocusHandlers} placeholder="Name des Empfängers" />
+                    <input value={form.payerAddress}
+                      onChange={e => setForm(f => ({ ...f, payerAddress: e.target.value }))}
+                      style={{ ...cellInputBase, fontSize: 12, color: '#555', width: '100%' }}
+                      {...cellFocusHandlers} placeholder="Adresse (optional)" />
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11.5, color: '#555', flexShrink: 0, lineHeight: 1.7 }}>
+                    <div>Rechnungsnummer&nbsp; <strong>VORSCHAU</strong></div>
+                    <div>Rechnungsdatum&nbsp; <strong>{fmtDate(new Date())}</strong></div>
+                  </div>
+                </div>
+
+                <h1 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 14px', color: '#1a1a1a' }}>Rechnung</h1>
+
+                {/* Positions-Tabelle — jede Zelle direkt editierbar */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1.5px solid ${branding.colorPrimary}` }}>
+                      <th style={{ textAlign: 'left', padding: '0 6px 8px 4px', fontSize: 11, color: '#888', fontWeight: 600, width: 108 }}>Datum</th>
+                      <th style={{ textAlign: 'left', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600 }}>Beschreibung</th>
+                      <th style={{ textAlign: 'center', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 54 }}>Anz.</th>
+                      <th style={{ textAlign: 'right', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 84 }}>Einzel €</th>
+                      <th style={{ textAlign: 'right', padding: '0 4px 8px 6px', fontSize: 11, color: '#888', fontWeight: 600, width: 84 }}>Gesamt €</th>
+                      <th style={{ width: 26 }} />
+                    </tr>
+                  </thead>
                   <tbody>
                     {lineItems.map(l => (
-                      <tr key={l.tempId}>
-                        <td style={{ verticalAlign: 'top', paddingTop: 6 }}>
+                      <tr key={l.tempId} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '6px 6px 6px 4px', verticalAlign: 'top' }}>
+                          <input type="date"
+                            value={l.lineDate ? l.lineDate.slice(0, 10) : ''}
+                            onChange={e => updateLine(l.tempId, { lineDate: e.target.value || null })}
+                            style={{ ...cellInputBase, width: '100%' }} {...cellFocusHandlers} />
+                          {l.patientName && (
+                            <div style={{ fontSize: 9.5, color: '#aaa', marginTop: 2, paddingLeft: 5 }}>{l.patientName}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
                           <RichTextEditor
                             compact
                             value={l.descriptionHtml || l.description}
@@ -436,46 +512,68 @@ export function KooperationspartnerRechnungClient({
                               descriptionHtml: html,
                               description: html.replace(/<[^>]+>/g, '') || l.description,
                             })}
-                            minHeight={36}
+                            minHeight={22}
                             placeholder="Beschreibung…"
                           />
                         </td>
-                        <td style={{ verticalAlign: 'top' }}>
-                          <input type="date" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px' }}
-                            value={l.lineDate ? l.lineDate.slice(0, 10) : ''}
-                            onChange={e => updateLine(l.tempId, { lineDate: e.target.value || null })} />
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                          <input type="number" step="0.5"
+                            value={l.quantity}
+                            onChange={e => updateLine(l.tempId, { quantity: parseFloat(e.target.value) || 0 })}
+                            style={{ ...cellInputBase, width: '100%', textAlign: 'center' }} {...cellFocusHandlers} />
                         </td>
-                        <td style={{ verticalAlign: 'top' }}>
-                          <input type="number" step="0.5" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px', textAlign: 'right' }}
-                            value={l.quantity} onChange={e => updateLine(l.tempId, { quantity: parseFloat(e.target.value) || 0 })} />
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                          <input type="number" step="0.01"
+                            value={l.unitPriceNet}
+                            onChange={e => updateLine(l.tempId, { unitPriceNet: parseFloat(e.target.value) || 0 })}
+                            style={{ ...cellInputBase, width: '100%', textAlign: 'right' }} {...cellFocusHandlers} />
                         </td>
-                        <td style={{ verticalAlign: 'top' }}>
-                          <input type="number" step="0.01" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px', textAlign: 'right' }}
-                            value={l.unitPriceNet} onChange={e => updateLine(l.tempId, { unitPriceNet: parseFloat(e.target.value) || 0 })} />
+                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, verticalAlign: 'top', paddingTop: 12 }}>
+                          {fmtEUR(l.quantity * l.unitPriceNet)}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, verticalAlign: 'top', paddingTop: 10 }}>{fmtEUR(l.quantity * l.unitPriceNet)}</td>
-                        <td style={{ verticalAlign: 'top' }}>
-                          <button onClick={() => removeLine(l.tempId)} className="btn-ghost" style={{ padding: 4, color: 'var(--red)' }}>
-                            <Trash2 style={{ width: 13, height: 13 }} />
+                        <td style={{ verticalAlign: 'top', paddingTop: 8 }}>
+                          <button onClick={() => l.sessionId ? removeSession(l.sessionId) : removeLine(l.tempId)}
+                            className="btn-ghost" style={{ padding: 3, color: 'var(--text-muted)' }}
+                            title={l.sessionId ? 'Sitzung entfernen' : 'Position entfernen'}>
+                            <X style={{ width: 12, height: 12 }} />
                           </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+
+                {/* Summenblock */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                  <div style={{ width: 230 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                      <span style={{ color: '#666' }}>Nettobetrag</span>
+                      <span>{fmtEUR(totalNet)}</span>
+                    </div>
+                    {form.vatRate > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
+                        <span style={{ color: '#666' }}>MwSt. {Math.round(form.vatRate * 100)}%</span>
+                        <span>{fmtEUR(vatAmount)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', marginTop: 4, borderTop: '1.5px solid #1a1a1a', fontSize: 15, fontWeight: 700 }}>
+                      <span>Gesamtbetrag</span>
+                      <span>{fmtEUR(totalGross)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Freitext — direkt im Papier, erscheint unter den Positionen */}
+                <div style={{ marginTop: 22, paddingTop: 14, borderTop: '0.5px solid #eee' }}>
+                  <RichTextEditor
+                    value={customNoteHtml}
+                    onChange={setCustomNoteHtml}
+                    placeholder="Optionaler Freitext, der unter den Positionen erscheint (Fettdruck, Listen, Farben…)"
+                    minHeight={60}
+                  />
+                </div>
               </div>
             )}
-          </div>
-
-          {/* Freitext-Bereich */}
-          <div>
-            <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 10px', color: 'var(--text-primary)' }}>Freitext / Anmerkungen</h2>
-            <RichTextEditor
-              value={customNoteHtml}
-              onChange={setCustomNoteHtml}
-              placeholder="Optionaler Freitext der unter den Positionen in der Rechnung erscheint (Fettdruck, Listen, Farben…)"
-              minHeight={100}
-            />
           </div>
 
           {/* Summe */}
