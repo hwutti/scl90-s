@@ -52,7 +52,18 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   const [editLineItems, setEditLineItems] = useState<any[]>([])
   const [editNoteHtml, setEditNoteHtml] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [editPayerName, setEditPayerName] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+
+  // Branding fürs Bearbeitungs-Panel im echten Rechnungs-Look (client-seitig
+  // geladen, damit PatientRecordClient.tsx nicht angefasst werden muss)
+  const [branding, setBranding] = useState<any>({
+    praxisName: 'Praxis', address: null, contactEmail: null, contactPhone: null,
+    logoBase64: null, logoMimeType: null, colorPrimary: '#4f46e5',
+  })
+  useEffect(() => {
+    fetch('/api/admin/branding').then(r => r.json()).then(setBranding).catch(() => {})
+  }, [])
 
   const [newSession, setNewSession] = useState({
     sessionDate: new Date().toISOString().slice(0,10),
@@ -158,8 +169,10 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
       id: li.id,
       description: li.description,
       descriptionHtml: li.descriptionHtml ?? '',
+      quantity: li.quantity, unitPriceNet: li.unitPriceNet, amountNet: li.amountNet, lineDate: li.lineDate,
     })) ?? [])
     setEditNoteHtml(tx.customNoteHtml ?? '')
+    setEditPayerName(tx.payerName ?? '')
   }
 
   async function saveEditLineItems() {
@@ -378,42 +391,93 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                     </div>
                   </div>
 
-                  {/* Rich-Text Bearbeitungs-Panel */}
+                  {/* Bearbeitungs-Panel im echten Rechnungs-Look. Beträge sind bereits
+                      ausgestellt und bleiben unveränderlich -- nur Beschreibungstext
+                      und Freitext lassen sich noch anpassen. */}
                   {editTxId === tx.id && (
-                    <div style={{ marginTop: 10, padding: 14, background: 'var(--surface-page)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
-                        Beschreibungen bearbeiten
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {editLineItems.map((li, i) => (
-                          <div key={li.id}>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Position {i + 1}</div>
-                            <RichTextEditor
-                              compact
-                              value={li.descriptionHtml || li.description}
-                              onChange={html => setEditLineItems(prev => prev.map((p, pi) => pi === i
-                                ? { ...p, descriptionHtml: html, description: html.replace(/<[^>]+>/g, '') || p.description }
-                                : p
-                              ))}
-                              minHeight={40}
-                            />
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{
+                        background: '#fff', borderRadius: 12, border: '0.5px solid var(--border)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.05)', padding: '26px 30px', color: '#1a1a1a',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+                          <div>
+                            {branding.logoBase64 && (
+                              <img src={`data:${branding.logoMimeType || 'image/png'};base64,${branding.logoBase64}`}
+                                alt="Logo" style={{ height: 36, marginBottom: 6, display: 'block' }} />
+                            )}
+                            <div style={{ fontSize: 15, fontWeight: 700, color: branding.colorPrimary }}>{branding.praxisName}</div>
                           </div>
-                        ))}
-                        <div>
+                          <div style={{ textAlign: 'right', fontSize: 11, color: '#666' }}>
+                            {branding.contactEmail && <div>{branding.contactEmail}</div>}
+                          </div>
+                        </div>
+                        <div style={{ borderTop: `2px solid ${branding.colorPrimary}`, marginBottom: 16 }} />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, gap: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 10, letterSpacing: 0.5, color: '#999', marginBottom: 3 }}>RECHNUNG AN</div>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{editPayerName}</div>
+                          </div>
+                          <div style={{ textAlign: 'right', fontSize: 11, color: '#555', lineHeight: 1.6 }}>
+                            <div>Rechnungsnummer&nbsp; <strong>{tx.referenceNumber}</strong></div>
+                            <div>Rechnungsdatum&nbsp; <strong>{fmtDate(tx.transactionDate)}</strong></div>
+                          </div>
+                        </div>
+
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, marginBottom: 14 }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1.5px solid ${branding.colorPrimary}` }}>
+                              <th style={{ textAlign: 'left', padding: '0 6px 8px 0', fontSize: 11, color: '#888', fontWeight: 600, width: 100 }}>Datum</th>
+                              <th style={{ textAlign: 'left', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600 }}>Beschreibung</th>
+                              <th style={{ textAlign: 'center', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 46 }}>Anz.</th>
+                              <th style={{ textAlign: 'right', padding: '0 6px 8px', fontSize: 11, color: '#888', fontWeight: 600, width: 78 }}>Einzel €</th>
+                              <th style={{ textAlign: 'right', padding: '0 0 8px 6px', fontSize: 11, color: '#888', fontWeight: 600, width: 78 }}>Gesamt €</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {editLineItems.map((li, i) => (
+                              <tr key={li.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '8px 6px 8px 0', color: '#888', fontSize: 12, verticalAlign: 'top' }}>
+                                  {li.lineDate ? fmtDate(li.lineDate) : '—'}
+                                </td>
+                                <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                                  <RichTextEditor
+                                    compact
+                                    value={li.descriptionHtml || li.description}
+                                    onChange={html => setEditLineItems(prev => prev.map((p, pi) => pi === i
+                                      ? { ...p, descriptionHtml: html, description: html.replace(/<[^>]+>/g, '') || p.description }
+                                      : p
+                                    ))}
+                                    minHeight={26}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px 6px', textAlign: 'center', color: '#555', verticalAlign: 'top' }}>{li.quantity}</td>
+                                <td style={{ padding: '8px 6px', textAlign: 'right', color: '#555', verticalAlign: 'top' }}>{fmtEUR(li.unitPriceNet)}</td>
+                                <td style={{ padding: '8px 0 8px 6px', textAlign: 'right', fontWeight: 600, verticalAlign: 'top' }}>{fmtEUR(li.amountNet)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div style={{ fontSize: 10.5, color: '#aaa', marginBottom: 16 }}>
+                          Beträge sind nach Ausstellung nicht mehr änderbar — nur Beschreibungstext und Freitext.
+                        </div>
+
+                        <div style={{ paddingTop: 10, borderTop: '0.5px solid #eee' }}>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Freitext (unter den Positionen)</div>
                           <RichTextEditor
                             value={editNoteHtml}
                             onChange={setEditNoteHtml}
                             placeholder="Optionaler Freitext…"
-                            minHeight={80}
+                            minHeight={70}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => setEditTxId(null)} className="btn-secondary" style={{ fontSize: 12 }}>Abbrechen</button>
-                          <button onClick={saveEditLineItems} disabled={editSaving} className="btn-primary" style={{ fontSize: 12 }}>
-                            <Save style={{ width: 12, height: 12 }} /> {editSaving ? 'Speichern…' : 'Speichern'}
-                          </button>
-                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                        <button onClick={() => setEditTxId(null)} className="btn-secondary" style={{ fontSize: 12 }}>Abbrechen</button>
+                        <button onClick={saveEditLineItems} disabled={editSaving} className="btn-primary" style={{ fontSize: 12 }}>
+                          <Save style={{ width: 12, height: 12 }} /> {editSaving ? 'Speichern…' : 'Speichern'}
+                        </button>
                       </div>
                     </div>
                   )}
