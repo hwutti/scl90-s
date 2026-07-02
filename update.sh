@@ -47,10 +47,10 @@ success "Commit: $COMMIT"
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
 
-# Nginx-Domain aus sites-enabled UND sites-available suchen
+# Nginx-Domain aus allen gängigen Konfig-Pfaden suchen
 NGINX_DOMAIN=""
-for DIR in /etc/nginx/sites-enabled /etc/nginx/sites-available; do
-  if [[ -d "$DIR" ]]; then
+for DIR in /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d /etc/nginx; do
+  if [[ -d "$DIR" ]] || [[ -f "$DIR" ]]; then
     FOUND=$(grep -rh "server_name" "$DIR"/ 2>/dev/null \
       | grep -v "localhost\|127\.0\.0\.1\| _\b" \
       | awk '{print $2}' | tr -d ';' \
@@ -60,9 +60,30 @@ for DIR in /etc/nginx/sites-enabled /etc/nginx/sites-available; do
   fi
 done
 
+# Fallback: direkt in nginx.conf suchen
+if [[ -z "$NGINX_DOMAIN" ]] && [[ -f /etc/nginx/nginx.conf ]]; then
+  FOUND=$(grep -h "server_name" /etc/nginx/nginx.conf 2>/dev/null \
+    | grep -v "localhost\|127\.0\.0\.1\| _\b" \
+    | awk '{print $2}' | tr -d ';' \
+    | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
+    | head -1 || true)
+  [[ -n "$FOUND" ]] && NGINX_DOMAIN="$FOUND"
+fi
+
+# Letzter Fallback: aus aktiver NEXTAUTH_URL oder aus Hostname ableiten
+if [[ -z "$NGINX_DOMAIN" ]]; then
+  EXISTING=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
+  if [[ "$EXISTING" != *"localhost"* && -n "$EXISTING" ]]; then
+    success "NEXTAUTH_URL bereits korrekt gesetzt: $EXISTING"
+    NGINX_DOMAIN="__skip__"
+  fi
+fi
+
 echo "  → nginx-Domain erkannt: '${NGINX_DOMAIN:-KEINE}'"
 
-if [[ -n "$NGINX_DOMAIN" ]]; then
+if [[ "$NGINX_DOMAIN" == "__skip__" ]]; then
+  : # Bereits oben als korrekt gemeldet
+elif [[ -n "$NGINX_DOMAIN" ]]; then
   if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
     NEW_URL="https://$NGINX_DOMAIN"
   else
@@ -83,9 +104,25 @@ if [[ -n "$NGINX_DOMAIN" ]]; then
 else
   # Kein nginx-Domain gefunden: aktuellen Wert zeigen, aber nicht überschreiben
   CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "nicht gesetzt")
-  if [[ "$CURRENT_URL" == "nicht gesetzt" || "$CURRENT_URL" == *"localhost"* ]]; then
-    warn "NEXTAUTH_URL = '$CURRENT_URL' — konnte nginx-Domain nicht automatisch erkennen."
-    warn "Bitte in $ENV_FILE manuell setzen: NEXTAUTH_URL=https://IHRE_DOMAIN"
+  if [[ "$CURRENT_URL" == "nicht gesetzt" || "$CURRENT_URL" == *"localhost"* || -z "$CURRENT_URL" ]]; then
+    # Letzter Versuch: Domain aus Let's Encrypt-Zertifikaten lesen
+    LE_DOMAIN=$(ls /etc/letsencrypt/live/ 2>/dev/null | grep -v "README" | head -1 || true)
+    if [[ -n "$LE_DOMAIN" ]]; then
+      if [[ -f "/etc/letsencrypt/live/$LE_DOMAIN/fullchain.pem" ]]; then
+        NEW_URL="https://$LE_DOMAIN"
+      else
+        NEW_URL="http://$LE_DOMAIN"
+      fi
+      if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
+        sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
+      else
+        echo "NEXTAUTH_URL=$NEW_URL" >> "$ENV_FILE"
+      fi
+      warn "NEXTAUTH_URL via Let's Encrypt gesetzt: $NEW_URL"
+    else
+      warn "NEXTAUTH_URL = '$CURRENT_URL' — nginx-Domain nicht erkannt, kein Let's Encrypt-Zertifikat gefunden."
+      warn "Bitte einmalig setzen: echo 'NEXTAUTH_URL=https://IHRE_DOMAIN' >> $ENV_FILE"
+    fi
   else
     success "NEXTAUTH_URL unverändert: $CURRENT_URL"
   fi
