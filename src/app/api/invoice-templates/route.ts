@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_INVOICE_HTML } from '@/lib/invoice/template'
+import { requireStaffSession, requireAdminSession } from '@/lib/access'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
   const templates = await prisma.invoiceTemplate.findMany({ where: { isActive: true }, orderBy: { createdAt: 'desc' } })
   return NextResponse.json(templates)
 }
@@ -24,8 +23,8 @@ const ALLOWED_FIELDS = new Set([
 ])
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminSession()
+  if ('error' in auth) return auth.error
   let body: any
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
