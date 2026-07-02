@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { prisma } from '@/lib/prisma'
+import { decryptString } from '@/lib/security/encryption'
 
 export interface SendMailOptions {
   to: string | string[]
@@ -18,11 +19,21 @@ export async function sendMail(opts: SendMailOptions): Promise<{ ok: boolean; er
   const config = await getSmtpConfig()
   if (!config) return { ok: false, error: 'Kein SMTP konfiguriert. Bitte unter Administration → E-Mail einrichten.' }
 
+  // Kein Klartext-Fallback: schlägt die Entschlüsselung fehl (ENCRYPTION_KEY fehlt/ungültig,
+  // oder das Passwort ist noch unverschlüsselter Alt-Bestand), bricht der Mailversand hart
+  // ab statt mit einem falschen/unverschlüsselten Wert weiterzumachen.
+  let decryptedPassword: string
+  try {
+    decryptedPassword = decryptString(config.password)
+  } catch (e: any) {
+    return { ok: false, error: `SMTP-Passwort konnte nicht entschlüsselt werden: ${e.message}` }
+  }
+
   const transporter = nodemailer.createTransport({
     host:   config.host,
     port:   config.port,
     secure: config.secure,
-    auth:   { user: config.user, pass: config.password },
+    auth:   { user: config.user, pass: decryptedPassword },
     tls:    { rejectUnauthorized: false }, // Self-signed certs erlaubt
   })
 

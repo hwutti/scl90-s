@@ -65,6 +65,27 @@ else
   success "NEXTAUTH_URL korrekt: $CURRENT_URL"
 fi
 
+# ─── 2b. ENCRYPTION_KEY ─────────────────────────────────────────────────────────
+step "ENCRYPTION_KEY prüfen"
+
+# Wird für AES-256-GCM-Verschlüsselung sensibler Werte benötigt (Audio-Aufnahmen,
+# SMTP-Passwort). Fehlt der Key komplett brechen die betroffenen Features hart ab
+# mit klarer Fehlermeldung (bewusst kein Klartext-Fallback) -- daher muss er
+# spätestens hier sichergestellt sein. Ein vorhandener Key wird NIE überschrieben,
+# da sonst bereits verschlüsselte Werte (z.B. das gespeicherte SMTP-Passwort)
+# nicht mehr entschlüsselbar wären.
+if ! grep -q "^ENCRYPTION_KEY=" "$ENV_FILE" 2>/dev/null || [[ -z "$(grep "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d= -f2-)" ]]; then
+  NEW_KEY=$(openssl rand -hex 32)
+  if grep -q "^ENCRYPTION_KEY=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$NEW_KEY|" "$ENV_FILE"
+  else
+    echo "ENCRYPTION_KEY=$NEW_KEY" >> "$ENV_FILE"
+  fi
+  warn "ENCRYPTION_KEY war nicht gesetzt -- neuen Key generiert und in .env eingetragen"
+else
+  success "ENCRYPTION_KEY vorhanden"
+fi
+
 # ─── 3. Dependencies ──────────────────────────────────────────────────────────
 step "pnpm install"
 sudo -u "$APP_USER" bash -c "cd $APP_DIR && pnpm install 2>&1 | tail -3" \

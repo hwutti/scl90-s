@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendTestMail } from '@/lib/email/mailer'
+import { encryptString } from '@/lib/security/encryption'
 
 // GET: aktuelle SMTP-Konfiguration laden
 export async function GET() {
@@ -41,8 +42,16 @@ export async function PUT(req: NextRequest) {
     fromEmail, replyTo: replyTo || null,
     isActive: true,
   }
-  // Passwort nur updaten wenn neu angegeben
-  if (password) data.password = password
+  // Passwort nur updaten wenn neu angegeben -- wird verschlüsselt gespeichert.
+  // Kein Klartext-Fallback: fehlt/ungültig ist ENCRYPTION_KEY, bricht das hier
+  // hart ab mit klarer Fehlermeldung statt das Passwort unverschlüsselt abzulegen.
+  if (password) {
+    try {
+      data.password = encryptString(password)
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
 
   let config
   if (existing) {

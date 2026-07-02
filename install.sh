@@ -38,6 +38,7 @@ DB_PASS=""
 BACKUP_DIR="/var/backups/kds"
 BACKUP_KEEP_DAYS="30"
 NEXTAUTH_SECRET=""
+ENCRYPTION_KEY=""
 # =============================================================================
 
 echo ""
@@ -55,8 +56,10 @@ if [[ -f "$APP_DIR/.env" ]]; then
   info "Bestehende .env gefunden – Werte werden wiederverwendet"
   DB_PASS_EXISTING=$(grep "^DATABASE_URL=" "$APP_DIR/.env" 2>/dev/null | sed 's/.*:\(.*\)@.*/\1/' || echo "")
   NEXTAUTH_SECRET_EXISTING=$(grep "^NEXTAUTH_SECRET=" "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "")
+  ENCRYPTION_KEY_EXISTING=$(grep "^ENCRYPTION_KEY=" "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "")
   [[ -n "$DB_PASS_EXISTING" ]] && DB_PASS="$DB_PASS_EXISTING"
   [[ -n "$NEXTAUTH_SECRET_EXISTING" ]] && NEXTAUTH_SECRET="$NEXTAUTH_SECRET_EXISTING"
+  [[ -n "$ENCRYPTION_KEY_EXISTING" ]] && ENCRYPTION_KEY="$ENCRYPTION_KEY_EXISTING"
 fi
 
 if [[ -z "$DOMAIN" ]]; then
@@ -70,6 +73,11 @@ fi
 
 if [[ -z "$NEXTAUTH_SECRET" ]]; then
   NEXTAUTH_SECRET=$(openssl rand -base64 48)
+fi
+
+if [[ -z "$ENCRYPTION_KEY" ]]; then
+  ENCRYPTION_KEY=$(openssl rand -hex 32)
+  info "Neuer ENCRYPTION_KEY generiert"
 fi
 
 # =============================================================================
@@ -162,6 +170,7 @@ cat > "$APP_DIR/.env" << ENV_EOF
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
 NEXTAUTH_URL=${APP_URL}
 NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 NODE_ENV=production
 JITSI_BASE_URL=https://meet.jit.si
 ENV_EOF
