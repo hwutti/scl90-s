@@ -1,4 +1,7 @@
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 
 // Standard Admin-Berechtigungen für Gruppenpraxis
 export const DEFAULT_ADMIN_PERMISSIONS = {
@@ -103,4 +106,77 @@ export async function getAccessiblePatientIds(
     ...shares.map(s => s.patientId),
   ])
   return [...ids]
+}
+
+// ─── Session-Guards für API-Routen ─────────────────────────────────────────────
+// Geben entweder { session, userId, role } zurück oder { error: NextResponse },
+// damit Routen einheitlich schreiben können:
+//   const auth = await requireStaffSession()
+//   if ('error' in auth) return auth.error
+
+type SessionGuardResult =
+  | { session: any; userId: string; role: string }
+  | { error: NextResponse }
+
+// Nur eingeloggte Staff-Rollen (ADMIN/THERAPIST) -- blockt insbesondere
+// Patienten-Logins (Rolle PATIENT) von internen/administrativen Routen ab.
+export async function requireStaffSession(): Promise<SessionGuardResult> {
+  const session = await getServerSession(authOptions)
+  if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  const role = (session.user as any).role
+  if (!['ADMIN', 'THERAPIST'].includes(role)) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { session, userId: (session.user as any).id, role }
+}
+
+// Nur ADMIN -- für global wirksame Praxisdaten/Branding.
+export async function requireAdminSession(): Promise<SessionGuardResult> {
+  const session = await getServerSession(authOptions)
+  if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  const role = (session.user as any).role
+  if (role !== 'ADMIN') {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { session, userId: (session.user as any).id, role }
+}
+
+// Prisma-where-Klausel für Transaktionen, konsistent mit canAccessPatient/
+// getAccessiblePatientIds: statt nur "von mir selbst erstellt" (createdByUserId)
+// werden auch Transaktionen zu freigegebenen Patient:innen berücksichtigt.
+// Kooperationspartner-Transaktionen sind wie die Partner-Stammdaten selbst für
+// alle Staff-Rollen sichtbar (kein Freigabe-Konzept für Partner, siehe
+// canAccessCooperationPartner) -- das ist eine bewusste Produktentscheidung,
+// keine technische Notwendigkeit.
+export async function buildAccessibleTransactionWhere(userId: string, role: string): Promise<any> {
+  if (role === 'ADMIN') {
+    const { mode, perms } = await getPracticeConfig()
+    if (mode === 'single' || perms.seeFinance) return {}
+    return { createdByUserId: userId }
+  }
+
+  const patientIds = await getAccessiblePatientIds(userId, role)
+  const patientClause = patientIds === 'ALL' ? {} : { patientId: { in: patientIds } }
+
+  return {
+    OR: [
+      patientClause,
+      { cooperationPartnerId: { not: null } },
+      { createdByUserId: userId },
+    ],
+  }
+}
+
+// Kooperationspartner sind globale Stammdaten ohne individuelles Freigabe-
+// Konzept (anders als Patient:innen) -- jede Staff-Rolle mit Zugriff auf den
+// Bereich "Kooperationspartner" darf sie sehen/verwenden. Admin-only bleibt
+// weiterhin das Bearbeiten/Löschen der Partner-Stammdaten selbst.
+export async function canAccessCooperationPartner(
+  userId: string,
+  role: string,
+  partnerId: string
+): Promise<boolean> {
+  if (!['ADMIN', 'THERAPIST'].includes(role)) return false
+  const partner = await prisma.cooperationPartner.findUnique({ where: { id: partnerId } })
+  return !!partner && partner.isActive
 }
