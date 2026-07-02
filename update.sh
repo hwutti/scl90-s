@@ -47,20 +47,17 @@ success "Commit: $COMMIT"
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
 
-# Nginx-Domain aus allen gängigen Konfig-Pfaden suchen.
-# Strategie: erst nach dem proxy_pass-Port suchen (sicherste Methode, unabhängig
-# vom Dateinamen), dann server_name aus derselben Datei lesen.
+# Nginx-Domain: alle nginx-Configs systemweit durchsuchen (Dateien MIT und OHNE
+# .conf-Endung, da install.sh die Datei ohne Endung anlegt z.B. "scl90s").
 NGINX_DOMAIN=""
-
-# Alle nginx-Konfigurationsdateien auf dem System finden
-ALL_NGINX_CONFS=$(find /etc/nginx /usr/local/etc/nginx 2>/dev/null -name "*.conf" -o -name "*.cfg" | sort)
-# Auch Dateien ohne Endung in sites-*
-ALL_NGINX_CONFS="$ALL_NGINX_CONFS $(find /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null -type f | sort)"
+ALL_NGINX_CONFS=$(find /etc/nginx /usr/local/etc/nginx 2>/dev/null \
+  \( -type f -o -type l \) | sort)
 
 for CONF in $ALL_NGINX_CONFS; do
   [[ -f "$CONF" ]] || continue
   # Suche Datei die proxy_pass auf unseren App-Port enthält
-  if grep -q "proxy_pass.*:${APP_PORT}" "$CONF" 2>/dev/null; then
+  # (sowohl 127.0.0.1 als auch localhost als Varianten)
+  if grep -qE "proxy_pass\s+http://(127\.0\.0\.1|localhost):${APP_PORT}" "$CONF" 2>/dev/null; then
     FOUND=$(grep "server_name" "$CONF" 2>/dev/null \
       | grep -v "localhost\|127\.0\.0\.1\| _\b" \
       | awk '{print $2}' | tr -d ';' \
@@ -68,23 +65,11 @@ for CONF in $ALL_NGINX_CONFS; do
       | head -1 || true)
     if [[ -n "$FOUND" ]]; then
       NGINX_DOMAIN="$FOUND"
+      echo "  → Konfiguration gefunden: $CONF"
       break
     fi
   fi
 done
-
-# Fallback: server_name aus allen nginx-Dateien ohne proxy_pass-Bedingung
-if [[ -z "$NGINX_DOMAIN" ]]; then
-  for CONF in $ALL_NGINX_CONFS; do
-    [[ -f "$CONF" ]] || continue
-    FOUND=$(grep "server_name" "$CONF" 2>/dev/null \
-      | grep -v "localhost\|127\.0\.0\.1\| _\b" \
-      | awk '{print $2}' | tr -d ';' \
-      | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
-      | head -1 || true)
-    [[ -n "$FOUND" ]] && NGINX_DOMAIN="$FOUND" && break
-  done
-fi
 
 # Fallback: Let's Encrypt Zertifikate
 if [[ -z "$NGINX_DOMAIN" ]]; then
@@ -107,6 +92,8 @@ if [[ "$NGINX_DOMAIN" == "__skip__" ]]; then
   : # Bereits oben als korrekt gemeldet
 elif [[ -n "$NGINX_DOMAIN" ]]; then
   if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
+    NEW_URL="https://$NGINX_DOMAIN"
+  elif grep -qE "listen.*443|ssl_certificate" "$CONF" 2>/dev/null; then
     NEW_URL="https://$NGINX_DOMAIN"
   else
     NEW_URL="http://$NGINX_DOMAIN"
