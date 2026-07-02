@@ -172,7 +172,7 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
     })
     setEditSaving(false)
     setEditTxId(null)
-    loadData()
+    load()
   }
 
   async function markPaid(txId: string) {
