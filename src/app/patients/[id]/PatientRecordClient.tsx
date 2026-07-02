@@ -951,7 +951,7 @@ export function PatientRecordClient({ patient, notes, instruments, invoiceTempla
         {/* ── SITZUNGEN ── */}
         {tab === 'sitzungen' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <SessionsBillingPanel patientId={patient.id} role={role} />
+            <SessionsBillingPanel patientId={patient.id} role={role} cooperationPartner={patient.cooperationPartner ?? null} />
 
             {/* Audio-Aufnahmen */}
             <div className="card" style={{ overflow: 'hidden' }}>

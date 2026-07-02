@@ -80,6 +80,17 @@ export async function createTransactionFromSessions(params: {
 }): Promise<{ transactionId: string; referenceNumber: string; invoiceHtml?: string }> {
 
   return await prisma.$transaction(async (tx) => {
+    // 0. Kooperationspartner-Patienten dürfen nicht über den normalen
+    // Patienten-Flow abgerechnet werden -- die Abrechnung läuft gesammelt
+    // über createPartnerTransaction() (siehe /kooperationspartner/[id]/rechnung/neu).
+    const patientCheck = await tx.patient.findUnique({
+      where: { id: params.patientId },
+      select: { cooperationPartnerId: true },
+    })
+    if (patientCheck?.cooperationPartnerId) {
+      throw new Error('Dieser Patient gehört zu einem Kooperationspartner. Abrechnung bitte über den Kooperationspartner vornehmen.')
+    }
+
     // 1. Sessions laden und validieren
     const sessions = await tx.therapySession.findMany({
       where: { id: { in: params.sessionIds } },

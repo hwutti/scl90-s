@@ -36,7 +36,7 @@ function fmtMins(m: number | null | undefined) {
   return m >= 60 ? `${Math.floor(m/60)}h ${m%60}min` : `${m} min`
 }
 
-export function SessionsBillingPanel({ patientId, role }: { patientId: string; role: string }) {
+export function SessionsBillingPanel({ patientId, role, cooperationPartner }: { patientId: string; role: string; cooperationPartner?: { id: string; name: string } | null }) {
   const [sessions, setSessions] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -265,10 +265,23 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 8 }}>
-              {selectedSessions.length > 0 && (
-                <button onClick={() => router.push(`/patients/${patientId}/abrechnen?sessions=${selectedSessions.join(',')}`)} className="btn-primary">
-                  <Euro style={{ width: 13, height: 13 }} /> Abrechnen ({selectedSessions.length})
-                </button>
+              {cooperationPartner ? (
+                selectedSessions.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                    background: 'var(--surface-page)', border: '1px solid var(--border)', borderRadius: 8,
+                    fontSize: 12.5, color: 'var(--text-muted)' }}>
+                    Abrechnung erfolgt gesammelt über Kooperationspartner{' '}
+                    <a href={`/kooperationspartner/${cooperationPartner.id}`} style={{ color: 'var(--color-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      {cooperationPartner.name} <ChevronRight style={{ width: 12, height: 12 }} />
+                    </a>
+                  </div>
+                )
+              ) : (
+                selectedSessions.length > 0 && (
+                  <button onClick={() => router.push(`/patients/${patientId}/abrechnen?sessions=${selectedSessions.join(',')}`)} className="btn-primary">
+                    <Euro style={{ width: 13, height: 13 }} /> Abrechnen ({selectedSessions.length})
+                  </button>
+                )
               )}
             </div>
             <button onClick={() => setShowNewSession(true)} className="btn-primary">

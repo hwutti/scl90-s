@@ -22,6 +22,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
 
+  const patient = await prisma.patient.findUnique({
+    where: { id: params.id },
+    select: { cooperationPartnerId: true },
+  })
+  if (!patient) return NextResponse.json({ error: 'Patient nicht gefunden' }, { status: 404 })
+  if (patient.cooperationPartnerId) {
+    return NextResponse.json({ error: 'Dieser Patient gehört zu einem Kooperationspartner. Abrechnung bitte über den Kooperationspartner vornehmen.' }, { status: 400 })
+  }
+
   const draft = await prisma.invoiceDraft.create({
     data: {
       patientId: params.id,

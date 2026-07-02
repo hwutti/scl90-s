@@ -27,6 +27,7 @@ export default async function PatientPage({ params }: { params: { id: string } }
       therapists: { include: { therapist: { select: { id: true, name: true, email: true } } } },
       record: true,
       patientUser: { select: { id: true, pin: true, active: true } },
+      cooperationPartner: { select: { id: true, name: true } },
       assessments: {
         include: {
           result: true,

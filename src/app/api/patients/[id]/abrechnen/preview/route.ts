@@ -23,9 +23,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const patient = await prisma.patient.findUnique({
     where: { id: params.id },
-    select: { defaultInvoiceTemplateId: true },
+    select: { defaultInvoiceTemplateId: true, cooperationPartnerId: true },
   })
   if (!patient) return NextResponse.json({ error: 'Patient nicht gefunden' }, { status: 404 })
+  if (patient.cooperationPartnerId) {
+    return NextResponse.json({ error: 'Dieser Patient gehört zu einem Kooperationspartner. Abrechnung bitte über den Kooperationspartner vornehmen.' }, { status: 400 })
+  }
 
   const sessions = await prisma.therapySession.findMany({
     where: { id: { in: sessionIds }, patientId: params.id },
