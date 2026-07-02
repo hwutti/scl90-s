@@ -52,6 +52,17 @@ export async function createTransactionFromSessions(params: {
   generateInvoiceDoc?: boolean
   anonymizeInvoice?: boolean
   invoiceTemplateId?: string | null
+  // Manuelle Überschreibungen einzelner Positionen aus der Abrechnen-Ansicht.
+  // Key: "session:<sessionId>" für die Sitzungs-Grundposition,
+  //      "service:<sessionServiceLineId>" für Zusatzleistungen
+  lineItemOverrides?: Record<string, {
+    description?: string
+    descriptionHtml?: string
+    quantity?: number
+    unitPriceNet?: number
+  }>
+  // Freitext, der unter den Positionen auf der Honorarnote erscheint
+  customNoteHtml?: string
 }): Promise<{ transactionId: string; referenceNumber: string; invoiceHtml?: string }> {
 
   return await prisma.$transaction(async (tx) => {
@@ -85,14 +96,57 @@ export async function createTransactionFromSessions(params: {
       serviceLinesBySession.set(line.sessionId, list)
     }
 
-    // 3. Beträge berechnen (Sitzungs-Basispreise + Zusatzleistungen)
-    const sessionAmountNet = sessions.reduce((sum, s) =>
-      sum + parseFloat(s.calculatedPriceNet?.toString() ?? '0'), 0)
-    const serviceLinesAmountNet = serviceLines.reduce((sum, l) =>
-      sum + parseFloat(l.amountNet?.toString() ?? '0'), 0)
-    const amountNet = sessionAmountNet + serviceLinesAmountNet
+    // 3. Positionen auflösen (Sitzungs-Basispreise + Zusatzleistungen), dabei
+    //    manuelle Überschreibungen aus der Abrechnen-Ansicht anwenden falls vorhanden
     const vatRate = params.vatRate ?? 0
-    const vatAmount = amountNet * vatRate
+    const overrides = params.lineItemOverrides ?? {}
+
+    interface ResolvedLine {
+      sessionId: string
+      description: string
+      descriptionHtml: string | null
+      serviceLabel?: string | null
+      quantity: number
+      unitPriceNet: number
+      vatRate: number
+      lineDate: Date
+    }
+    const resolvedLines: ResolvedLine[] = []
+
+    for (const s of sessions) {
+      const baseOverride = overrides[`session:${s.id}`]
+      resolvedLines.push({
+        sessionId: s.id,
+        // "Sitzung-N" statt vollem Session-Namen (der bereits das Datum enthält,
+        // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
+        description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
+        descriptionHtml: baseOverride?.descriptionHtml ?? null,
+        serviceLabel: s.serviceLabel ?? params.serviceLabel,
+        quantity: baseOverride?.quantity ?? 1,
+        unitPriceNet: baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0'),
+        vatRate,
+        lineDate: s.sessionDate,
+      })
+
+      // Zusatzleistungen dieser Sitzung als eigene Rechnungspositionen übernehmen
+      // (eigener vatRate je Zeile beibehalten statt dem Sitzungs-vatRate zu erzwingen)
+      for (const line of serviceLinesBySession.get(s.id) ?? []) {
+        const lineOverride = overrides[`service:${line.id}`]
+        resolvedLines.push({
+          sessionId: s.id,
+          description: lineOverride?.description ?? line.description,
+          descriptionHtml: lineOverride?.descriptionHtml ?? null,
+          serviceLabel: line.catalogCode ?? undefined,
+          quantity: lineOverride?.quantity ?? parseFloat(line.quantity.toString()),
+          unitPriceNet: lineOverride?.unitPriceNet ?? parseFloat(line.unitPriceNet.toString()),
+          vatRate: parseFloat(line.vatRate.toString()),
+          lineDate: s.sessionDate,
+        })
+      }
+    }
+
+    const amountNet = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
+    const vatAmount = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet * l.vatRate, 0)
     const amountGross = amountNet + vatAmount
 
     // 4. Referenznummer reservieren
@@ -122,32 +176,32 @@ export async function createTransactionFromSessions(params: {
         paymentUndoDeadline: params.markAsPaid ? new Date(now.getTime() + 5 * 60 * 1000) : null,
         lifecycleStatus: 'ACTIVE',
         notes: params.notes,
+        customNoteHtml: params.customNoteHtml || null,
         invoiceTemplateId: params.invoiceTemplateId || null,
       },
     })
 
     // 6. LineItems und Allocations erstellen (Basispreis + Zusatzleistungen je Sitzung)
     let sortOrder = 0
-    for (const s of sessions) {
-      const lineAmountNet = parseFloat(s.calculatedPriceNet?.toString() ?? '0')
-      const lineVatAmount = lineAmountNet * vatRate
+    for (const line of resolvedLines) {
+      const lineAmountNet = line.quantity * line.unitPriceNet
+      const lineVatAmount = lineAmountNet * line.vatRate
       const lineAmountGross = lineAmountNet + lineVatAmount
 
       const lineItem = await tx.txLineItem.create({
         data: {
           transactionId: transaction.id,
-          sessionId: s.id,
-          // "Sitzung-N" statt vollem Session-Namen (der bereits das Datum enthält,
-          // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
-          description: `Sitzung-${s.sessionNumber}`,
-          serviceLabel: s.serviceLabel ?? params.serviceLabel,
-          quantity: 1,
-          unitPriceNet: lineAmountNet,
+          sessionId: line.sessionId,
+          description: line.description,
+          descriptionHtml: line.descriptionHtml,
+          serviceLabel: line.serviceLabel,
+          quantity: line.quantity,
+          unitPriceNet: line.unitPriceNet,
           amountNet: lineAmountNet,
-          vatRate,
+          vatRate: line.vatRate,
           vatAmount: lineVatAmount,
           amountGross: lineAmountGross,
-          lineDate: s.sessionDate,
+          lineDate: line.lineDate,
           sortOrder: sortOrder++,
         },
       })
@@ -156,7 +210,7 @@ export async function createTransactionFromSessions(params: {
         data: {
           transactionId: transaction.id,
           lineItemId: lineItem.id,
-          sessionId: s.id,
+          sessionId: line.sessionId,
           allocationPercentage: 1.0,
           allocatedAmountNet: lineAmountNet,
           allocatedVatAmount: lineVatAmount,
@@ -164,45 +218,6 @@ export async function createTransactionFromSessions(params: {
           isActive: true,
         },
       })
-
-      // Zusatzleistungen dieser Sitzung als eigene Rechnungspositionen übernehmen
-      // (eigener vatRate je Zeile beibehalten statt dem Sitzungs-vatRate zu erzwingen)
-      for (const line of serviceLinesBySession.get(s.id) ?? []) {
-        const lAmountNet = parseFloat(line.amountNet.toString())
-        const lVatRate = parseFloat(line.vatRate.toString())
-        const lVatAmount = lAmountNet * lVatRate
-        const lAmountGross = lAmountNet + lVatAmount
-
-        const extraLineItem = await tx.txLineItem.create({
-          data: {
-            transactionId: transaction.id,
-            sessionId: s.id,
-            description: line.description,
-            serviceLabel: line.catalogCode ?? undefined,
-            quantity: line.quantity,
-            unitPriceNet: line.unitPriceNet,
-            amountNet: lAmountNet,
-            vatRate: lVatRate,
-            vatAmount: lVatAmount,
-            amountGross: lAmountGross,
-            lineDate: s.sessionDate,
-            sortOrder: sortOrder++,
-          },
-        })
-
-        await tx.txSessionAllocation.create({
-          data: {
-            transactionId: transaction.id,
-            lineItemId: extraLineItem.id,
-            sessionId: s.id,
-            allocationPercentage: 1.0,
-            allocatedAmountNet: lAmountNet,
-            allocatedVatAmount: lVatAmount,
-            allocatedAmountGross: lAmountGross,
-            isActive: true,
-          },
-        })
-      }
     }
 
     // 6. Timeline
