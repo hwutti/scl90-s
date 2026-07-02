@@ -50,18 +50,23 @@ async function main() {
   console.log(`  FinanceTransaction EXPENSE:   ${ftExpense.length}`)
 
   // ── 2. Doppelzählung: Belegnummern in BEIDEN Tabellen ────────────────────
+  // WICHTIG: prüft sowohl INCOME als auch EXPENSE -- vorher wurde hier nur die
+  // Einnahmen-Seite geprüft, wodurch unklar blieb, ob die 16 (Stand Juli 2026)
+  // Legacy-EXPENSE-Zeilen (Miete, Fortbildung, Strom, ...) überhaupt schon als
+  // Transaction existieren. Das muss VOR einem Löschen der Tabelle klar sein.
   console.log('\n' + '-'.repeat(70))
   console.log('DOPPELZÄHLUNG: Belegnummern, die in Transaction UND FinanceTransaction vorkommen')
   console.log('-'.repeat(70))
 
-  const txRefSet = new Map(txIncomeActive.map(t => [t.referenceNumber, t]))
-  const duplicates: { ref: string; txAmount: number; ftAmount: number; ftId: string; ftDesc: string }[] = []
+  const txRefSetAll = new Map(txActive.map(t => [t.referenceNumber, t]))
+  const duplicates: { ref: string; type: string; txAmount: number; ftAmount: number; ftId: string; ftDesc: string }[] = []
 
-  for (const ft of ftIncome) {
-    if (ft.invoiceNumber && txRefSet.has(ft.invoiceNumber)) {
-      const tx = txRefSet.get(ft.invoiceNumber)!
+  for (const ft of ftAll) {
+    if (ft.invoiceNumber && txRefSetAll.has(ft.invoiceNumber)) {
+      const tx = txRefSetAll.get(ft.invoiceNumber)!
       duplicates.push({
         ref: ft.invoiceNumber,
+        type: ft.type,
         txAmount: Number(tx.amountGross),
         ftAmount: Number(ft.amount),
         ftId: ft.id,
@@ -70,33 +75,52 @@ async function main() {
     }
   }
 
+  const dupIncome = duplicates.filter(d => d.type === 'INCOME')
+  const dupExpense = duplicates.filter(d => d.type === 'EXPENSE')
+  const ftWithoutMatch = ftAll.filter(f => !duplicates.some(d => d.ftId === f.id))
+
   if (duplicates.length === 0) {
     console.log('✅ Keine Überschneidungen gefunden.')
   } else {
-    console.log(`❌ ${duplicates.length} Belegnummern doppelt erfasst:\n`)
-    console.log('Belegnr.'.padEnd(12) + 'Transaction'.padEnd(15) + 'FinanceTransaction'.padEnd(20) + 'FT-Beschreibung')
-    let sumDuplicated = 0
+    console.log(`${duplicates.length} Belegnummern existieren in BEIDEN Tabellen (${dupIncome.length} INCOME, ${dupExpense.length} EXPENSE):\n`)
+    console.log('Typ'.padEnd(9) + 'Belegnr.'.padEnd(12) + 'Transaction'.padEnd(15) + 'FinanceTransaction'.padEnd(20) + 'FT-Beschreibung')
     for (const d of duplicates) {
       console.log(
-        d.ref.padEnd(12) + fmtEur(d.txAmount).padEnd(15) + fmtEur(d.ftAmount).padEnd(20) + d.ftDesc
+        d.type.padEnd(9) + d.ref.padEnd(12) + fmtEur(d.txAmount).padEnd(15) + fmtEur(d.ftAmount).padEnd(20) + d.ftDesc
       )
-      sumDuplicated += d.ftAmount
     }
-    console.log(`\nSumme der doppelt gezählten Beträge (nur FinanceTransaction-Seite): ${fmtEur(sumDuplicated)}`)
-    console.log('→ Das ist der Betrag, um den BMD-Export und Steuerberater-PDF aktuell zu hoch sind.')
   }
 
-  // ── 3. Summen-Vergleich (aktueller Bug-Zustand vs. bereinigt) ────────────
+  console.log(`\n${ftWithoutMatch.length === 0 ? '✅' : '❌'} FinanceTransaction-Zeilen OHNE passende Transaction: ${ftWithoutMatch.length}`)
+  if (ftWithoutMatch.length > 0) {
+    console.log('→ ACHTUNG: Diese Zeilen sind NUR in FinanceTransaction vorhanden. Ein Löschen der Tabelle')
+    console.log('  würde diese Daten unwiederbringlich entfernen. Vor dem Löschen erst migrieren')
+    console.log('  (scripts/legacy-financetransaction-migrate.ts) oder manuell klären:')
+    for (const f of ftWithoutMatch) {
+      console.log(`  ${(f.invoiceNumber ?? f.id).padEnd(20)} ${f.type.padEnd(8)} ${fmtEur(Number(f.amount)).padEnd(12)} ${f.description ?? ''}`)
+    }
+  } else {
+    console.log('→ Jede FinanceTransaction-Zeile hat eine passende Transaction mit gleicher Belegnummer.')
+    console.log('  Die Tabelle enthält aktuell nur noch redundante (bereits migrierte) Daten.')
+  }
+
+  // ── 3. Summen-Übersicht ───────────────────────────────────────────────────
+  // Hinweis: computeTransactionJournal() (BMD-Export, Steuerberater-PDF) liest
+  // ausschließlich aus Transaction -- die Summen hier sind KEIN Abbild eines
+  // aktuell fehlerhaften Reports, sondern zeigen nur, wie viel Legacy-Daten
+  // in FinanceTransaction stecken und wie viel davon bereits als Transaction
+  // dupliziert vorliegt.
   console.log('\n' + '-'.repeat(70))
-  console.log('SUMMEN-VERGLEICH')
+  console.log('SUMMEN-ÜBERSICHT')
   console.log('-'.repeat(70))
   const sumTxIncome = txIncomeActive.reduce((s, t) => s + Number(t.amountGross), 0)
   const sumFtIncome = ftIncome.reduce((s, t) => s + Number(t.amount), 0)
-  const sumDuplicatedFt = duplicates.reduce((s, d) => s + d.ftAmount, 0)
-  console.log(`Einnahmen nur aus Transaction:                 ${fmtEur(sumTxIncome)}`)
-  console.log(`Einnahmen nur aus FinanceTransaction:           ${fmtEur(sumFtIncome)}`)
-  console.log(`Summe aktuell in Reports (Transaction+FT):      ${fmtEur(sumTxIncome + sumFtIncome)}${duplicates.length > 0 ? '  ⚠ enthält Duplikate' : '  ✅ keine Duplikate'}`)
-  console.log(`Summe bereinigt (Duplikate abgezogen):          ${fmtEur(sumTxIncome + sumFtIncome - sumDuplicatedFt)}`)
+  const sumFtExpense = ftExpense.reduce((s, t) => s + Number(t.amount), 0)
+  const sumDuplicated = duplicates.reduce((s, d) => s + d.ftAmount, 0)
+  console.log(`Einnahmen in Transaction (aktive Quelle für Reports): ${fmtEur(sumTxIncome)}`)
+  console.log(`Einnahmen in FinanceTransaction (Legacy):             ${fmtEur(sumFtIncome)}`)
+  console.log(`Ausgaben in FinanceTransaction (Legacy):              ${fmtEur(sumFtExpense)}`)
+  console.log(`Davon bereits als Transaction dupliziert vorhanden:   ${fmtEur(sumDuplicated)}`)
 
   // ── 4. Verdacht auf Vorzeichen-Bug bei Stornos ────────────────────────────
   console.log('\n' + '-'.repeat(70))
