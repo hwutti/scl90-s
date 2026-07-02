@@ -111,29 +111,35 @@ elif [[ -n "$NGINX_DOMAIN" ]]; then
     success "NEXTAUTH_URL korrekt: $CURRENT_URL"
   fi
 else
-  # Kein nginx-Domain gefunden: aktuellen Wert zeigen, aber nicht überschreiben
-  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "nicht gesetzt")
-  if [[ "$CURRENT_URL" == "nicht gesetzt" || "$CURRENT_URL" == *"localhost"* || -z "$CURRENT_URL" ]]; then
-    # Letzter Versuch: Domain aus Let's Encrypt-Zertifikaten lesen
-    LE_DOMAIN=$(ls /etc/letsencrypt/live/ 2>/dev/null | grep -v "README" | head -1 || true)
-    if [[ -n "$LE_DOMAIN" ]]; then
-      if [[ -f "/etc/letsencrypt/live/$LE_DOMAIN/fullchain.pem" ]]; then
-        NEW_URL="https://$LE_DOMAIN"
+  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
+  if [[ "$CURRENT_URL" == *"localhost"* || "$CURRENT_URL" == *"127.0.0.1"* || -z "$CURRENT_URL" ]]; then
+    # nginx hat server_name _ (Wildcard) — Domain steht nicht in der nginx-Konfig.
+    # Typisch wenn SSL vor diesem Server terminiert wird (z.B. Proxmox/Firewall).
+    # Einmal interaktiv fragen und dauerhaft in .env speichern.
+    echo ""
+    warn "NEXTAUTH_URL zeigt auf localhost — App-Login wird fehlschlagen!"
+    warn "Die Domain kann nicht automatisch erkannt werden (nginx nutzt server_name _)."
+    echo ""
+    if [[ -t 0 ]]; then
+      read -rp "  → App-URL eingeben (z.B. https://kds.meinserver.at): " INPUT_URL </dev/tty
+      INPUT_URL="${INPUT_URL%/}"
+      if [[ -n "$INPUT_URL" && "$INPUT_URL" == http* ]]; then
+        if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
+          sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$INPUT_URL|" "$ENV_FILE"
+        else
+          echo "NEXTAUTH_URL=$INPUT_URL" >> "$ENV_FILE"
+        fi
+        success "NEXTAUTH_URL gesetzt: $INPUT_URL (wird bei künftigen Updates beibehalten)"
       else
-        NEW_URL="http://$LE_DOMAIN"
+        warn "Ungültige Eingabe — bitte beim nächsten Update erneut eingeben."
       fi
-      if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
-      else
-        echo "NEXTAUTH_URL=$NEW_URL" >> "$ENV_FILE"
-      fi
-      warn "NEXTAUTH_URL via Let's Encrypt gesetzt: $NEW_URL"
     else
-      warn "NEXTAUTH_URL = '$CURRENT_URL' — Domain konnte nicht automatisch erkannt werden."
-      warn "Bitte einmalig setzen: sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://IHRE_DOMAIN|' $ENV_FILE"
+      warn "Nicht-interaktiver Modus. Bitte einmalig manuell setzen:"
+      warn "  sudo sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://IHRE_DOMAIN|' $ENV_FILE"
+      warn "  Danach: sudo bash $APP_DIR/update.sh"
     fi
   else
-    success "NEXTAUTH_URL unverändert: $CURRENT_URL"
+    success "NEXTAUTH_URL korrekt: $CURRENT_URL"
   fi
 fi
 
