@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireAdminSession } from '@/lib/access'
 
 const ALLOWED_FIELDS = new Set([
   'name','description','htmlContent','cssContent','isDefault','isActive',
@@ -16,8 +15,8 @@ const ALLOWED_FIELDS = new Set([
 ])
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminSession()
+  if ('error' in auth) return auth.error
 
   let body: any
   try {
@@ -58,8 +57,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminSession()
+  if ('error' in auth) return auth.error
   await prisma.invoiceTemplate.update({ where: { id: params.id }, data: { isActive: false } })
   return NextResponse.json({ ok: true })
 }
