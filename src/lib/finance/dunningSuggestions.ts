@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { parseDunningSettings, DUNNING_LEVEL_ORDER } from '@/lib/finance/dunningSettings'
+import { buildAccessibleTransactionWhere } from '@/lib/access'
 
 export interface DunningSuggestion {
   transactionId: string
@@ -25,7 +26,7 @@ const DAY_MS = 24 * 3600 * 1000
 export async function computeDunningSuggestions(userId: string, role: string): Promise<DunningSuggestion[]> {
   const config = await prisma.praxisConfig.findFirst({ where: { key: 'default' } })
   const settings = parseDunningSettings(config?.dunningSettings)
-  const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
+  const where: any = await buildAccessibleTransactionWhere(userId, role)
 
   const transactions = await prisma.transaction.findMany({
     where: { ...where, direction: 'INCOME', lifecycleStatus: 'ACTIVE', paymentStatus: 'UNPAID' },
