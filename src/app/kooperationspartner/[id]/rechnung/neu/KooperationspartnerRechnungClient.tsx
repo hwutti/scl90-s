@@ -1,10 +1,16 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   ArrowLeft, ChevronRight, Calendar, Clock,
   Check, AlertCircle, FileText, Loader, Printer, Mail, X, Eye, RefreshCw, Plus, Trash2,
 } from 'lucide-react'
+
+const RichTextEditor = dynamic(
+  () => import('@/components/editor/RichTextEditor').then(m => m.RichTextEditor),
+  { ssr: false, loading: () => <div style={{ height: 60, background: 'var(--surface-page)', borderRadius: 8 }} /> }
+)
 
 function fmtEUR(n: any) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(parseFloat(n ?? 0))
@@ -22,6 +28,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 interface LineItem {
   tempId: string
   description: string
+  descriptionHtml?: string
   quantity: number
   unitPriceNet: number
   sessionId?: string | null
@@ -147,6 +154,7 @@ export function KooperationspartnerRechnungClient({
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [customNoteHtml, setCustomNoteHtml] = useState('')
   const [done, setDone] = useState<{ referenceNumber: string; transactionId?: string; invoiceHtml?: string } | null>(null)
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [emailTo, setEmailTo] = useState(partner.email ?? '')
@@ -175,8 +183,10 @@ export function KooperationspartnerRechnungClient({
           notes: form.notes,
           lineItems: lineItems.map(l => ({
             description: l.description, quantity: l.quantity, unitPriceNet: l.unitPriceNet,
+            descriptionHtml: l.descriptionHtml || null,
             sessionId: l.sessionId || null, lineDate: l.lineDate || null,
           })),
+          customNoteHtml: customNoteHtml || null,
         }),
       })
       const data = await res.json()
@@ -409,25 +419,33 @@ export function KooperationspartnerRechnungClient({
                   <tbody>
                     {lineItems.map(l => (
                       <tr key={l.tempId}>
-                        <td>
-                          <input style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px' }}
-                            value={l.description} onChange={e => updateLine(l.tempId, { description: e.target.value })} />
+                        <td style={{ verticalAlign: 'top', paddingTop: 6 }}>
+                          <RichTextEditor
+                            compact
+                            value={l.descriptionHtml || l.description}
+                            onChange={html => updateLine(l.tempId, {
+                              descriptionHtml: html,
+                              description: html.replace(/<[^>]+>/g, '') || l.description,
+                            })}
+                            minHeight={36}
+                            placeholder="Beschreibung…"
+                          />
                         </td>
-                        <td>
+                        <td style={{ verticalAlign: 'top' }}>
                           <input type="date" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px' }}
                             value={l.lineDate ? l.lineDate.slice(0, 10) : ''}
                             onChange={e => updateLine(l.tempId, { lineDate: e.target.value || null })} />
                         </td>
-                        <td>
+                        <td style={{ verticalAlign: 'top' }}>
                           <input type="number" step="0.5" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px', textAlign: 'right' }}
                             value={l.quantity} onChange={e => updateLine(l.tempId, { quantity: parseFloat(e.target.value) || 0 })} />
                         </td>
-                        <td>
+                        <td style={{ verticalAlign: 'top' }}>
                           <input type="number" step="0.01" style={{ ...inputStyle, border: 'none', background: 'none', padding: '2px 4px', textAlign: 'right' }}
                             value={l.unitPriceNet} onChange={e => updateLine(l.tempId, { unitPriceNet: parseFloat(e.target.value) || 0 })} />
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtEUR(l.quantity * l.unitPriceNet)}</td>
-                        <td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, verticalAlign: 'top', paddingTop: 10 }}>{fmtEUR(l.quantity * l.unitPriceNet)}</td>
+                        <td style={{ verticalAlign: 'top' }}>
                           <button onClick={() => removeLine(l.tempId)} className="btn-ghost" style={{ padding: 4, color: 'var(--red)' }}>
                             <Trash2 style={{ width: 13, height: 13 }} />
                           </button>
@@ -438,6 +456,17 @@ export function KooperationspartnerRechnungClient({
                 </table>
               </div>
             )}
+          </div>
+
+          {/* Freitext-Bereich */}
+          <div>
+            <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 10px', color: 'var(--text-primary)' }}>Freitext / Anmerkungen</h2>
+            <RichTextEditor
+              value={customNoteHtml}
+              onChange={setCustomNoteHtml}
+              placeholder="Optionaler Freitext der unter den Positionen in der Rechnung erscheint (Fettdruck, Listen, Farben…)"
+              minHeight={100}
+            />
           </div>
 
           {/* Summe */}

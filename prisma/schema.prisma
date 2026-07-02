@@ -1268,6 +1268,7 @@ model Transaction {
 
   // Sonstiges
   notes                   String?
+  customNoteHtml          String?   // Freier Rich-Text-Bereich (Tiptap) der unter den Positionen in der Rechnung erscheint
   hellocashReceiptId      String?
   invoiceTemplateId       String?             // explizite Vorlagen-Wahl bei Erstellung (überschreibt Patient-Default)
   category                String?             // Einnahmen-/Ausgabenkategorie (z.B. HONORAR, MISC_BUSINESS) — für BMD-Export-Kontenzuordnung & Gewinnermittlung. Ersetzt FinanceTransaction.incomeCategory/expenseCategory.
@@ -1294,6 +1295,7 @@ model TxLineItem {
   sessionId       String?
 
   description     String
+  descriptionHtml String?   // Rich-Text HTML (Tiptap) — wenn gesetzt, überschreibt description in der Rechnung
   serviceLabel    String?
   quantity        Decimal     @db.Decimal(8, 2) @default(1)
   unitPriceNet    Decimal     @db.Decimal(10, 2)

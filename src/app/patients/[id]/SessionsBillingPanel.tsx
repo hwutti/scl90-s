@@ -1,9 +1,15 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { ClipboardList, Plus, X, ChevronRight, Check, Clock, AlertCircle, Edit3, 
-         FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban, ClipboardCheck } from 'lucide-react'
+         FileText, Euro, Trash2, Eye, Download, RotateCcw, Ban, ClipboardCheck, Pencil, Save } from 'lucide-react'
 import { ConfirmationsPanel } from './ConfirmationsPanel'
+
+const RichTextEditor = dynamic(
+  () => import('@/components/editor/RichTextEditor').then(m => m.RichTextEditor),
+  { ssr: false, loading: () => <div style={{ height: 40, background: 'var(--surface-page)', borderRadius: 8 }} /> }
+)
 
 const BILLING_STATUS_LABEL: Record<string,string> = {
   UNBILLED: 'Nicht verrechnet', BILLED_UNPAID: 'Verrechnet (offen)',
@@ -41,6 +47,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
   const [payingTxId, setPayingTxId] = useState<string|null>(null)
   const [undoCountdown, setUndoCountdown] = useState<Record<string,number>>({})
   const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([])
+  // Rich-Text Bearbeitungs-State für bestehende Rechnungen
+  const [editTxId, setEditTxId] = useState<string|null>(null)
+  const [editLineItems, setEditLineItems] = useState<any[]>([])
+  const [editNoteHtml, setEditNoteHtml] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
 
   const [newSession, setNewSession] = useState({
@@ -139,6 +150,29 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
     setSavingTx(false)
     setSelectedSessions([])
     load()
+  }
+
+  function openEdit(tx: any) {
+    setEditTxId(tx.id)
+    setEditLineItems(tx.lineItems?.map((li: any) => ({
+      id: li.id,
+      description: li.description,
+      descriptionHtml: li.descriptionHtml ?? '',
+    })) ?? [])
+    setEditNoteHtml(tx.customNoteHtml ?? '')
+  }
+
+  async function saveEditLineItems() {
+    if (!editTxId) return
+    setEditSaving(true)
+    await fetch(`/api/transactions/${editTxId}/line-items`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineItems: editLineItems, customNoteHtml: editNoteHtml }),
+    })
+    setEditSaving(false)
+    setEditTxId(null)
+    loadData()
   }
 
   async function markPaid(txId: string) {
@@ -323,6 +357,11 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                           <Check style={{width:12,height:12}} /> Bezahlt
                         </button>
                       )}
+                      {tx.paymentStatus === 'UNPAID' && tx.lifecycleStatus === 'ACTIVE' && (
+                        <button onClick={() => editTxId === tx.id ? setEditTxId(null) : openEdit(tx)} className="btn-secondary" style={{fontSize:12,padding:'4px 8px'}} title="Beschreibungen bearbeiten">
+                          <Pencil style={{width:13,height:13}} />
+                        </button>
+                      )}
                       {undoCountdown[tx.id] > 0 && (
                         <button onClick={() => undoPayment(tx.id)} className="btn-danger" style={{fontSize:12,padding:'4px 10px'}}>
                           <RotateCcw style={{width:12,height:12}} /> Rückgängig
@@ -338,6 +377,46 @@ export function SessionsBillingPanel({ patientId, role }: { patientId: string; r
                       )}
                     </div>
                   </div>
+
+                  {/* Rich-Text Bearbeitungs-Panel */}
+                  {editTxId === tx.id && (
+                    <div style={{ marginTop: 10, padding: 14, background: 'var(--surface-page)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
+                        Beschreibungen bearbeiten
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {editLineItems.map((li, i) => (
+                          <div key={li.id}>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Position {i + 1}</div>
+                            <RichTextEditor
+                              compact
+                              value={li.descriptionHtml || li.description}
+                              onChange={html => setEditLineItems(prev => prev.map((p, pi) => pi === i
+                                ? { ...p, descriptionHtml: html, description: html.replace(/<[^>]+>/g, '') || p.description }
+                                : p
+                              ))}
+                              minHeight={40}
+                            />
+                          </div>
+                        ))}
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Freitext (unter den Positionen)</div>
+                          <RichTextEditor
+                            value={editNoteHtml}
+                            onChange={setEditNoteHtml}
+                            placeholder="Optionaler Freitext…"
+                            minHeight={80}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button onClick={() => setEditTxId(null)} className="btn-secondary" style={{ fontSize: 12 }}>Abbrechen</button>
+                          <button onClick={saveEditLineItems} disabled={editSaving} className="btn-primary" style={{ fontSize: 12 }}>
+                            <Save style={{ width: 12, height: 12 }} /> {editSaving ? 'Speichern…' : 'Speichern'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Invoice Docs */}
                   {tx.invoiceDocuments?.length > 0 && (
                     <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems: 'center' }}>

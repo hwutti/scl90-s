@@ -299,6 +299,7 @@ export type InvoiceData = {
   line_items: Array<{
     date: string
     description: string
+    description_html?: string   // Rich-Text HTML wenn vorhanden (überschreibt description)
     service_label?: string
     quantity: string
     unit_price_net: string
@@ -318,7 +319,9 @@ export function renderInvoice(template: string, data: InvoiceData): string {
         return (item as any)[key] ? inner : ''
       })
       row = row.replace(/\{\{this\.date\}\}/g, item.date)
-      row = row.replace(/\{\{this\.description\}\}/g, item.description)
+      // description_html hat Vorrang vor description (Rich-Text)
+      const descHtml = (item as any).description_html
+      row = row.replace(/\{\{this\.description\}\}/g, descHtml ? descHtml : item.description)
       row = row.replace(/\{\{this\.service_label\}\}/g, item.service_label || '')
       row = row.replace(/\{\{this\.quantity\}\}/g, item.quantity)
       row = row.replace(/\{\{this\.unit_price_net\}\}/g, item.unit_price_net)
@@ -504,12 +507,13 @@ async function renderInvoiceCore(input: InvoiceCoreInput): Promise<string> {
     payment_info:        paymentInfo,
     notes:               input.notes ?? '',
     line_items: input.lineItems.map((li) => ({
-      date:           li.date ? fmtDate(li.date) : '',
-      description:    li.description,
-      service_label:  li.serviceLabel ?? '',
-      quantity:       li.quantity.toString(),
-      unit_price_net: fmtEUR(li.unitPriceNet),
-      amount_net:     fmtEUR(li.amountNet),
+      date:             li.date ? fmtDate(li.date) : '',
+      description:      li.description,
+      description_html: (li as any).descriptionHtml ?? undefined,
+      service_label:    li.serviceLabel ?? '',
+      quantity:         li.quantity.toString(),
+      unit_price_net:   fmtEUR(li.unitPriceNet),
+      amount_net:       fmtEUR(li.amountNet),
     })),
   }
 
@@ -555,6 +559,7 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
     lineItems: tx.lineItems.map((li: any) => ({
       date: li.lineDate,
       description: li.description,
+      descriptionHtml: li.descriptionHtml ?? null,
       serviceLabel: li.serviceLabel,
       quantity: parseFloat(li.quantity.toString()),
       unitPriceNet: parseFloat(li.unitPriceNet.toString()),
