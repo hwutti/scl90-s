@@ -49,13 +49,5 @@ export async function PATCH(req: NextRequest) {
     },
   })
 
-  // Farbe auch in PraxisConfig spiegeln (globales Branding-Override)
-  if (body.accentColor) {
-    await prisma.praxisConfig.updateMany({
-      where: { key: 'default' },
-      data: { colorPrimary: body.accentColor },
-    }).catch(() => {})
-  }
-
   return NextResponse.json(updated)
 }
