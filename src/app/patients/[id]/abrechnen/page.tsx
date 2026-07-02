@@ -50,29 +50,21 @@ export default async function AbrechnenPage({
       billingStatus: 'UNBILLED',
       excludedFromFinances: false,
     },
+    include: { serviceLines: { orderBy: { sortOrder: 'asc' } } },
     orderBy: { sessionDate: 'asc' },
   })
 
-  // Alle offenen Sessions (für "alle auswählen")
+  // Alle offenen Sessions (für "alle auswählen") — inkl. Zusatzleistungen, damit
+  // sie direkt in der Positions-Übersicht editierbar sind (nicht nur die Summe)
   const allUnbilled = await prisma.therapySession.findMany({
     where: { patientId: params.id, billingStatus: 'UNBILLED', excludedFromFinances: false },
-    select: { id: true, name: true, sessionDate: true, calculatedPriceNet: true, durationMinutes: true },
+    include: { serviceLines: { orderBy: { sortOrder: 'asc' } } },
     orderBy: { sessionDate: 'asc' },
   })
 
-  // Zusatzleistungen-Summe je Sitzung dazuladen — sonst zeigt die Vorschau-Summe
-  // im UI einen niedrigeren Betrag als die tatsächlich erstellte Rechnung
-  const serviceLineTotals = await prisma.sessionServiceLine.groupBy({
-    by: ['sessionId'],
-    where: { sessionId: { in: allUnbilled.map(s => s.id) } },
-    _sum: { amountNet: true },
-  })
-  const serviceLineTotalBySession = new Map(
-    serviceLineTotals.map(t => [t.sessionId, parseFloat(t._sum.amountNet?.toString() ?? '0')])
-  )
   const allUnbilledWithExtras = allUnbilled.map(s => ({
     ...s,
-    serviceLinesTotalNet: serviceLineTotalBySession.get(s.id) ?? 0,
+    serviceLinesTotalNet: s.serviceLines.reduce((sum, l) => sum + parseFloat(l.amountNet.toString()), 0),
   }))
 
   const invoiceTemplates = await prisma.invoiceTemplate.findMany({
