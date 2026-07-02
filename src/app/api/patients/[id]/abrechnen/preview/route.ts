@@ -49,12 +49,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const overrides: Record<string, any> = body.lineItemOverrides ?? {}
+  const removedKeys = new Set<string>(Array.isArray(body.removedLineKeys) ? body.removedLineKeys : [])
 
   const lineItems = sessions.flatMap(s => {
-    const baseOverride = overrides[`session:${s.id}`]
+    const baseKey = `session:${s.id}`
+    const baseOverride = overrides[baseKey]
     const baseAmountNet = baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0')
     const baseQuantity = baseOverride?.quantity ?? 1
-    const baseLine = {
+    const baseLine = removedKeys.has(baseKey) ? null : {
       date: s.sessionDate,
       description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
       descriptionHtml: baseOverride?.descriptionHtml ?? null,
@@ -63,21 +65,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       unitPriceNet: baseAmountNet,
       amountNet: baseQuantity * baseAmountNet,
     }
-    const extraLines = (serviceLinesBySession.get(s.id) ?? []).map(l => {
-      const lineOverride = overrides[`service:${l.id}`]
-      const qty = lineOverride?.quantity ?? parseFloat(l.quantity.toString())
-      const unitPrice = lineOverride?.unitPriceNet ?? parseFloat(l.unitPriceNet.toString())
-      return {
-        date: s.sessionDate,
-        description: lineOverride?.description ?? l.description,
-        descriptionHtml: lineOverride?.descriptionHtml ?? null,
-        serviceLabel: l.catalogCode ?? null,
-        quantity: qty,
-        unitPriceNet: unitPrice,
-        amountNet: qty * unitPrice,
-      }
-    })
-    return [baseLine, ...extraLines]
+    const extraLines = (serviceLinesBySession.get(s.id) ?? [])
+      .filter(l => !removedKeys.has(`service:${l.id}`))
+      .map(l => {
+        const lineOverride = overrides[`service:${l.id}`]
+        const qty = lineOverride?.quantity ?? parseFloat(l.quantity.toString())
+        const unitPrice = lineOverride?.unitPriceNet ?? parseFloat(l.unitPriceNet.toString())
+        return {
+          date: s.sessionDate,
+          description: lineOverride?.description ?? l.description,
+          descriptionHtml: lineOverride?.descriptionHtml ?? null,
+          serviceLabel: l.catalogCode ?? null,
+          quantity: qty,
+          unitPriceNet: unitPrice,
+          amountNet: qty * unitPrice,
+        }
+      })
+    return baseLine ? [baseLine, ...extraLines] : extraLines
   })
 
   // Frei hinzugefügte Positionen ohne Sitzungsbezug ebenfalls in der Vorschau zeigen
