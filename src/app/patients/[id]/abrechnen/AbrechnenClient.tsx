@@ -22,6 +22,15 @@ function fmtMins(m: number | null) {
   if (!m) return '—'
   return m >= 60 ? `${Math.floor(m/60)}h ${m%60 > 0 ? m%60+'min' : ''}`.trim() : `${m} min`
 }
+// Next.js/React Server Components geben Date-Felder als echte Date-Objekte an
+// Client-Komponenten weiter (nicht als String) — daher hier immer normalisieren,
+// bevor irgendwo .slice() o.ä. auf einem Datum aufgerufen wird.
+function toDateInputValue(d: any): string | null {
+  if (!d) return null
+  if (typeof d === 'string') return d
+  if (d instanceof Date) return d.toISOString()
+  return String(d)
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   UNBAR_BANK_TRANSFER: 'Überweisung',
@@ -88,7 +97,7 @@ export function AbrechnenClient({
       descriptionHtml: baseEdit.descriptionHtml,
       quantity: baseEdit.quantity ?? 1,
       unitPriceNet: baseEdit.unitPriceNet ?? parseFloat(s.calculatedPriceNet ?? 0),
-      lineDate: baseEdit.lineDate ?? s.sessionDate,
+      lineDate: baseEdit.lineDate ?? toDateInputValue(s.sessionDate),
     })
     for (const l of s.serviceLines ?? []) {
       const key = `service:${l.id}`
@@ -100,7 +109,7 @@ export function AbrechnenClient({
         descriptionHtml: edit.descriptionHtml,
         quantity: edit.quantity ?? parseFloat(l.quantity),
         unitPriceNet: edit.unitPriceNet ?? parseFloat(l.unitPriceNet),
-        lineDate: edit.lineDate ?? s.sessionDate,
+        lineDate: edit.lineDate ?? toDateInputValue(s.sessionDate),
       })
     }
     return lines
