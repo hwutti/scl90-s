@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireStaffSession } from '@/lib/access'
 
 export async function GET(_: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   const templates = await prisma.sessionTemplate.findMany({
     include: {
@@ -18,8 +17,8 @@ export async function GET(_: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
   const body = await req.json()
 
   // Wenn isDefault: alle anderen auf false setzen
