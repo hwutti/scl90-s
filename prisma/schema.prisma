@@ -239,6 +239,7 @@ model User {
   exportJobs            ExportJob[]             @relation("UserExportJobs")
   supervisionEntriesAs  SupervisionEntry[]      @relation("SuperviseeEntries")
   supervisorEntries     SupervisionEntry[]      @relation("SupervisorEntries")
+  invoiceDrafts         InvoiceDraft[]          @relation("UserInvoiceDrafts")
 }
 
 model Account {
@@ -362,6 +363,7 @@ model Patient {
   audioRecordings       AudioRecording[]        @relation("PatientAudio")
   reportDocuments       PatientReportDocument[]
   confirmations         Confirmation[]
+  invoiceDrafts         InvoiceDraft[]
 
   @@index([lastName, firstName])
   @@index([dob])
@@ -1332,6 +1334,39 @@ model TxSessionAllocation {
 
   @@index([transactionId])
   @@index([sessionId])
+}
+
+// ─── Honorarnote-Entwurf ──────────────────────────────────────────────────────
+// Zwischenspeicherung des Bearbeitungsstands auf der Abrechnen-Seite, damit man
+// eine angefangene Honorarnote später weiterbearbeiten kann, ohne sie sofort
+// verbindlich zu erstellen (kein referenceNumber, keine Transaction).
+model InvoiceDraft {
+  id                 String   @id @default(cuid())
+  patientId          String
+  patient            Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdByUserId    String
+  createdBy          User     @relation("UserInvoiceDrafts", fields: [createdByUserId], references: [id])
+
+  sessionIds         Json     @default("[]")  // string[]
+  lineItemOverrides  Json     @default("{}")  // Record<string, {description?, descriptionHtml?, quantity?, unitPriceNet?, lineDate?, serviceLabel?}>
+  manualLines        Json     @default("[]")  // Array<{id, description, descriptionHtml, quantity, unitPriceNet, lineDate}>
+  removedLineKeys    Json     @default("[]")  // string[]
+  customNoteHtml     String?
+
+  payerName          String?
+  payerAddress       String?
+  vatRate            Decimal? @db.Decimal(5,4)
+  paymentMethod      String?
+  markAsPaid         Boolean  @default(false)
+  generateInvoiceDoc Boolean  @default(true)
+  anonymizeInvoice   Boolean  @default(false)
+  invoiceTemplateId  String?
+  notes              String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([patientId])
 }
 
 // ─── Rechnungsdokument ────────────────────────────────────────────────────────
