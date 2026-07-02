@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getBranding } from '@/lib/branding'
 import { KooperationspartnerRechnungClient } from './KooperationspartnerRechnungClient'
 
 export default async function KooperationspartnerRechnungPage({ params }: { params: { id: string } }) {
@@ -33,6 +34,7 @@ export default async function KooperationspartnerRechnungPage({ params }: { para
   })
 
   const therapistName = session.user?.name ?? ''
+  const branding = await getBranding()
 
   return (
     <KooperationspartnerRechnungClient
@@ -40,6 +42,15 @@ export default async function KooperationspartnerRechnungPage({ params }: { para
       unbilledSessions={unbilledSessions as any}
       invoiceTemplates={invoiceTemplates}
       therapistName={therapistName}
+      branding={{
+        praxisName: branding.praxisName,
+        address: branding.address,
+        contactEmail: branding.contactEmail,
+        contactPhone: branding.contactPhone,
+        logoBase64: branding.logoBase64,
+        logoMimeType: branding.logoMimeType,
+        colorPrimary: branding.colorPrimary,
+      }}
     />
   )
 }
