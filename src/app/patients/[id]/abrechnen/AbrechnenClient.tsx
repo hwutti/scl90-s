@@ -92,6 +92,21 @@ export function AbrechnenClient({
     const next = new Set(selectedIds); next.delete(sessionId); setSelectedIds(next)
   }
 
+  // Einzelne Positionen können unabhängig von der Sitzung gelöscht werden (z.B.
+  // wenn die Sitzung selbst korrekt im System verbucht bleiben soll, aber die
+  // automatisch befüllte Position umgeschrieben oder ganz entfernt werden soll).
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set())
+  function removeLineOnly(key: string, sessionId: string) {
+    const next = new Set(removedKeys); next.add(key); setRemovedKeys(next)
+    // Wenn dadurch ALLE Positionen dieser Sitzung entfernt wären, macht es keinen
+    // Sinn, die Sitzung weiter als "ausgewählt" zu führen -- dann auch abwählen.
+    const session = allUnbilled.find(s => s.id === sessionId)
+    if (session) {
+      const stillRemaining = resolveLinesForSession(session).some(l => l.key !== key && !next.has(l.key))
+      if (!stillRemaining) removeSession(sessionId)
+    }
+  }
+
   // Manuelle Überschreibungen einzelner Positionen (Beschreibung/Menge/Preis/Datum)
   // Key: "session:<id>" für die Sitzungs-Grundposition, "service:<id>" für Zusatzleistungen
   const [lineEdits, setLineEdits] = useState<Record<string, LineEdit>>({})
@@ -136,7 +151,7 @@ export function AbrechnenClient({
     return lines
   }
 
-  const allResolvedLines = selected.flatMap(resolveLinesForSession)
+  const allResolvedLines = selected.flatMap(s => resolveLinesForSession(s).filter(l => !removedKeys.has(l.key)))
 
   // Frei hinzugefügte Positionen ohne Sitzungsbezug (z.B. Sonderleistungen) —
   // direkt per "+ Position hinzufügen" in der Tabelle editierbar, wie eine neue
@@ -224,6 +239,7 @@ export function AbrechnenClient({
               description: l.description, descriptionHtml: l.descriptionHtml,
               quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
             })),
+            removedLineKeys: [...removedKeys],
             customNoteHtml,
           }),
         })
@@ -234,7 +250,7 @@ export function AbrechnenClient({
     }, 500)
     return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, lineEdits, manualLines, customNoteHtml, form.payerName, form.payerAddress, form.vatRate, form.notes, form.invoiceTemplateId])
+  }, [selectedIds, lineEdits, manualLines, removedKeys, customNoteHtml, form.payerName, form.payerAddress, form.vatRate, form.notes, form.invoiceTemplateId])
 
   const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string; invoiceHtml?: string } | null>(null)
   const [showEmailForm, setShowEmailForm] = useState(false)
@@ -278,6 +294,7 @@ export function AbrechnenClient({
             description: l.description, descriptionHtml: l.descriptionHtml,
             quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
           })),
+          removedLineKeys: [...removedKeys],
           customNoteHtml:    customNoteHtml || undefined,
         }),
       })
@@ -573,7 +590,7 @@ export function AbrechnenClient({
                   </thead>
                   <tbody>
                     {selected.map(s => {
-                      const lines = resolveLinesForSession(s)
+                      const lines = resolveLinesForSession(s).filter(l => !removedKeys.has(l.key))
                       return lines.map(line => (
                         <tr key={line.key} style={{ borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '6px 6px 6px 4px', verticalAlign: 'top' }}>
@@ -610,12 +627,10 @@ export function AbrechnenClient({
                             {fmtEUR(line.quantity * line.unitPriceNet)}
                           </td>
                           <td style={{ verticalAlign: 'top', paddingTop: 8 }}>
-                            {line.isFirstOfSession && (
-                              <button onClick={() => removeSession(line.sessionId)} className="btn-ghost"
-                                style={{ padding: 3, color: 'var(--text-muted)' }} title="Sitzung entfernen">
-                                <X style={{ width: 12, height: 12 }} />
-                              </button>
-                            )}
+                            <button onClick={() => removeLineOnly(line.key, line.sessionId)} className="btn-ghost"
+                              style={{ padding: 3, color: 'var(--text-muted)' }} title="Diese Position entfernen">
+                              <X style={{ width: 12, height: 12 }} />
+                            </button>
                           </td>
                         </tr>
                       ))
