@@ -199,6 +199,12 @@ export const DEFAULT_INVOICE_HTML = `<!DOCTYPE html>
   </div>
   {{/if}}
 
+  {{#if custom_note_html}}
+  <div style="font-size:9.5pt;color:#333;margin-bottom:6mm;padding:6px 10px;">
+    {{custom_note_html}}
+  </div>
+  {{/if}}
+
   {{#if signature_image_base64}}
   <div style="display:flex; justify-content:flex-end; margin-top:8mm;">
     <div style="display:flex; flex-direction:column; align-items:center;">
@@ -250,6 +256,7 @@ export const INVOICE_PLACEHOLDERS = {
   '{{is_paid}}':          'true wenn bezahlt',
   '{{payment_info}}':     'Zahlungsinformationen (IBAN etc.)',
   '{{notes}}':            'Notizen zur Transaktion',
+  '{{custom_note_html}}': 'Freitext-Bereich unter den Positionen (Rich-Text HTML)',
   // Positionen
   '{{#each line_items}}': 'Schleife über Rechnungspositionen',
   '{{this.date}}':        'Datum der Position',
@@ -282,6 +289,7 @@ export type InvoiceData = {
   vat_enabled: boolean
   payment_info?: string
   notes?: string
+  custom_note_html?: string
   invoice_title?: string
   tax_number?: string
   vat_id?: string
@@ -343,7 +351,7 @@ export function renderInvoice(template: string, data: InvoiceData): string {
     'praxis_name','praxis_slogan','praxis_address','praxis_email','praxis_phone',
     'logo_base64','logo_mime','primary_color','reference_number','transaction_date',
     'due_date','payer_name','payer_address','amount_net','vat_rate','vat_amount',
-    'amount_gross','payment_info','notes',
+    'amount_gross','payment_info','notes','custom_note_html',
     'invoice_title','tax_number','vat_id','footer_text',
     'header_image_base64','header_image_mime','footer_image_base64','footer_image_mime',
     'bg_image_base64','bg_image_mime','bg_image_opacity',
@@ -429,6 +437,7 @@ interface InvoiceCoreInput {
   amountGross: number
   isPaid: boolean
   notes: string
+  customNoteHtml?: string | null
   lineItems: Array<{
     date: Date | null
     description: string
@@ -506,6 +515,7 @@ async function renderInvoiceCore(input: InvoiceCoreInput): Promise<string> {
     vat_enabled:         input.vatRate > 0,
     payment_info:        paymentInfo,
     notes:               input.notes ?? '',
+    custom_note_html:    input.customNoteHtml ?? '',
     line_items: input.lineItems.map((li) => ({
       date:             li.date ? fmtDate(li.date) : '',
       description:      li.description,
@@ -556,6 +566,7 @@ export async function renderInvoiceHtmlForTransaction(transactionId: string): Pr
     amountGross: parseFloat(tx.amountGross.toString()),
     isPaid: tx.paymentStatus === 'PAID',
     notes: tx.notes ?? '',
+    customNoteHtml: (tx as any).customNoteHtml ?? '',
     lineItems: tx.lineItems.map((li: any) => ({
       date: li.lineDate,
       description: li.description,
