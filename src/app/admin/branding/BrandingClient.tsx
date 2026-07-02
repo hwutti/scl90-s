@@ -456,12 +456,46 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
                   <label className="label" style={{ marginBottom: 10 }}>Login-Box Design</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div>
-                      <label className="label">Hintergrundfarbe / Transparenz</label>
-                      <input type="text" className="input" style={{ fontSize: 12, fontFamily: 'monospace' }}
-                        value={(form as any).loginCardBg ?? 'rgba(255,255,255,0.92)'}
-                        onChange={e => setForm(f => ({ ...f, loginCardBg: e.target.value } as any))}
-                        placeholder="rgba(255,255,255,0.92)" />
-                      <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>CSS-Farbe: rgba(R,G,B,Transparenz) oder #Hex</p>
+                      <label className="label">Box-Hintergrundfarbe & Transparenz</label>
+                      {(() => {
+                        // rgba(R,G,B,A) parsen für getrennte Farb- und Alpha-Steuerung
+                        const raw = (form as any).loginCardBg ?? 'rgba(255,255,255,0.92)'
+                        const m = raw.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/)
+                        const r = m ? parseInt(m[1]) : 255
+                        const g = m ? parseInt(m[2]) : 255
+                        const b = m ? parseInt(m[3]) : 255
+                        const a = m ? parseFloat(m[4] ?? '1') : 0.92
+                        const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('')
+                        const updateCardBg = (newHex: string, newA: number) => {
+                          const rr = parseInt(newHex.slice(1,3),16)
+                          const gg = parseInt(newHex.slice(3,5),16)
+                          const bb = parseInt(newHex.slice(5,7),16)
+                          setForm(f => ({ ...f, loginCardBg: `rgba(${rr},${gg},${bb},${newA.toFixed(2)})` } as any))
+                        }
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div>
+                              <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>Farbe</label>
+                              <input type="color" value={hex}
+                                onChange={e => updateCardBg(e.target.value, a)}
+                                style={{ width: 48, height: 36, border: '0.5px solid var(--border)', padding: 2, cursor: 'pointer', borderRadius: 8 }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>
+                                Transparenz — {Math.round((1 - a) * 100)}% durchsichtig
+                              </label>
+                              <input type="range" min={0} max={1} step={0.04}
+                                value={a}
+                                onChange={e => updateCardBg(hex, parseFloat(e.target.value))}
+                                style={{ width: '100%', accentColor: form.colorPrimary }} />
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)' }}>
+                                <span>Voll transparent</span><span>Undurchsichtig</span>
+                              </div>
+                            </div>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid var(--border)', background: raw, flexShrink: 0 }} title="Vorschau" />
+                          </div>
+                        )
+                      })()}
                     </div>
                     <div>
                       <label className="label">Glasmorphism Blur — {(form as any).loginCardBlur ?? 12}px</label>
