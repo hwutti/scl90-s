@@ -75,6 +75,7 @@ interface Branding {
 export function AbrechnenClient({
   patient, sessions: initialSessions, allUnbilled,
   invoiceTemplates, therapistName, role, branding,
+  initialDraft, existingDrafts,
 }: {
   patient: any
   sessions: any[]
@@ -83,12 +84,21 @@ export function AbrechnenClient({
   therapistName: string
   role: string
   branding: Branding
+  initialDraft?: any
+  existingDrafts?: { id: string; updatedAt: string }[]
 }) {
   const router = useRouter()
 
+  // Aktuell geladener Entwurf (falls über "Weiterbearbeiten" geöffnet oder
+  // bereits einmal während dieser Sitzung gespeichert)
+  const [draftId, setDraftId] = useState<string | null>(initialDraft?.id ?? null)
+  const [draftSaving, setDraftSaving] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
+  const [dismissedDraftBanner, setDismissedDraftBanner] = useState(false)
+
   // Ausgewählte Sessions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(initialSessions.map((s: any) => s.id))
+    new Set(initialDraft?.sessionIds?.length ? initialDraft.sessionIds : initialSessions.map((s: any) => s.id))
   )
   const selected = allUnbilled.filter(s => selectedIds.has(s.id))
 
@@ -99,7 +109,9 @@ export function AbrechnenClient({
   // Einzelne Positionen können unabhängig von der Sitzung gelöscht werden (z.B.
   // wenn die Sitzung selbst korrekt im System verbucht bleiben soll, aber die
   // automatisch befüllte Position umgeschrieben oder ganz entfernt werden soll).
-  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set())
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(
+    new Set(initialDraft?.removedLineKeys ?? [])
+  )
   function removeLineOnly(key: string, sessionId: string) {
     const next = new Set(removedKeys); next.add(key); setRemovedKeys(next)
     // Wenn dadurch ALLE Positionen dieser Sitzung entfernt wären, macht es keinen
@@ -113,13 +125,13 @@ export function AbrechnenClient({
 
   // Manuelle Überschreibungen einzelner Positionen (Beschreibung/Menge/Preis/Datum)
   // Key: "session:<id>" für die Sitzungs-Grundposition, "service:<id>" für Zusatzleistungen
-  const [lineEdits, setLineEdits] = useState<Record<string, LineEdit>>({})
+  const [lineEdits, setLineEdits] = useState<Record<string, LineEdit>>(initialDraft?.lineItemOverrides ?? {})
   function updateLineEdit(key: string, patch: LineEdit) {
     setLineEdits(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
   }
 
   // Freitext, der unter den Positionen auf der Honorarnote erscheint
-  const [customNoteHtml, setCustomNoteHtml] = useState('')
+  const [customNoteHtml, setCustomNoteHtml] = useState(initialDraft?.customNoteHtml ?? '')
 
   // Aus Session-Daten + Overrides die tatsächlichen Rechnungspositionen ableiten
   function resolveLinesForSession(s: any): ResolvedLine[] {
@@ -170,7 +182,7 @@ export function AbrechnenClient({
     unitPriceNet: number
     lineDate: string
   }
-  const [manualLines, setManualLines] = useState<ManualLine[]>([])
+  const [manualLines, setManualLines] = useState<ManualLine[]>(initialDraft?.manualLines ?? [])
   function addManualLine() {
     const today = new Date().toISOString().slice(0, 10)
     setManualLines(prev => [...prev, {
@@ -197,15 +209,15 @@ export function AbrechnenClient({
     .filter(Boolean).join(', ')
 
   const [form, setForm] = useState({
-    payerName:           payerNameDefault,
-    payerAddress:        payerAddressDefault,
-    vatRate:             parseFloat(patient.defaultVatRate ?? 0),
-    paymentMethod:       patient.defaultPaymentMethod ?? 'UNBAR_BANK_TRANSFER',
-    markAsPaid:          Boolean(patient.defaultMarkAsPaid),
-    generateInvoiceDoc:  true,
-    anonymizeInvoice:    false,
-    invoiceTemplateId:   patient.defaultInvoiceTemplateId ?? '',
-    notes:               '',
+    payerName:           initialDraft?.payerName ?? payerNameDefault,
+    payerAddress:        initialDraft?.payerAddress ?? payerAddressDefault,
+    vatRate:             initialDraft?.vatRate ?? parseFloat(patient.defaultVatRate ?? 0),
+    paymentMethod:       initialDraft?.paymentMethod ?? patient.defaultPaymentMethod ?? 'UNBAR_BANK_TRANSFER',
+    markAsPaid:          initialDraft ? Boolean(initialDraft.markAsPaid) : Boolean(patient.defaultMarkAsPaid),
+    generateInvoiceDoc:  initialDraft ? initialDraft.generateInvoiceDoc !== false : true,
+    anonymizeInvoice:    initialDraft ? Boolean(initialDraft.anonymizeInvoice) : false,
+    invoiceTemplateId:   initialDraft?.invoiceTemplateId ?? patient.defaultInvoiceTemplateId ?? '',
+    notes:               initialDraft?.notes ?? '',
   })
 
   const vatAmount  = totalNet * form.vatRate
@@ -226,28 +238,10 @@ export function AbrechnenClient({
     setPreviewLoading(true)
     previewDebounce.current = setTimeout(async () => {
       try {
-        const lineItemOverrides: Record<string, LineEdit> = {}
-        for (const l of allResolvedLines) {
-          if (lineEdits[l.key]) lineItemOverrides[l.key] = lineEdits[l.key]
-        }
         const res = await fetch(`/api/patients/${patient.id}/abrechnen/preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionIds: [...selectedIds],
-            payerName: form.payerName,
-            payerAddress: form.payerAddress,
-            vatRate: form.vatRate,
-            notes: form.notes,
-            invoiceTemplateId: form.invoiceTemplateId || null,
-            lineItemOverrides,
-            manualLines: manualLines.map(l => ({
-              description: l.description, descriptionHtml: l.descriptionHtml,
-              quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
-            })),
-            removedLineKeys: [...removedKeys],
-            customNoteHtml,
-          }),
+          body: JSON.stringify(buildPayloadBase()),
         })
         const data = await res.json()
         if (res.ok) setPreviewHtml(data.html)
@@ -268,45 +262,81 @@ export function AbrechnenClient({
 
   const backUrl = `/patients/${patient.id}?tab=sitzungen`
 
+  // Gemeinsamer Zustand für Vorschau/Erstellen/Entwurf-Speichern, damit alle drei
+  // garantiert dieselben Daten verwenden (keine Abweichungen möglich).
+  function buildPayloadBase() {
+    const lineItemOverrides: Record<string, LineEdit> = {}
+    for (const l of allResolvedLines) {
+      if (lineEdits[l.key]) lineItemOverrides[l.key] = lineEdits[l.key]
+    }
+    return {
+      sessionIds: [...selectedIds],
+      payerName: form.payerName,
+      payerAddress: form.payerAddress,
+      vatRate: form.vatRate,
+      markAsPaid: form.markAsPaid,
+      paymentMethod: form.paymentMethod,
+      generateInvoiceDoc: form.generateInvoiceDoc,
+      anonymizeInvoice: form.anonymizeInvoice,
+      invoiceTemplateId: form.invoiceTemplateId || null,
+      notes: form.notes,
+      lineItemOverrides,
+      manualLines: manualLines.map(l => ({
+        description: l.description, descriptionHtml: l.descriptionHtml,
+        quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
+      })),
+      removedLineKeys: [...removedKeys],
+      customNoteHtml: customNoteHtml || undefined,
+    }
+  }
+
+  async function saveDraft() {
+    setDraftSaving(true)
+    try {
+      if (draftId) {
+        await fetch(`/api/invoice-drafts/${draftId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayloadBase()),
+        })
+      } else {
+        const res = await fetch(`/api/patients/${patient.id}/abrechnen/draft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayloadBase()),
+        })
+        const data = await res.json()
+        if (res.ok) setDraftId(data.id)
+      }
+      setDraftSavedAt(new Date())
+    } catch { /* nicht kritisch -- Nutzer kann es erneut versuchen */ }
+    setDraftSaving(false)
+  }
+
+  async function discardDraft(id: string) {
+    await fetch(`/api/invoice-drafts/${id}`, { method: 'DELETE' }).catch(() => null)
+    setDismissedDraftBanner(true)
+  }
+
   async function submit() {
     if (!form.payerName.trim()) { setError('Rechnungsempfänger fehlt.'); return }
     if (selectedIds.size === 0)  { setError('Keine Sitzungen ausgewählt.'); return }
     setSaving(true); setError('')
     try {
-      // Overrides nur für tatsächlich betroffene (ausgewählte) Positionen mitschicken
-      const lineItemOverrides: Record<string, LineEdit> = {}
-      for (const l of allResolvedLines) {
-        if (lineEdits[l.key]) lineItemOverrides[l.key] = lineEdits[l.key]
-      }
-
       const res = await fetch('/api/transactions/from-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionIds:        [...selectedIds],
-          patientId:         patient.id,
-          payerName:         form.payerName,
-          payerAddress:      form.payerAddress,
-          payeeName:         therapistName,
-          vatRate:           form.vatRate,
-          markAsPaid:        form.markAsPaid,
-          paymentMethod:     form.paymentMethod,
-          generateInvoiceDoc:form.generateInvoiceDoc,
-          anonymizeInvoice:  form.anonymizeInvoice,
-          invoiceTemplateId: form.invoiceTemplateId || null,
-          notes:             form.notes,
-          lineItemOverrides,
-          manualLines: manualLines.map(l => ({
-            description: l.description, descriptionHtml: l.descriptionHtml,
-            quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
-          })),
-          removedLineKeys: [...removedKeys],
-          customNoteHtml:    customNoteHtml || undefined,
+          ...buildPayloadBase(),
+          patientId: patient.id,
+          payeeName: therapistName,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`)
       setDone({ referenceNumber: data.referenceNumber, transactionId: data.id ?? data.transactionId, invoiceHtml: data.invoiceHtml })
+      // Entwurf ist jetzt zur echten Rechnung geworden -- aufräumen
+      if (draftId) fetch(`/api/invoice-drafts/${draftId}`, { method: 'DELETE' }).catch(() => null)
       // E-Mail-Adresse aus Patientenprofil vorausfüllen
       if ((patient as any).email) setEmailTo((patient as any).email)
     } catch (e: any) {
@@ -453,6 +483,12 @@ export function AbrechnenClient({
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Honorarnote erstellen</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           {error && <span style={{ fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 4 }}><AlertCircle style={{ width: 13, height: 13 }} />{error}</span>}
+          {draftSavedAt && !draftSaving && (
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Entwurf gespeichert {draftSavedAt.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}</span>
+          )}
+          <button onClick={saveDraft} disabled={draftSaving || selectedIds.size === 0} className="btn-secondary" style={{ fontSize: 13 }}>
+            {draftSaving ? <><Loader style={{ width: 13, height: 13 }} /> Speichere...</> : 'Entwurf speichern'}
+          </button>
           <button onClick={submit} disabled={saving || selectedIds.size === 0} className="btn-primary" style={{ fontSize: 13, minWidth: 160 }}>
             {saving
               ? <><Loader style={{ width: 13, height: 13 }} /> Erstelle...</>
@@ -460,6 +496,27 @@ export function AbrechnenClient({
           </button>
         </div>
       </div>
+
+      {/* Hinweis auf vorhandene Entwürfe zum Weiterbearbeiten */}
+      {!draftId && !dismissedDraftBanner && existingDrafts && existingDrafts.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 20px', background: 'var(--color-primary-light)', borderBottom: '0.5px solid var(--border)', fontSize: 12.5, flexShrink: 0 }}>
+          <span style={{ color: 'var(--color-primary)' }}>
+            Du hast {existingDrafts.length === 1 ? 'einen gespeicherten Entwurf' : `${existingDrafts.length} gespeicherte Entwürfe`} für diesen Patienten.
+          </span>
+          <button onClick={() => router.push(`/patients/${patient.id}/abrechnen?draftId=${existingDrafts[0].id}`)}
+            className="btn-ghost" style={{ fontSize: 12, color: 'var(--color-primary)', textDecoration: 'underline', padding: '2px 6px' }}>
+            Neuesten weiterbearbeiten
+          </button>
+          <button onClick={() => discardDraft(existingDrafts[0].id)}
+            className="btn-ghost" style={{ fontSize: 12, color: 'var(--text-muted)', padding: '2px 6px' }}>
+            Verwerfen
+          </button>
+          <button onClick={() => setDismissedDraftBanner(true)}
+            className="btn-ghost" style={{ marginLeft: 'auto', padding: 3, color: 'var(--text-muted)' }}>
+            <X style={{ width: 13, height: 13 }} />
+          </button>
+        </div>
+      )}
 
       {/* Body: zwei Spalten */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
