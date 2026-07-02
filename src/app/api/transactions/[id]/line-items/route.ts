@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { renderInvoiceHtmlForTransaction } from '@/lib/invoice/template'
 
 // PATCH /api/transactions/[id]/line-items
 // Aktualisiert Beschreibungen (inkl. Rich-Text HTML) und den optionalen
@@ -48,6 +49,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { id: params.id },
       data: { customNoteHtml: customNoteHtml ?? null },
     })
+  }
+
+  // Gespeichertes Rechnungs-Snapshot (InvoiceDocument) neu rendern, sonst
+  // bleiben Änderungen an Beschreibungen/Freitext in Anzeige & PDF unsichtbar,
+  // da die Rechnung normalerweise nur einmalig beim Erstellen gerendert wird.
+  try {
+    const newHtml = await renderInvoiceHtmlForTransaction(params.id)
+    const existingDoc = await prisma.invoiceDocument.findFirst({
+      where: { transactionId: params.id, documentType: 'INVOICE_PDF' },
+    })
+    if (existingDoc) {
+      await prisma.invoiceDocument.update({
+        where: { id: existingDoc.id },
+        data: { data: Buffer.from(newHtml, 'utf8') },
+      })
+    } else {
+      await prisma.invoiceDocument.create({
+        data: {
+          transactionId: params.id,
+          documentType: 'INVOICE_PDF',
+          format: 'html',
+          anonymized: false,
+          data: Buffer.from(newHtml, 'utf8'),
+          mimeType: 'text/html',
+        },
+      })
+    }
+  } catch (e) {
+    console.error('[line-items] Snapshot-Neu-Rendering fehlgeschlagen:', e)
+    // nicht kritisch - Rohdaten sind bereits gespeichert, Snapshot wird beim
+    // nächsten Anzeigen/Drucken ggf. veraltet angezeigt
   }
 
   return NextResponse.json({ ok: true })
