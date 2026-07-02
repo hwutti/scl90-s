@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireStaffSession } from '@/lib/access'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   const partners = await prisma.cooperationPartner.findMany({
     where: { isActive: true },
@@ -21,8 +20,8 @@ const ALLOWED_FIELDS = new Set([
 ])
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   let body: any
   try { body = await req.json() } catch {
