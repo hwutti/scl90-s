@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireStaffSession, buildAccessibleTransactionWhere, canAccessPatient, canAccessCooperationPartner } from '@/lib/access'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const userId = (session.user as any).id
-  const role   = (session.user as any).role
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
+  const { userId, role } = auth
   const { searchParams } = new URL(req.url)
   const year = searchParams.get('year')
   const patientId = searchParams.get('patientId')
   const cooperationPartnerId = searchParams.get('cooperationPartnerId')
   const direction = searchParams.get('direction')
 
-  const where: any = role === 'ADMIN' ? {} : { createdByUserId: userId }
+  const where: any = await buildAccessibleTransactionWhere(userId, role)
   if (patientId) where.patientId = patientId
   if (cooperationPartnerId) where.cooperationPartnerId = cooperationPartnerId
   if (direction) where.direction = direction
@@ -39,10 +37,25 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
+  const { userId, role } = auth
   const body = await req.json()
-  const userId = (session.user as any).id
+
+  // Serverseitige Validierung: Therapeut:innen dürfen Transaktionen nur zu
+  // Patient:innen anlegen, auf die sie Zugriff haben (eigene/freigegebene),
+  // bzw. zu Kooperationspartnern, auf die sie zugreifen dürfen. Admins dürfen
+  // alles. Das schließt den Bypass über diese generische Route.
+  if (role !== 'ADMIN') {
+    if (body.patientId) {
+      const ok = await canAccessPatient(userId, role, body.patientId)
+      if (!ok) return NextResponse.json({ error: 'Kein Zugriff auf diese Patientin/diesen Patienten' }, { status: 403 })
+    }
+    if (body.cooperationPartnerId) {
+      const ok = await canAccessCooperationPartner(userId, role, body.cooperationPartnerId)
+      if (!ok) return NextResponse.json({ error: 'Kein Zugriff auf diesen Kooperationspartner' }, { status: 403 })
+    }
+  }
 
   const { reserveReferenceNumber } = await import('@/lib/services/transaction.service')
   const refNum = await reserveReferenceNumber({ direction: body.direction ?? 'INCOME' })
