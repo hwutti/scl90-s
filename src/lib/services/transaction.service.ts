@@ -63,6 +63,15 @@ export async function createTransactionFromSessions(params: {
   }>
   // Freitext, der unter den Positionen auf der Honorarnote erscheint
   customNoteHtml?: string
+  // Frei hinzugefügte Positionen ohne Sitzungsbezug (z.B. Sonderleistungen),
+  // direkt in der Abrechnen-Ansicht per "+ Position hinzufügen" erstellt
+  manualLines?: {
+    description?: string
+    descriptionHtml?: string
+    quantity?: number
+    unitPriceNet?: number
+    lineDate?: string | null
+  }[]
 }): Promise<{ transactionId: string; referenceNumber: string; invoiceHtml?: string }> {
 
   return await prisma.$transaction(async (tx) => {
@@ -102,7 +111,7 @@ export async function createTransactionFromSessions(params: {
     const overrides = params.lineItemOverrides ?? {}
 
     interface ResolvedLine {
-      sessionId: string
+      sessionId: string | null
       description: string
       descriptionHtml: string | null
       serviceLabel?: string | null
@@ -145,13 +154,29 @@ export async function createTransactionFromSessions(params: {
       }
     }
 
+    // Frei hinzugefügte Positionen ohne Sitzungsbezug (kein sessionId -> keine
+    // TxSessionAllocation, analog zu createPartnerTransaction)
+    const nowForManualLines = new Date()
+    for (const ml of params.manualLines ?? []) {
+      resolvedLines.push({
+        sessionId: null,
+        description: ml.description?.trim() || 'Position',
+        descriptionHtml: ml.descriptionHtml ?? null,
+        serviceLabel: null,
+        quantity: ml.quantity ?? 1,
+        unitPriceNet: ml.unitPriceNet ?? 0,
+        vatRate,
+        lineDate: ml.lineDate ? new Date(ml.lineDate) : nowForManualLines,
+      })
+    }
+
     const amountNet = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
     const vatAmount = resolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet * l.vatRate, 0)
     const amountGross = amountNet + vatAmount
 
     // 4. Referenznummer reservieren
     const referenceNumber = await reserveReferenceNumber({ direction: 'INCOME' })
-    const now = new Date()
+    const now = nowForManualLines
 
     // 5. Transaktion erstellen
     const transaction = await tx.transaction.create({
@@ -206,18 +231,20 @@ export async function createTransactionFromSessions(params: {
         },
       })
 
-      await tx.txSessionAllocation.create({
-        data: {
-          transactionId: transaction.id,
-          lineItemId: lineItem.id,
-          sessionId: line.sessionId,
-          allocationPercentage: 1.0,
-          allocatedAmountNet: lineAmountNet,
-          allocatedVatAmount: lineVatAmount,
-          allocatedAmountGross: lineAmountGross,
-          isActive: true,
-        },
-      })
+      if (line.sessionId) {
+        await tx.txSessionAllocation.create({
+          data: {
+            transactionId: transaction.id,
+            lineItemId: lineItem.id,
+            sessionId: line.sessionId,
+            allocationPercentage: 1.0,
+            allocatedAmountNet: lineAmountNet,
+            allocatedVatAmount: lineVatAmount,
+            allocatedAmountGross: lineAmountGross,
+            isActive: true,
+          },
+        })
+      }
     }
 
     // 6. Timeline
