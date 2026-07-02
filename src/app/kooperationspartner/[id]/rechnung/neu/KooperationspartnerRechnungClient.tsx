@@ -18,6 +18,15 @@ function fmtEUR(n: any) {
 function fmtDate(d: string | Date) {
   return new Intl.DateTimeFormat('de-AT', { dateStyle: 'medium' }).format(new Date(d))
 }
+// Next.js/React Server Components geben Date-Felder als echte Date-Objekte an
+// Client-Komponenten weiter (nicht als String) — daher hier immer normalisieren,
+// bevor irgendwo .slice() o.ä. auf einem Datum aufgerufen wird.
+function toDateInputValue(d: any): string | null {
+  if (!d) return null
+  if (typeof d === 'string') return d
+  if (d instanceof Date) return d.toISOString()
+  return String(d)
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   UNBAR_BANK_TRANSFER: 'Überweisung',
@@ -66,7 +75,7 @@ export function KooperationspartnerRechnungClient({
         unitPriceNet: basePrice,
         sessionId: s.id,
         patientName,
-        lineDate: s.sessionDate,
+        lineDate: toDateInputValue(s.sessionDate),
       })
     }
     for (const line of s.serviceLines) {
@@ -77,7 +86,7 @@ export function KooperationspartnerRechnungClient({
         unitPriceNet: parseFloat(line.unitPriceNet),
         sessionId: s.id,
         patientName,
-        lineDate: s.sessionDate,
+        lineDate: toDateInputValue(s.sessionDate),
       })
     }
     setLineItems(li => [...li, ...newLines])
