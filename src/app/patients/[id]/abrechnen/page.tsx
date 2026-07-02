@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PageShell } from '@/components/layout/PageShell'
+import { getBranding } from '@/lib/branding'
 import { AbrechnenClient } from './AbrechnenClient'
 
 export default async function AbrechnenPage({
@@ -73,6 +74,7 @@ export default async function AbrechnenPage({
     orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
   })
 
+  const branding = await getBranding()
   const therapistName = session.user?.name ?? ''
 
   return (
@@ -84,6 +86,15 @@ export default async function AbrechnenPage({
         invoiceTemplates={invoiceTemplates}
         therapistName={therapistName}
         role={role}
+        branding={{
+          praxisName: branding.praxisName,
+          address: branding.address,
+          contactEmail: branding.contactEmail,
+          contactPhone: branding.contactPhone,
+          logoBase64: branding.logoBase64,
+          logoMimeType: branding.logoMimeType,
+          colorPrimary: branding.colorPrimary,
+        }}
       />
     </PageShell>
   )
