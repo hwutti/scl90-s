@@ -13,7 +13,8 @@ interface MigrationPreview {
 }
 interface MigrationResult {
   patients: number; patientsSkipped: number; sessions: number; sessionsSkipped: number
-  transactions: number; diagnoses: number; supervisions: number; warnings: string[]
+  transactions: number; diagnoses: number; supervisions: number
+  protocols: number; protocolsSkipped: number; warnings: string[]
 }
 
 const STATUS_CFG = {
@@ -116,7 +117,8 @@ export function MigrationClient() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceHash: preview.sourceHash, selectedAreas: Array.from(selectedAreas),
           patients: getItems('profiles'), sessions: getItems('sessions'),
-          invoices: getItems('rechnungen_einnahmen'), bmdRows: getItems('finanzexport') }),
+          invoices: getItems('rechnungen_einnahmen'), bmdRows: getItems('finanzexport'),
+          protocols: getItems('kurzprotokoll') }),
       })
       let data: any
       try { data = await res.json() } catch { setError('Server-Fehler beim Import.'); setStep('preview'); return }
@@ -235,7 +237,7 @@ export function MigrationClient() {
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Import abgeschlossen</h2>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-              {[['Klient:innen', result.patients], ['Übersprungen', result.patientsSkipped], ['Sitzungen', result.sessions], ['Transaktionen', result.transactions], ['Diagnosen', result.diagnoses], ['Supervisionen', result.supervisions]].map(([label, val]) => (
+              {[['Klient:innen', result.patients], ['Übersprungen', result.patientsSkipped], ['Sitzungen', result.sessions], ['Transaktionen', result.transactions], ['Diagnosen', result.diagnoses], ['Supervisionen', result.supervisions], ['Kurzprotokolle', result.protocols]].map(([label, val]) => (
                 <div key={String(label)} style={{ background: 'var(--surface-2)', borderRadius: 8, padding: 12 }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-primary)' }}>{val}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>

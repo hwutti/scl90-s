@@ -67,6 +67,20 @@ export interface TpBmdRow {
   typ: 'E' | 'A'
 }
 
+/** Eine Zeile aus der dedizierten Kurzprotokoll-Export-Datei (eigene Datei,
+ *  nicht Teil des Sessions-Exports -- Spalten-Layout verifiziert anhand eines
+ *  echten befüllten Exports am 2.7.2026). */
+export interface TpProtocol {
+  sessionName: string     // z.B. "MeWe_1_09.02.2026" -- matcht TherapySession.name
+  klient: string          // Codename, nur informativ (Matching läuft über sessionName)
+  datum: string
+  thema: string
+  hypothese: string
+  intervention: string
+  ziele: string
+  supervision: string
+}
+
 export interface MigrationArea {
   id: string
   label: string
@@ -126,6 +140,42 @@ function readAllSheets(filePath: string): Record<string, any[][]> {
   const out: Record<string, any[][]> = {}
   for (const name of wb.SheetNames) {
     out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: false, blankrows: true }) as any[][]
+  }
+  return out
+}
+
+// ── Kurzprotokoll-Export parsen ────────────────────────────────────────────────
+/** Eigene Datei (z.B. "Kurzprotokolle_01_07_2026.xlsx"), ein Sheet. Zeile 2
+ *  (Index 1) trägt den Titel "Kurzprotokoll" in Spalte E, Header in Zeile 6
+ *  (Index 5): Sessionname, Klient, Dauer, Datum, Gesamtdauer, Thema der Stunde,
+ *  Verstehenshypothese, Therapeutische Intervention, Therapeutische Ziele,
+ *  Supervision. Verifiziert anhand eines echten befüllten Exports (2.7.2026).
+ *  Zeilen ohne Sessionname oder mit allen 4 Inhaltsfeldern leer werden übersprungen. */
+function parseProtocolXlsx(filePath: string): TpProtocol[] {
+  const allSheets = readAllSheets(filePath)
+  const rows = allSheets[Object.keys(allSheets)[0]] ?? []
+  const HEADER_ROW = 5
+  const out: TpProtocol[] = []
+
+  for (let i = HEADER_ROW + 1; i < rows.length; i++) {
+    const r = rows[i]
+    if (!r || !r[0]) continue
+    const sessionName = r[0]?.toString().trim()
+    if (!sessionName) continue
+
+    const thema = r[5]?.toString().trim() ?? ''
+    const hypothese = r[6]?.toString().trim() ?? ''
+    const intervention = r[7]?.toString().trim() ?? ''
+    const ziele = r[8]?.toString().trim() ?? ''
+    const supervision = r[9]?.toString().trim() ?? ''
+    if (!thema && !hypothese && !intervention && !ziele) continue // nichts zu importieren
+
+    out.push({
+      sessionName,
+      klient: r[1]?.toString().trim() ?? '',
+      datum: (r[3]?.toString().trim() ?? '').split(' ')[0],
+      thema, hypothese, intervention, ziele, supervision,
+    })
   }
   return out
 }
@@ -417,16 +467,22 @@ function parseFinanzexportStatus(exportDir: string): Map<string, TpFinanceStatus
 export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, 'sourceHash'> {
   // 1. Sessions
   const sessionsFile = fs.readdirSync(exportDir).find(f => f.startsWith('Sessions'))
-  const { sessions, extraColumnLabels, otherSheetNames } = sessionsFile
+  const { sessions, otherSheetNames } = sessionsFile
     ? parseSessionsXlsx(path.join(exportDir, sessionsFile))
     : { sessions: [] as TpSession[], extraColumnLabels: [] as string[], otherSheetNames: [] as string[] }
 
-  // 1b. Kurz-/Langprotokoll-Inhalte ehrlich prüfen statt pauschal als "nicht vorhanden"
-  //     zu behaupten: zählen, wie viele Sessions tatsächlich befüllte Zusatzspalten
-  //     haben, und ob es weitere Sheets im Sessions-Workbook gibt (z.B. ein separates
-  //     Protokoll-Tab), die bisher komplett ignoriert wurden.
+  // 1b. Kurzprotokoll: eigene, dedizierte Export-Datei (nicht Teil des Sessions-
+  //     Exports). Langprotokoll wurde laut Herbert nie geschrieben -- es gibt
+  //     keinen Datenbestand dafür, daher hier bewusst nicht danach gesucht.
+  const kurzprotokollFile = fs.readdirSync(exportDir).find(f => /^Kurzprotokoll/i.test(f))
+  const kurzprotokolle = kurzprotokollFile
+    ? parseProtocolXlsx(path.join(exportDir, kurzprotokollFile))
+    : []
+  // Fallback: falls (aus welchem Grund auch immer) keine dedizierte Datei da ist,
+  // aber der Sessions-Export doch Zusatzspalten/-Sheets hätte, ehrlich melden statt
+  // stillschweigend "nichts gefunden" zu behaupten.
   const sessionsWithExtraData = sessions.filter(s => s.extraFields.length > 0)
-  const protocolDataFound = sessionsWithExtraData.length > 0 || otherSheetNames.length > 0
+  const unverifiedExtrasFound = kurzprotokolle.length === 0 && (sessionsWithExtraData.length > 0 || otherSheetNames.length > 0)
 
   // 2. Rechnungen
   const { income: invoices, expensePdfs } = parseAllInvoices(exportDir)
@@ -479,26 +535,28 @@ export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, '
       id: 'kurzprotokoll',
       label: 'Kurzprotokolle',
       emoji: '📝',
-      status: protocolDataFound ? 'found' : 'empty',
-      count: sessionsWithExtraData.length,
-      description: protocolDataFound
-        ? `Es wurden mögliche Protokoll-Inhalte im Export gefunden: ${sessionsWithExtraData.length} Session(s) mit befüllten Zusatzspalten` +
-          (extraColumnLabels.length ? ` (Spalten: ${extraColumnLabels.join(', ')})` : '') +
-          (otherSheetNames.length ? `, zusätzliche Sheets im Workbook: ${otherSheetNames.join(', ')}` : '') +
-          '. Automatischer Import ist noch NICHT implementiert — Spalten-/Sheet-Zuordnung zu Kurz- vs. Langprotokoll muss erst anhand eines echten befüllten Exports verifiziert werden, bevor Daten geschrieben werden.'
-        : 'Keine Kurzprotokoll-Inhalte im Export gefunden (weder in Zusatzspalten der Sessions-Tabelle noch in weiteren Sheets). Hinweis: Diese Prüfung erkennt nur Spalten/Sheets — falls TheraPsy Protokolle woanders exportiert, bitte Rückmeldung geben.',
-      canImport: false,
-      items: sessionsWithExtraData,
+      status: kurzprotokolle.length > 0 ? 'found' : (unverifiedExtrasFound ? 'found' : 'empty'),
+      count: kurzprotokolle.length,
+      description: kurzprotokolle.length > 0
+        ? `${kurzprotokolle.length} Kurzprotokoll(e) gefunden (Thema der Stunde, Verstehenshypothese, ` +
+          `Therapeutische Intervention, Therapeutische Ziele, Supervision). Werden als Verlaufsnotiz ` +
+          `(§16a) an die jeweils passende Sitzung angehängt, sofern eine Sitzung mit gleichem ` +
+          `Sessionnamen bereits importiert wurde.`
+        : unverifiedExtrasFound
+          ? `Keine dedizierte Kurzprotokoll-Datei im Export gefunden, aber Zusatzspalten/-Sheets im ` +
+            `Sessions-Export entdeckt. Automatischer Import ist dafür NICHT implementiert -- die ` +
+            `dedizierte Kurzprotokoll-Datei (Dateiname beginnt mit "Kurzprotokoll") fehlt im Export.`
+          : 'Keine Kurzprotokoll-Datei im Export gefunden.',
+      canImport: kurzprotokolle.length > 0,
+      items: kurzprotokolle,
     },
     {
       id: 'langprotokoll',
       label: 'Langprotokolle',
       emoji: '📄',
-      status: protocolDataFound ? 'found' : 'empty',
-      count: sessionsWithExtraData.length,
-      description: protocolDataFound
-        ? 'Möglicherweise in denselben Zusatzspalten/Sheets wie Kurzprotokoll enthalten (siehe dort) — bisher keine verlässliche Unterscheidung zwischen Kurz- und Langprotokoll anhand des Spalten-Layouts möglich.'
-        : 'Keine Langprotokoll-Inhalte im Export gefunden (siehe Kurzprotokoll-Prüfung).',
+      status: 'empty',
+      count: 0,
+      description: 'Für diese Praxis wurden nie Langprotokolle geschrieben (bestätigt) -- es gibt keinen zu importierenden Datenbestand.',
       canImport: false,
       items: [],
     },
@@ -538,7 +596,7 @@ export function parseTherapsyExport(exportDir: string): Omit<MigrationPreview, '
       emoji: '💸',
       status: expensePdfs.length > 0 ? 'pdf_only' : 'empty',
       count: expensePdfs.length,
-      description: 'Ausgaben-Rechnungen liegen nur als PDF vor — strukturierte Daten sind nicht extrahierbar. Werden als manuelle Legacy-Buchungen importiert.',
+      description: 'Ausgaben-Rechnungen liegen nur als PDF vor — strukturierte Daten sind nicht extrahierbar. Kein automatischer Import; müssen manuell in KDS erfasst werden.',
       canImport: false,
       items: expensePdfs.map(f => ({ filename: f })),
     },

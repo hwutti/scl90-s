@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { TpPatient, TpSession, TpInvoice, TpBmdRow } from './therapsyParser'
+import type { TpPatient, TpSession, TpInvoice, TpBmdRow, TpProtocol } from './therapsyParser'
 
 export interface ExecuteOptions {
   userId: string
@@ -14,6 +14,8 @@ export interface ExecuteResult {
   transactions: number
   diagnoses: number
   supervisions: number
+  protocols: number
+  protocolsSkipped: number
   warnings: string[]
 }
 
@@ -42,17 +44,36 @@ const ICD10_LABELS: Record<string, string> = {
   'F60.3': 'Emotional instabile Persönlichkeitsstörung',
 }
 
+// ── Kurzprotokoll → kombinierter Notiz-Text ────────────────────────────────────
+// Eine Notiz pro Sitzung mit klar beschrifteten Abschnitten (statt Aufsplittung
+// in mehrere Einzelnotizen) — erhält den zusammenhängenden Charakter des
+// Original-Kurzprotokolls. Leere Abschnitte werden weggelassen. Der führende
+// Marker dient der Idempotenz (Wiedererkennung bei erneutem Migrationslauf).
+function buildProtocolContent(p: TpProtocol): string {
+  const sections: [string, string][] = [
+    ['Thema der Stunde', p.thema],
+    ['Verstehenshypothese', p.hypothese],
+    ['Therapeutische Intervention', p.intervention],
+    ['Therapeutische Ziele', p.ziele],
+    ['Supervision', p.supervision],
+  ]
+  const parts = sections.filter(([, v]) => v).map(([label, v]) => `${label}:\n${v}`)
+  return `[TheraPsy-Import: ${p.sessionName}]\n\n${parts.join('\n\n')}`
+}
+
 export async function executeMigration(
   patients: TpPatient[],
   sessions: TpSession[],
   invoices: TpInvoice[],
   bmdRows: TpBmdRow[],
+  protocols: TpProtocol[],
   opts: ExecuteOptions,
 ): Promise<ExecuteResult> {
   const result: ExecuteResult = {
     patients: 0, patientsSkipped: 0,
     sessions: 0, sessionsSkipped: 0,
     transactions: 0, diagnoses: 0, supervisions: 0,
+    protocols: 0, protocolsSkipped: 0,
     warnings: [],
   }
   const { userId, selectedAreas } = opts
@@ -186,6 +207,46 @@ export async function executeMigration(
   // Einmalig für Schritt 3+4: Name der Praxis/des Therapeuten als payeeName/payerName
   const therapistUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
   const praxisName = therapistUser?.name ?? 'Praxis'
+
+  // ── 2b. Kurzprotokolle als Verlaufsnotizen (§16a) ────────────────────────────
+  // Matching läuft bewusst über eine direkte DB-Abfrage nach Sitzungsname (nicht
+  // über die in-memory sessionIdByPatientAndName-Map von oben), da dieser Schritt
+  // auch in einem SEPARATEN, späteren Migrationslauf ausgeführt werden kann,
+  // wenn die Sitzungen bereits aus einem früheren Lauf in der DB stehen.
+  if (selectedAreas.includes('kurzprotokoll')) {
+    for (const p of protocols) {
+      const session = await prisma.therapySession.findFirst({
+        where: { therapistId: userId, name: p.sessionName },
+        select: { id: true, patientId: true, sessionDate: true },
+      })
+      if (!session) {
+        result.warnings.push(`Kurzprotokoll ${p.sessionName}: Keine passende Sitzung gefunden — übersprungen`)
+        result.protocolsSkipped++
+        continue
+      }
+
+      // Idempotenz: bei erneutem Lauf nicht doppelt anlegen (Marker-Präfix erkennen)
+      const marker = `[TheraPsy-Import: ${p.sessionName}]`
+      const existing = await prisma.sessionNote.findFirst({
+        where: { patientId: session.patientId, content: { startsWith: marker } },
+      })
+      if (existing) {
+        result.protocolsSkipped++
+        continue
+      }
+
+      await prisma.sessionNote.create({
+        data: {
+          patientId: session.patientId,
+          authorId: userId,
+          date: session.sessionDate,
+          noteType: 'PROGRESS',
+          content: buildProtocolContent(p),
+        },
+      })
+      result.protocols++
+    }
+  }
 
   // ── 3. Honorarnoten/Einnahmen als echte Transaktionen ────────────────────────
   if (selectedAreas.includes('rechnungen_einnahmen')) {

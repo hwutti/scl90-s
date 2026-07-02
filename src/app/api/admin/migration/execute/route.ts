@@ -7,7 +7,7 @@ import { executeMigration } from '@/lib/migration/therapsyExecutor'
 export const maxDuration = 120
 
 // POST /api/admin/migration/execute
-// Body: { sourceHash, selectedAreas, patients, sessions, invoices, bmdRows }
+// Body: { sourceHash, selectedAreas, patients, sessions, invoices, bmdRows, protocols }
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session || (session.user as any).role !== 'ADMIN') {
@@ -20,14 +20,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ungültiges JSON.' }, { status: 400 })
   }
 
-  const { sourceHash, selectedAreas, patients, sessions, invoices, bmdRows } = body
+  const { sourceHash, selectedAreas, patients, sessions, invoices, bmdRows, protocols } = body
   if (!sourceHash || !selectedAreas) {
     return NextResponse.json({ error: 'sourceHash und selectedAreas sind erforderlich.' }, { status: 400 })
   }
 
   try {
     const result = await executeMigration(
-      patients ?? [], sessions ?? [], invoices ?? [], bmdRows ?? [],
+      patients ?? [], sessions ?? [], invoices ?? [], bmdRows ?? [], protocols ?? [],
       { userId, selectedAreas },
     )
 
