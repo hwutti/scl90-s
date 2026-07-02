@@ -47,35 +47,57 @@ success "Commit: $COMMIT"
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
 
-# Nginx-Domain aus allen gängigen Konfig-Pfaden suchen
+# Nginx-Domain aus allen gängigen Konfig-Pfaden suchen.
+# Strategie: erst nach dem proxy_pass-Port suchen (sicherste Methode, unabhängig
+# vom Dateinamen), dann server_name aus derselben Datei lesen.
 NGINX_DOMAIN=""
-for DIR in /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d /etc/nginx; do
-  if [[ -d "$DIR" ]] || [[ -f "$DIR" ]]; then
-    FOUND=$(grep -rh "server_name" "$DIR"/ 2>/dev/null \
+
+# Alle nginx-Konfigurationsdateien auf dem System finden
+ALL_NGINX_CONFS=$(find /etc/nginx /usr/local/etc/nginx 2>/dev/null -name "*.conf" -o -name "*.cfg" | sort)
+# Auch Dateien ohne Endung in sites-*
+ALL_NGINX_CONFS="$ALL_NGINX_CONFS $(find /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null -type f | sort)"
+
+for CONF in $ALL_NGINX_CONFS; do
+  [[ -f "$CONF" ]] || continue
+  # Suche Datei die proxy_pass auf unseren App-Port enthält
+  if grep -q "proxy_pass.*:${APP_PORT}" "$CONF" 2>/dev/null; then
+    FOUND=$(grep "server_name" "$CONF" 2>/dev/null \
+      | grep -v "localhost\|127\.0\.0\.1\| _\b" \
+      | awk '{print $2}' | tr -d ';' \
+      | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
+      | head -1 || true)
+    if [[ -n "$FOUND" ]]; then
+      NGINX_DOMAIN="$FOUND"
+      break
+    fi
+  fi
+done
+
+# Fallback: server_name aus allen nginx-Dateien ohne proxy_pass-Bedingung
+if [[ -z "$NGINX_DOMAIN" ]]; then
+  for CONF in $ALL_NGINX_CONFS; do
+    [[ -f "$CONF" ]] || continue
+    FOUND=$(grep "server_name" "$CONF" 2>/dev/null \
       | grep -v "localhost\|127\.0\.0\.1\| _\b" \
       | awk '{print $2}' | tr -d ';' \
       | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
       | head -1 || true)
     [[ -n "$FOUND" ]] && NGINX_DOMAIN="$FOUND" && break
-  fi
-done
-
-# Fallback: direkt in nginx.conf suchen
-if [[ -z "$NGINX_DOMAIN" ]] && [[ -f /etc/nginx/nginx.conf ]]; then
-  FOUND=$(grep -h "server_name" /etc/nginx/nginx.conf 2>/dev/null \
-    | grep -v "localhost\|127\.0\.0\.1\| _\b" \
-    | awk '{print $2}' | tr -d ';' \
-    | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
-    | head -1 || true)
-  [[ -n "$FOUND" ]] && NGINX_DOMAIN="$FOUND"
+  done
 fi
 
-# Letzter Fallback: aus aktiver NEXTAUTH_URL oder aus Hostname ableiten
+# Fallback: Let's Encrypt Zertifikate
+if [[ -z "$NGINX_DOMAIN" ]]; then
+  LE_DOMAIN=$(ls /etc/letsencrypt/live/ 2>/dev/null | grep -v "README" | head -1 || true)
+  [[ -n "$LE_DOMAIN" ]] && NGINX_DOMAIN="$LE_DOMAIN"
+fi
+
+# Fallback: NEXTAUTH_URL bereits korrekt gesetzt (nicht localhost)
 if [[ -z "$NGINX_DOMAIN" ]]; then
   EXISTING=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
-  if [[ "$EXISTING" != *"localhost"* && -n "$EXISTING" ]]; then
-    success "NEXTAUTH_URL bereits korrekt gesetzt: $EXISTING"
+  if [[ -n "$EXISTING" && "$EXISTING" != *"localhost"* && "$EXISTING" != *"127.0.0.1"* ]]; then
     NGINX_DOMAIN="__skip__"
+    success "NEXTAUTH_URL bereits korrekt: $EXISTING"
   fi
 fi
 
@@ -120,8 +142,8 @@ else
       fi
       warn "NEXTAUTH_URL via Let's Encrypt gesetzt: $NEW_URL"
     else
-      warn "NEXTAUTH_URL = '$CURRENT_URL' — nginx-Domain nicht erkannt, kein Let's Encrypt-Zertifikat gefunden."
-      warn "Bitte einmalig setzen: echo 'NEXTAUTH_URL=https://IHRE_DOMAIN' >> $ENV_FILE"
+      warn "NEXTAUTH_URL = '$CURRENT_URL' — Domain konnte nicht automatisch erkannt werden."
+      warn "Bitte einmalig setzen: sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://IHRE_DOMAIN|' $ENV_FILE"
     fi
   else
     success "NEXTAUTH_URL unverändert: $CURRENT_URL"
