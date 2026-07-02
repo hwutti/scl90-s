@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
@@ -137,9 +137,37 @@ export function AbrechnenClient({
   }
 
   const allResolvedLines = selected.flatMap(resolveLinesForSession)
+
+  // Frei hinzugefügte Positionen ohne Sitzungsbezug (z.B. Sonderleistungen) —
+  // direkt per "+ Position hinzufügen" in der Tabelle editierbar, wie eine neue
+  // Excel-Zeile.
+  interface ManualLine {
+    id: string
+    description: string
+    descriptionHtml: string
+    quantity: number
+    unitPriceNet: number
+    lineDate: string
+  }
+  const [manualLines, setManualLines] = useState<ManualLine[]>([])
+  function addManualLine() {
+    const today = new Date().toISOString().slice(0, 10)
+    setManualLines(prev => [...prev, {
+      id: `manual-${Date.now()}-${prev.length}`,
+      description: '', descriptionHtml: '', quantity: 1, unitPriceNet: 0, lineDate: today,
+    }])
+  }
+  function updateManualLine(id: string, patch: Partial<ManualLine>) {
+    setManualLines(prev => prev.map(l => l.id === id ? { ...l, ...patch } : l))
+  }
+  function removeManualLine(id: string) {
+    setManualLines(prev => prev.filter(l => l.id !== id))
+  }
+
   // Verrechnung: Summe wird IMMER direkt aus Menge × Einzelpreis der tatsächlichen
   // Positions-Daten berechnet — nie aus Freitext o.ä. — damit sie zwingend korrekt bleibt.
   const totalNet = allResolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
+    + manualLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
 
   // Formular — vorausgefüllt aus Patientenprofil
   const payerNameDefault = patient.billRecipientName
@@ -202,6 +230,10 @@ export function AbrechnenClient({
           invoiceTemplateId: form.invoiceTemplateId || null,
           notes:             form.notes,
           lineItemOverrides,
+          manualLines: manualLines.map(l => ({
+            description: l.description, descriptionHtml: l.descriptionHtml,
+            quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
+          })),
           customNoteHtml:    customNoteHtml || undefined,
         }),
       })
@@ -243,16 +275,16 @@ export function AbrechnenClient({
 
   // Borderloses "Zellen"-Eingabefeld, das erst bei Fokus/Hover als Feld erkennbar
   // wird — für das Word/Excel-artige Gefühl direkt im Rechnungs-Papier.
-  const cellInputBase: React.CSSProperties = {
+  const cellInputBase: CSSProperties = {
     border: '1px solid transparent', borderRadius: 5, background: 'transparent',
     font: 'inherit', color: 'inherit', padding: '3px 5px', boxSizing: 'border-box',
     outline: 'none',
   }
   const cellFocusHandlers = {
-    onFocus: (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid var(--color-primary)'; e.target.style.background = '#fff' },
-    onBlur:  (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' },
-    onMouseEnter: (e: React.MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid #d8dce3' },
-    onMouseLeave: (e: React.MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid transparent' },
+    onFocus: (e: FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid var(--color-primary)'; e.target.style.background = '#fff' },
+    onBlur:  (e: FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' },
+    onMouseEnter: (e: MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid #d8dce3' },
+    onMouseLeave: (e: MouseEvent<HTMLInputElement>) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.border = '1px solid transparent' },
   }
 
   // ── Erfolgsseite ──────────────────────────────────────────────────────────────
@@ -544,8 +576,54 @@ export function AbrechnenClient({
                         </tr>
                       ))
                     })}
+                    {manualLines.map(line => (
+                      <tr key={line.id} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '6px 6px 6px 4px', verticalAlign: 'top' }}>
+                          <input type="date"
+                            value={line.lineDate}
+                            onChange={e => updateManualLine(line.id, { lineDate: e.target.value })}
+                            style={{ ...cellInputBase, width: '100%' }} {...cellFocusHandlers} />
+                          <div style={{ fontSize: 9.5, color: '#aaa', marginTop: 2, paddingLeft: 5 }}>Manuelle Position</div>
+                        </td>
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                          <RichTextEditor
+                            value={line.descriptionHtml || line.description}
+                            onChange={html => updateManualLine(line.id, { descriptionHtml: html })}
+                            placeholder="Beschreibung…"
+                            minHeight={22}
+                            compact
+                          />
+                        </td>
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                          <input type="number" step="0.5"
+                            value={line.quantity}
+                            onChange={e => updateManualLine(line.id, { quantity: parseFloat(e.target.value) || 0 })}
+                            style={{ ...cellInputBase, width: '100%', textAlign: 'center' }} {...cellFocusHandlers} />
+                        </td>
+                        <td style={{ padding: '6px', verticalAlign: 'top' }}>
+                          <input type="number" step="0.01"
+                            value={line.unitPriceNet}
+                            onChange={e => updateManualLine(line.id, { unitPriceNet: parseFloat(e.target.value) || 0 })}
+                            style={{ ...cellInputBase, width: '100%', textAlign: 'right' }} {...cellFocusHandlers} />
+                        </td>
+                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, verticalAlign: 'top', paddingTop: 12 }}>
+                          {fmtEUR(line.quantity * line.unitPriceNet)}
+                        </td>
+                        <td style={{ verticalAlign: 'top', paddingTop: 8 }}>
+                          <button onClick={() => removeManualLine(line.id)} className="btn-ghost"
+                            style={{ padding: 3, color: 'var(--text-muted)' }} title="Position entfernen">
+                            <X style={{ width: 12, height: 12 }} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+
+                <button onClick={addManualLine} className="btn-ghost"
+                  style={{ fontSize: 12, marginTop: 8, padding: '5px 8px', color: 'var(--color-primary)' }}>
+                  + Position hinzufügen
+                </button>
 
                 {/* Summenblock */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
@@ -658,7 +736,7 @@ export function AbrechnenClient({
             <div style={{ padding: '12px 14px', background: 'var(--color-primary-light)', borderRadius: 10, fontSize: 13, lineHeight: 1.8 }}>
               <div style={{ fontWeight: 600, color: 'var(--color-primary)', marginBottom: 4 }}>Zusammenfassung</div>
               <div style={{ color: 'var(--text-primary)' }}>
-                <div>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {allResolvedLines.length} Position{allResolvedLines.length !== 1 ? 'en' : ''} · {fmtEUR(totalGross)}</div>
+                <div>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {allResolvedLines.length + manualLines.length} Position{(allResolvedLines.length + manualLines.length) !== 1 ? 'en' : ''} · {fmtEUR(totalGross)}</div>
                 <div>{form.generateInvoiceDoc ? '✓ Mit Honorarnote' : '– Ohne Honorarnote'}</div>
                 <div>{form.markAsPaid ? `✓ Sofort bezahlt (${PAYMENT_LABELS[form.paymentMethod]})` : '⏳ Zahlung ausstehend'}</div>
                 <div>Empfänger: {form.payerName || <span style={{ color: 'var(--red)' }}>fehlt!</span>}</div>
