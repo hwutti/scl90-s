@@ -60,7 +60,22 @@ if [[ -f "$APP_DIR/.env" ]]; then
 fi
 
 if [[ -z "$DOMAIN" ]]; then
-  read -rp "Domain (z.B. kds.meinserver.at) oder leer für IP-only: " DOMAIN </dev/tty
+  # Bestehende NEXTAUTH_URL als Vorschlag verwenden wenn bereits korrekt gesetzt
+  EXISTING_URL=$(grep "^NEXTAUTH_URL=" "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
+  if [[ -n "$EXISTING_URL" && "$EXISTING_URL" != *"localhost"* ]]; then
+    info "Bestehende URL gefunden: $EXISTING_URL"
+    read -rp "App-URL (Enter für bestehenden Wert übernehmen): " INPUT_URL </dev/tty
+    DOMAIN="${INPUT_URL:-$EXISTING_URL}"
+  else
+    echo ""
+    echo "  Die App-URL wird für Login-Weiterleitungen benötigt."
+    echo "  Beispiele: https://kds.meinserver.at  |  http://192.168.1.100:3000"
+    read -rp "  App-URL eingeben: " DOMAIN </dev/tty
+    while [[ -z "$DOMAIN" || "$DOMAIN" != http* ]]; do
+      warn "Bitte eine gültige URL eingeben (muss mit http:// oder https:// beginnen)"
+      read -rp "  App-URL eingeben: " DOMAIN </dev/tty
+    done
+  fi
 fi
 
 if [[ -z "$DB_PASS" ]]; then
@@ -155,8 +170,14 @@ chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 # =============================================================================
 step ".env Datei erstellen"
 
-APP_URL="${DOMAIN:+https://$DOMAIN}"
-APP_URL="${APP_URL:-http://localhost:$APP_PORT}"
+# DOMAIN enthält jetzt die vollständige URL (https://... oder http://...)
+# oder nur den Hostnamen — beides abfangen
+if [[ "$DOMAIN" == http* ]]; then
+  APP_URL="${DOMAIN%/}"  # trailing slash entfernen
+else
+  # Nur Hostname/IP eingegeben → https:// voranstellen
+  APP_URL="https://$DOMAIN"
+fi
 
 cat > "$APP_DIR/.env" << ENV_EOF
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
