@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireStaffSession } from '@/lib/access'
 
 const ALLOWED_FIELDS = new Set([
   'name', 'address', 'postalCode', 'city', 'contactPerson', 'email', 'phone', 'uidNumber',
@@ -9,8 +8,8 @@ const ALLOWED_FIELDS = new Set([
 ])
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   const partner = await prisma.cooperationPartner.findUnique({
     where: { id: params.id },
@@ -21,8 +20,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
 
   let body: any
   try { body = await req.json() } catch {
@@ -46,8 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 // Weiches Löschen (wie bei InvoiceTemplate) -- Patienten/Transaktionen des Partners bleiben erhalten
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireStaffSession()
+  if ('error' in auth) return auth.error
   await prisma.cooperationPartner.update({ where: { id: params.id }, data: { isActive: false } })
   return NextResponse.json({ ok: true })
 }
