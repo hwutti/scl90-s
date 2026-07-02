@@ -1,5 +1,5 @@
 'use client'
-import { useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
+import { useState, useEffect, useRef, type CSSProperties, type FocusEvent, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
@@ -192,6 +192,50 @@ export function AbrechnenClient({
 
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
+
+  // Separate Vorschau des tatsächlich fertigen Dokuments (inkl. Fußzeile, Signatur,
+  // SEPA-QR-Code, Vorlage etc. — Dinge, die der Direkt-Editor bewusst nicht zeigt)
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const previewDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (previewDebounce.current) clearTimeout(previewDebounce.current)
+    if (selectedIds.size === 0) { setPreviewHtml(''); return }
+    setPreviewLoading(true)
+    previewDebounce.current = setTimeout(async () => {
+      try {
+        const lineItemOverrides: Record<string, LineEdit> = {}
+        for (const l of allResolvedLines) {
+          if (lineEdits[l.key]) lineItemOverrides[l.key] = lineEdits[l.key]
+        }
+        const res = await fetch(`/api/patients/${patient.id}/abrechnen/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionIds: [...selectedIds],
+            payerName: form.payerName,
+            payerAddress: form.payerAddress,
+            vatRate: form.vatRate,
+            notes: form.notes,
+            invoiceTemplateId: form.invoiceTemplateId || null,
+            lineItemOverrides,
+            manualLines: manualLines.map(l => ({
+              description: l.description, descriptionHtml: l.descriptionHtml,
+              quantity: l.quantity, unitPriceNet: l.unitPriceNet, lineDate: l.lineDate || null,
+            })),
+            customNoteHtml,
+          }),
+        })
+        const data = await res.json()
+        if (res.ok) setPreviewHtml(data.html)
+      } catch { /* Vorschau ist optional -- Fehler hier nicht blockierend anzeigen */ }
+      setPreviewLoading(false)
+    }, 500)
+    return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, lineEdits, manualLines, customNoteHtml, form.payerName, form.payerAddress, form.vatRate, form.notes, form.invoiceTemplateId])
+
   const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string; invoiceHtml?: string } | null>(null)
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [emailTo, setEmailTo]   = useState('')
@@ -654,6 +698,27 @@ export function AbrechnenClient({
                     minHeight={60}
                   />
                 </div>
+              </div>
+
+              {/* Separate Vorschau: das tatsächlich fertige Dokument (Fußzeile,
+                  Signatur, SEPA-QR-Code, gewählte Vorlage etc. — Dinge, die der
+                  Direkt-Editor oben bewusst vereinfacht/weglässt) */}
+              <div style={{ marginTop: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Vorschau (fertiges Dokument)</h2>
+                  {previewLoading && <Loader style={{ width: 12, height: 12, color: 'var(--text-muted)' }} />}
+                </div>
+                {previewHtml ? (
+                  <iframe
+                    srcDoc={previewHtml}
+                    title="Vorschau"
+                    style={{ width: '100%', height: 520, border: '0.5px solid var(--border)', borderRadius: 10, background: '#fff' }}
+                  />
+                ) : (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
+                    Vorschau wird geladen…
+                  </div>
+                )}
               </div>
             </div>
           )}
