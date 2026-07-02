@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getBranding } from '@/lib/branding'
 import { KooperationspartnerDetailClient } from './KooperationspartnerDetailClient'
 import { PatientsListClient } from '@/app/patients/PatientsListClient'
 
@@ -35,9 +36,24 @@ export default async function KooperationspartnerDetailPage({ params }: { params
     orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
   })
 
+  const branding = await getBranding()
+
   return (
     <div className="flex-1 flex flex-col">
-      <KooperationspartnerDetailClient partner={partner as any} invoiceTemplates={invoiceTemplates} role={role} />
+      <KooperationspartnerDetailClient
+        partner={partner as any}
+        invoiceTemplates={invoiceTemplates}
+        role={role}
+        branding={{
+          praxisName: branding.praxisName,
+          address: branding.address,
+          contactEmail: branding.contactEmail,
+          contactPhone: branding.contactPhone,
+          logoBase64: branding.logoBase64,
+          logoMimeType: branding.logoMimeType,
+          colorPrimary: branding.colorPrimary,
+        }}
+      />
       <PatientsListClient
         patients={patients as any}
         instruments={instruments}
