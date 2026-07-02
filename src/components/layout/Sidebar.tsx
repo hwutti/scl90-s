@@ -249,7 +249,7 @@ export function Sidebar({ branding }: { branding: BrandingConfig }) {
           </div>
         </div>
 
-        <button onClick={() => signOut({ callbackUrl: '/login' })} className="nav-link w-full"
+        <button onClick={() => signOut({ callbackUrl: window.location.origin + '/login' })} className="nav-link w-full"
           style={{ color: 'var(--sb-text)', opacity: 0.7, width: '100%', background: 'none', border: 'none', cursor: 'pointer' }}
           onMouseEnter={e => { (e.currentTarget as any).style.color = 'var(--red)'; (e.currentTarget as any).style.background = 'var(--red-bg)' }}
           onMouseLeave={e => { (e.currentTarget as any).style.color = 'var(--text-muted)'; (e.currentTarget as any).style.background = '' }}>

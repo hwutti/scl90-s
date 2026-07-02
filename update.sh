@@ -47,100 +47,22 @@ success "Commit: $COMMIT"
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
 
-# Nginx-Domain: alle nginx-Configs systemweit durchsuchen (Dateien MIT und OHNE
-# .conf-Endung, da install.sh die Datei ohne Endung anlegt z.B. "scl90s").
-NGINX_DOMAIN=""
-ALL_NGINX_CONFS=$(find /etc/nginx /usr/local/etc/nginx 2>/dev/null \
-  \( -type f -o -type l \) | sort)
+# Die App läuft hinter einem Reverse-Proxy (nginx Proxy Manager o.ä.) auf Port 80/443.
+# NEXTAUTH_URL muss auf die interne App-Adresse zeigen — nicht auf die externe Domain.
+# signOut/signIn-Callbacks im Client nutzen window.location.origin, daher funktioniert
+# http://localhost:APP_PORT korrekt unabhängig von der externen Domain/URL.
+EXPECTED_URL="http://localhost:${APP_PORT}"
+CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
 
-for CONF in $ALL_NGINX_CONFS; do
-  [[ -f "$CONF" ]] || continue
-  # Suche Datei die proxy_pass auf unseren App-Port enthält
-  # (sowohl 127.0.0.1 als auch localhost als Varianten)
-  if grep -qE "proxy_pass\s+http://(127\.0\.0\.1|localhost):${APP_PORT}" "$CONF" 2>/dev/null; then
-    FOUND=$(grep "server_name" "$CONF" 2>/dev/null \
-      | grep -v "localhost\|127\.0\.0\.1\| _\b" \
-      | awk '{print $2}' | tr -d ';' \
-      | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
-      | head -1 || true)
-    if [[ -n "$FOUND" ]]; then
-      NGINX_DOMAIN="$FOUND"
-      echo "  → Konfiguration gefunden: $CONF"
-      break
-    fi
-  fi
-done
-
-# Fallback: Let's Encrypt Zertifikate
-if [[ -z "$NGINX_DOMAIN" ]]; then
-  LE_DOMAIN=$(ls /etc/letsencrypt/live/ 2>/dev/null | grep -v "README" | head -1 || true)
-  [[ -n "$LE_DOMAIN" ]] && NGINX_DOMAIN="$LE_DOMAIN"
-fi
-
-# Fallback: NEXTAUTH_URL bereits korrekt gesetzt (nicht localhost)
-if [[ -z "$NGINX_DOMAIN" ]]; then
-  EXISTING=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
-  if [[ -n "$EXISTING" && "$EXISTING" != *"localhost"* && "$EXISTING" != *"127.0.0.1"* ]]; then
-    NGINX_DOMAIN="__skip__"
-    success "NEXTAUTH_URL bereits korrekt: $EXISTING"
-  fi
-fi
-
-echo "  → nginx-Domain erkannt: '${NGINX_DOMAIN:-KEINE}'"
-
-if [[ "$NGINX_DOMAIN" == "__skip__" ]]; then
-  : # Bereits oben als korrekt gemeldet
-elif [[ -n "$NGINX_DOMAIN" ]]; then
-  if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
-    NEW_URL="https://$NGINX_DOMAIN"
-  elif grep -qE "listen.*443|ssl_certificate" "$CONF" 2>/dev/null; then
-    NEW_URL="https://$NGINX_DOMAIN"
+if [[ "$CURRENT_URL" != "$EXPECTED_URL" ]]; then
+  if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$EXPECTED_URL|" "$ENV_FILE"
   else
-    NEW_URL="http://$NGINX_DOMAIN"
+    echo "NEXTAUTH_URL=$EXPECTED_URL" >> "$ENV_FILE"
   fi
-  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
-  if [[ "$CURRENT_URL" != "$NEW_URL" ]]; then
-    # Zeile vorhanden: ersetzen; nicht vorhanden: anhängen
-    if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
-      sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
-    else
-      echo "NEXTAUTH_URL=$NEW_URL" >> "$ENV_FILE"
-    fi
-    warn "NEXTAUTH_URL aktualisiert: '${CURRENT_URL:-nicht vorhanden}' → $NEW_URL"
-  else
-    success "NEXTAUTH_URL korrekt: $CURRENT_URL"
-  fi
+  warn "NEXTAUTH_URL gesetzt auf: $EXPECTED_URL (war: '${CURRENT_URL:-nicht gesetzt}')"
 else
-  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
-  if [[ "$CURRENT_URL" == *"localhost"* || "$CURRENT_URL" == *"127.0.0.1"* || -z "$CURRENT_URL" ]]; then
-    # nginx hat server_name _ (Wildcard) — Domain steht nicht in der nginx-Konfig.
-    # Typisch wenn SSL vor diesem Server terminiert wird (z.B. Proxmox/Firewall).
-    # Einmal interaktiv fragen und dauerhaft in .env speichern.
-    echo ""
-    warn "NEXTAUTH_URL zeigt auf localhost — App-Login wird fehlschlagen!"
-    warn "Die Domain kann nicht automatisch erkannt werden (nginx nutzt server_name _)."
-    echo ""
-    if [[ -t 0 ]]; then
-      read -rp "  → App-URL eingeben (z.B. https://kds.meinserver.at): " INPUT_URL </dev/tty
-      INPUT_URL="${INPUT_URL%/}"
-      if [[ -n "$INPUT_URL" && "$INPUT_URL" == http* ]]; then
-        if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
-          sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$INPUT_URL|" "$ENV_FILE"
-        else
-          echo "NEXTAUTH_URL=$INPUT_URL" >> "$ENV_FILE"
-        fi
-        success "NEXTAUTH_URL gesetzt: $INPUT_URL (wird bei künftigen Updates beibehalten)"
-      else
-        warn "Ungültige Eingabe — bitte beim nächsten Update erneut eingeben."
-      fi
-    else
-      warn "Nicht-interaktiver Modus. Bitte einmalig manuell setzen:"
-      warn "  sudo sed -i 's|^NEXTAUTH_URL=.*|NEXTAUTH_URL=https://IHRE_DOMAIN|' $ENV_FILE"
-      warn "  Danach: sudo bash $APP_DIR/update.sh"
-    fi
-  else
-    success "NEXTAUTH_URL korrekt: $CURRENT_URL"
-  fi
+  success "NEXTAUTH_URL korrekt: $CURRENT_URL"
 fi
 
 # ─── 3. Dependencies ──────────────────────────────────────────────────────────
