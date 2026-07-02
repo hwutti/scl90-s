@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     totalSessions, sessionsThisMonth,
     totalTransactions, unpaidAmount, unbilledCount,
     upcomingAppointments, todayAppointments,
-    recentSessions, activityData,
+    recentSessions,
     notesCount,
   ] = await Promise.all([
     prisma.patient.count({ where: pWhere }),
@@ -42,16 +42,6 @@ export async function GET(req: NextRequest) {
       where, orderBy: [{ sessionDate: 'desc' }, { sessionNumber: 'desc' }], take: 8,
       include: { patient: { select: { firstName: true, lastName: true, codeName: true } } },
     }),
-    // Activity last 14 days
-    prisma.$queryRaw`
-      SELECT
-        DATE_TRUNC('day', "sessionDate") as day,
-        COUNT(*) as sessions
-      FROM "TherapySession"
-      WHERE "sessionDate" >= NOW() - INTERVAL '14 days'
-      ${role !== 'ADMIN' ? prisma.$queryRaw`AND "therapistId" = ${userId}` : prisma.$queryRaw``}
-      GROUP BY day ORDER BY day ASC
-    `.catch(() => []),
     prisma.sessionNote.count({ where: { patient: pWhere } }),
   ])
 
@@ -90,15 +80,24 @@ export async function GET(req: NextRequest) {
   }
   for (const row of activityRaw) {
     const k = new Date(row.sessionDate).toISOString().slice(0,10)
-    if (days[k]) days[k].sitzungen = row._count.id
+    // Bei sessionDate landet praktisch immer nur eine Gruppe pro Tag (Datum wird
+    // ohne Uhrzeit gespeichert), Summierung schadet hier aber ebenfalls nicht.
+    if (days[k]) days[k].sitzungen += row._count.id
   }
   for (const row of txActivity) {
     const k = new Date(row.transactionDate).toISOString().slice(0,10)
-    if (days[k]) days[k].transaktionen = row._count.id
+    // WICHTIG: += statt = -- transactionDate enthält eine exakte Uhrzeit, daher
+    // erzeugt jede Rechnung mit abweichender Uhrzeit am selben Tag eine eigene
+    // groupBy-Gruppe. Mit einer reinen Zuweisung hätte jede weitere Gruppe des
+    // Tages die vorherige überschrieben statt addiert -> massive Unterzählung
+    // an Tagen mit mehreren Rechnungen.
+    if (days[k]) days[k].transaktionen += row._count.id
   }
   for (const row of apptActivity) {
     const k = new Date(row.startAt).toISOString().slice(0,10)
-    if (days[k]) days[k].termine = row._count.id
+    // Gleicher Grund wie oben: startAt hat eine exakte Uhrzeit, mehrere Termine
+    // am selben Tag zu unterschiedlichen Uhrzeiten erzeugen mehrere Gruppen.
+    if (days[k]) days[k].termine += row._count.id
   }
 
   const activity = Object.entries(days).map(([date, counts]) => ({
