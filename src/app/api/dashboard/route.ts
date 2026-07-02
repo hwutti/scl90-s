@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { buildAccessibleTransactionWhere } from '@/lib/access'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -10,6 +11,7 @@ export async function GET(req: NextRequest) {
   const role   = (session.user as any).role
   const where  = role === 'ADMIN' ? {} : { therapistId: userId }
   const pWhere = role === 'ADMIN' ? {} : { therapists: { some: { therapistId: userId } } }
+  const txWhere = await buildAccessibleTransactionWhere(userId, role)
 
   const now   = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -28,9 +30,9 @@ export async function GET(req: NextRequest) {
     prisma.patient.count({ where: { ...pWhere, active: true } }),
     prisma.therapySession.count({ where }),
     prisma.therapySession.count({ where: { ...where, sessionDate: { gte: month } } }),
-    prisma.transaction.count({ where: { ...( role !== 'ADMIN' ? { createdByUserId: userId } : {} ), lifecycleStatus: 'ACTIVE' } }),
+    prisma.transaction.count({ where: { ...txWhere, lifecycleStatus: 'ACTIVE' } }),
     prisma.transaction.aggregate({
-      where: { ...( role !== 'ADMIN' ? { createdByUserId: userId } : {} ), paymentStatus: 'UNPAID', lifecycleStatus: 'ACTIVE', direction: 'INCOME' },
+      where: { ...txWhere, paymentStatus: 'UNPAID', lifecycleStatus: 'ACTIVE', direction: 'INCOME' },
       _sum: { amountGross: true },
     }),
     prisma.therapySession.count({ where: { ...where, billingStatus: 'UNBILLED' } }),
@@ -64,7 +66,7 @@ export async function GET(req: NextRequest) {
   const txActivity = await prisma.transaction.groupBy({
     by: ['transactionDate'],
     where: {
-      ...(role !== 'ADMIN' ? { createdByUserId: userId } : {}),
+      ...txWhere,
       transactionDate: { gte: new Date(Date.now() - 14*24*3600000) },
       lifecycleStatus: 'ACTIVE',
     },
