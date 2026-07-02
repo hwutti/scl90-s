@@ -48,6 +48,15 @@ export async function PATCH(req: NextRequest) {
     vatId:             body.vatId             ?? '',
     address:           body.address           ?? '',
     bundesland:        body.bundesland        ?? 'Kärnten',
+    // Login-Design
+    loginBgImageBase64: body.loginBgImageBase64 ?? null,
+    loginBgImageMime:   body.loginBgImageMime   ?? null,
+    loginBgColor:       body.loginBgColor       ?? null,
+    loginBoxPosition:   body.loginBoxPosition   ?? 'center',
+    loginBgOverlay:     body.loginBgOverlay     ?? 0,
+    // App-Typografie
+    appFontFamily:      body.appFontFamily      ?? 'system',
+    appFontSize:        body.appFontSize        ?? 14,
     updatedBy:         userId,
   }
 

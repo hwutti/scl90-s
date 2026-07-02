@@ -585,6 +585,13 @@ model PraxisConfig {
   contactPhone    String?
   address         String?
 
+  // Login-Seite Design
+  loginBgImageBase64  String?   // Hintergrundbild der Login-Seite (Base64)
+  loginBgImageMime    String?   // MIME-Type des Hintergrundbilds
+  loginBgColor        String?   // Fallback-Hintergrundfarbe wenn kein Bild (Hex)
+  loginBoxPosition    String    @default("center")  // "top-left"|"top-center"|"top-right"|"middle-left"|"center"|"middle-right"|"bottom-left"|"bottom-center"|"bottom-right"
+  loginBgOverlay      Float     @default(0.0)        // Overlay-Opacity 0-0.7 (abdunkeln/aufhellen)
+
   // Bankverbindung (für Rechnungen, Honorarnoten)
   iban            String?
   bic             String?
@@ -613,6 +620,10 @@ model PraxisConfig {
   // festgelegt. { groups: { MALE: {seed}, FEMALE: {seed}, DIVERSE: {seed},
   // PAIR: {seed}, FAMILY: {seed}, GROUP: {seed} }, backgroundColor }
   avatarSettings  String?
+
+  // App-Typografie (global, wirkt auf die gesamte App inkl. Login)
+  appFontFamily   String   @default("system")   // "system"|"inter"|"georgia"|"palatino"|"optima"|"gill-sans"
+  appFontSize     Int      @default(14)          // Basis-Schriftgröße in px (13–18)
 
   updatedAt       DateTime @updatedAt
   updatedBy       String?

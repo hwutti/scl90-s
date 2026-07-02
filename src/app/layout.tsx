@@ -40,9 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </main>
             </div>
           ) : (
-            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-page)' }}>
-              {children}
-            </div>
+            <>{children}</>
           )}
         </Providers>
       </body>

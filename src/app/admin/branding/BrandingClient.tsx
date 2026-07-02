@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Upload, X, Palette, Building2, FileText, Eye } from 'lucide-react'
+import { Save, Upload, X, Palette, Building2, FileText, Eye, Monitor, Type } from 'lucide-react'
 import type { BrandingConfig } from '@/lib/branding'
 
 const PRESET_COLORS = [
@@ -28,7 +28,18 @@ const DEFAULT_VALUES = {
 export function BrandingClient({ initial }: { initial: BrandingConfig }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [form, setForm] = useState({ ...initial, bundesland: initial.bundesland ?? 'Kärnten' })
+  const loginBgRef = useRef<HTMLInputElement>(null)
+  const [form, setForm] = useState({
+    ...initial,
+    bundesland: initial.bundesland ?? 'Kärnten',
+    loginBgImageBase64: (initial as any).loginBgImageBase64 ?? null,
+    loginBgImageMime:   (initial as any).loginBgImageMime   ?? null,
+    loginBgColor:       (initial as any).loginBgColor       ?? null,
+    loginBoxPosition:   (initial as any).loginBoxPosition   ?? 'center',
+    loginBgOverlay:     (initial as any).loginBgOverlay     ?? 0,
+    appFontFamily:      (initial as any).appFontFamily      ?? 'system',
+    appFontSize:        (initial as any).appFontSize        ?? 14,
+  })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
   const [preview, setPreview] = useState(false)
@@ -57,16 +68,27 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Datei zu groß. Bitte max. 5 MB.')
-      return
-    }
+    if (file.size > 5 * 1024 * 1024) { alert('Datei zu groß. Bitte max. 5 MB.'); return }
     const reader = new FileReader()
     reader.onload = ev => {
       const result = ev.target?.result as string
       const [header, base64] = result.split(',')
       const mimeType = header.match(/data:(.+);/)?.[1] ?? 'image/png'
       setForm(f => ({ ...f, logoBase64: base64, logoMimeType: mimeType }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleLoginBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) { alert('Datei zu groß. Bitte max. 8 MB.'); return }
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const result = ev.target?.result as string
+      const [header, base64] = result.split(',')
+      const mimeType = header.match(/data:(.+);/)?.[1] ?? 'image/jpeg'
+      setForm(f => ({ ...f, loginBgImageBase64: base64, loginBgImageMime: mimeType } as any))
     }
     reader.readAsDataURL(file)
   }
@@ -315,6 +337,139 @@ export function BrandingClient({ initial }: { initial: BrandingConfig }) {
               placeholder="<p>Betreiber: Dr. Max Mustermann ...</p>"
             />
             <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Wird auf der Seite /impressum angezeigt</p>
+          </div>
+
+          {/* Login-Seite Design */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Monitor className="w-4 h-4" style={{ color: form.colorPrimary }} />
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Login-Seite Design</h2>
+            </div>
+            <div className="space-y-4">
+
+              {/* Hintergrundbild Upload */}
+              <div>
+                <label className="label">Hintergrundbild</label>
+                <div className="flex items-start gap-3">
+                  <div style={{ width: 120, height: 70, borderRadius: 8, border: '0.5px solid var(--border)', overflow: 'hidden', background: (form as any).loginBgColor ?? 'var(--surface-page)', flexShrink: 0, position: 'relative' }}>
+                    {(form as any).loginBgImageBase64 && (
+                      <img src={`data:${(form as any).loginBgImageMime};base64,${(form as any).loginBgImageBase64}`}
+                        alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
+                    {!(form as any).loginBgImageBase64 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 10, color: 'var(--text-muted)' }}>Kein Bild</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                    <input ref={loginBgRef} type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={handleLoginBgUpload} />
+                    <button onClick={() => loginBgRef.current?.click()} className="btn-secondary" style={{ fontSize: 12 }}>
+                      <Upload className="w-3 h-3" /> Bild hochladen
+                    </button>
+                    {(form as any).loginBgImageBase64 && (
+                      <button onClick={() => setForm(f => ({ ...f, loginBgImageBase64: null, loginBgImageMime: null } as any))} className="btn-ghost" style={{ fontSize: 12 }}>
+                        <X className="w-3 h-3" /> Entfernen
+                      </button>
+                    )}
+                    <div>
+                      <label className="label" style={{ marginBottom: 2 }}>Fallback-Hintergrundfarbe</label>
+                      <input type="color" value={(form as any).loginBgColor ?? '#f0f2f7'}
+                        onChange={e => setForm(f => ({ ...f, loginBgColor: e.target.value } as any))}
+                        style={{ width: 40, height: 28, border: 'none', padding: 2, cursor: 'pointer', borderRadius: 6 }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overlay */}
+              {(form as any).loginBgImageBase64 && (
+                <div>
+                  <label className="label">Bild abdunkeln (Overlay) — {Math.round(((form as any).loginBgOverlay ?? 0) * 100)}%</label>
+                  <input type="range" min={0} max={0.7} step={0.05}
+                    value={(form as any).loginBgOverlay ?? 0}
+                    onChange={e => setForm(f => ({ ...f, loginBgOverlay: parseFloat(e.target.value) } as any))}
+                    style={{ width: '100%', accentColor: form.colorPrimary }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                    <span>Kein Overlay</span><span>Stark abgedunkelt</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Login-Box-Position */}
+              <div>
+                <label className="label">Position des Login-Felds</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, maxWidth: 180 }}>
+                  {([
+                    ['top-left','↖'],['top-center','↑'],['top-right','↗'],
+                    ['middle-left','←'],['center','·'],['middle-right','→'],
+                    ['bottom-left','↙'],['bottom-center','↓'],['bottom-right','↘'],
+                  ] as [string,string][]).map(([pos, icon]) => (
+                    <button key={pos} onClick={() => setForm(f => ({ ...f, loginBoxPosition: pos } as any))}
+                      style={{
+                        padding: '8px 4px', borderRadius: 8, fontSize: 16, cursor: 'pointer',
+                        border: '1.5px solid',
+                        borderColor: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--border)',
+                        background: (form as any).loginBoxPosition === pos ? form.colorPrimaryLight : 'var(--surface-page)',
+                        color: (form as any).loginBoxPosition === pos ? form.colorPrimary : 'var(--text-muted)',
+                      }}>
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* App-Typografie */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Type className="w-4 h-4" style={{ color: form.colorPrimary }} />
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>App-Typografie</h2>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Schriftgröße — {(form as any).appFontSize ?? 14}px</label>
+                <input type="range" min={13} max={18} step={1}
+                  value={(form as any).appFontSize ?? 14}
+                  onChange={e => {
+                    const sz = parseInt(e.target.value)
+                    setForm(f => ({ ...f, appFontSize: sz } as any))
+                    document.documentElement.style.setProperty('--font-size-base', sz + 'px')
+                    document.documentElement.style.setProperty('--font-size-sm', (sz - 1) + 'px')
+                    document.documentElement.style.setProperty('--font-size-xs', (sz - 2) + 'px')
+                    document.documentElement.style.setProperty('--font-size-lg', (sz + 2) + 'px')
+                  }}
+                  style={{ width: '100%', accentColor: form.colorPrimary }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                  <span>Klein (13px)</span><span>Mittel (14px)</span><span>Groß (18px)</span>
+                </div>
+              </div>
+              <div>
+                <label className="label">Schriftart</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {([
+                    ['system',    'System (Standard)',         '-apple-system, "Segoe UI", sans-serif'],
+                    ['inter',     'Inter',                     '"Inter", -apple-system, sans-serif'],
+                    ['georgia',   'Georgia',                   'Georgia, serif'],
+                    ['palatino',  'Palatino',                  '"Palatino Linotype", Palatino, serif'],
+                    ['optima',    'Optima',                    'Optima, Candara, sans-serif'],
+                    ['gill-sans', 'Gill Sans',                 '"Gill Sans MT", "Gill Sans", Calibri, sans-serif'],
+                  ] as [string,string,string][]).map(([key, label, stack]) => (
+                    <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 10px', borderRadius: 8, background: (form as any).appFontFamily === key ? form.colorPrimaryLight : 'var(--surface-page)', border: '0.5px solid var(--border)' }}>
+                      <input type="radio" name="appFont" value={key}
+                        checked={(form as any).appFontFamily === key}
+                        onChange={() => {
+                          setForm(f => ({ ...f, appFontFamily: key } as any))
+                          document.documentElement.style.setProperty('--font-family', stack)
+                        }} />
+                      <span style={{ fontFamily: stack, fontSize: 14, color: (form as any).appFontFamily === key ? form.colorPrimary : 'var(--text-primary)', fontWeight: (form as any).appFontFamily === key ? 600 : 400 }}>
+                        {label} — Beispieltext: Praxis Wutti
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

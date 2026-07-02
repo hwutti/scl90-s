@@ -95,8 +95,8 @@
     @apply antialiased;
     background: var(--surface-page);
     color: var(--text-primary);
-    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-    font-size: 14px;
+    font-family: var(--font-family, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif);
+    font-size: var(--font-size-base, 14px);
     line-height: 1.5;
     transition: background 0.2s, color 0.2s;
   }
