@@ -60,6 +60,7 @@ export async function createTransactionFromSessions(params: {
     descriptionHtml?: string
     quantity?: number
     unitPriceNet?: number
+    serviceLabel?: string
   }>
   // Freitext, der unter den Positionen auf der Honorarnote erscheint
   customNoteHtml?: string
@@ -137,7 +138,7 @@ export async function createTransactionFromSessions(params: {
           // das aber schon in der eigenen Datum-Spalte der Rechnung steht)
           description: baseOverride?.description ?? `Sitzung-${s.sessionNumber}`,
           descriptionHtml: baseOverride?.descriptionHtml ?? null,
-          serviceLabel: s.serviceLabel ?? params.serviceLabel,
+          serviceLabel: baseOverride?.serviceLabel !== undefined ? baseOverride.serviceLabel : (s.serviceLabel ?? params.serviceLabel),
           quantity: baseOverride?.quantity ?? 1,
           unitPriceNet: baseOverride?.unitPriceNet ?? parseFloat(s.calculatedPriceNet?.toString() ?? '0'),
           vatRate,
@@ -155,7 +156,7 @@ export async function createTransactionFromSessions(params: {
           sessionId: s.id,
           description: lineOverride?.description ?? line.description,
           descriptionHtml: lineOverride?.descriptionHtml ?? null,
-          serviceLabel: line.catalogCode ?? undefined,
+          serviceLabel: lineOverride?.serviceLabel !== undefined ? lineOverride.serviceLabel : (line.catalogCode ?? undefined),
           quantity: lineOverride?.quantity ?? parseFloat(line.quantity.toString()),
           unitPriceNet: lineOverride?.unitPriceNet ?? parseFloat(line.unitPriceNet.toString()),
           vatRate: parseFloat(line.vatRate.toString()),
