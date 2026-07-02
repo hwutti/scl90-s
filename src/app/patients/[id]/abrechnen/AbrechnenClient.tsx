@@ -1,10 +1,16 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
-  ArrowLeft, ChevronRight, Euro, Calendar, Clock,
-  Check, AlertCircle, FileText, Loader, Printer, Mail, X, Eye, RefreshCw,
+  ArrowLeft, ChevronRight, Calendar, Clock,
+  Check, AlertCircle, FileText, Loader, Printer, Mail, X,
 } from 'lucide-react'
+
+const RichTextEditor = dynamic(
+  () => import('@/components/editor/RichTextEditor').then(m => m.RichTextEditor),
+  { ssr: false, loading: () => <div style={{ height: 40, background: 'var(--surface-page)', borderRadius: 8 }} /> }
+)
 
 function fmtEUR(n: any) {
   return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(parseFloat(n ?? 0))
@@ -21,6 +27,24 @@ const PAYMENT_LABELS: Record<string, string> = {
   UNBAR_BANK_TRANSFER: 'Überweisung',
   CASH: 'Bar',
   CARD_BANKOMAT: 'Karte / Bankomat',
+}
+
+// ── Editierbare Position (Sitzungs-Grundpreis ODER Zusatzleistung) ────────────
+interface LineEdit {
+  description?: string
+  descriptionHtml?: string
+  quantity?: number
+  unitPriceNet?: number
+  lineDate?: string | null
+}
+interface ResolvedLine {
+  key: string
+  sessionId: string
+  description: string
+  descriptionHtml?: string
+  quantity: number
+  unitPriceNet: number
+  lineDate: string | null
 }
 
 export function AbrechnenClient({
@@ -41,8 +65,49 @@ export function AbrechnenClient({
     new Set(initialSessions.map((s: any) => s.id))
   )
   const selected = allUnbilled.filter(s => selectedIds.has(s.id))
-  const totalNet = selected.reduce((sum, s) =>
-    sum + parseFloat(s.calculatedPriceNet ?? 0) + parseFloat(s.serviceLinesTotalNet ?? 0), 0)
+
+  // Manuelle Überschreibungen einzelner Positionen (Beschreibung/Menge/Preis/Datum)
+  // Key: "session:<id>" für die Sitzungs-Grundposition, "service:<id>" für Zusatzleistungen
+  const [lineEdits, setLineEdits] = useState<Record<string, LineEdit>>({})
+  function updateLineEdit(key: string, patch: LineEdit) {
+    setLineEdits(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  // Freitext, der unter den Positionen auf der Honorarnote erscheint
+  const [customNoteHtml, setCustomNoteHtml] = useState('')
+
+  // Aus Session-Daten + Overrides die tatsächlichen Rechnungspositionen ableiten
+  function resolveLinesForSession(s: any): ResolvedLine[] {
+    const lines: ResolvedLine[] = []
+    const baseKey = `session:${s.id}`
+    const baseEdit = lineEdits[baseKey] ?? {}
+    lines.push({
+      key: baseKey,
+      sessionId: s.id,
+      description: baseEdit.description ?? `Sitzung-${s.sessionNumber}`,
+      descriptionHtml: baseEdit.descriptionHtml,
+      quantity: baseEdit.quantity ?? 1,
+      unitPriceNet: baseEdit.unitPriceNet ?? parseFloat(s.calculatedPriceNet ?? 0),
+      lineDate: baseEdit.lineDate ?? s.sessionDate,
+    })
+    for (const l of s.serviceLines ?? []) {
+      const key = `service:${l.id}`
+      const edit = lineEdits[key] ?? {}
+      lines.push({
+        key,
+        sessionId: s.id,
+        description: edit.description ?? l.description,
+        descriptionHtml: edit.descriptionHtml,
+        quantity: edit.quantity ?? parseFloat(l.quantity),
+        unitPriceNet: edit.unitPriceNet ?? parseFloat(l.unitPriceNet),
+        lineDate: edit.lineDate ?? s.sessionDate,
+      })
+    }
+    return lines
+  }
+
+  const allResolvedLines = selected.flatMap(resolveLinesForSession)
+  const totalNet = allResolvedLines.reduce((sum, l) => sum + l.quantity * l.unitPriceNet, 0)
 
   // Formular — vorausgefüllt aus Patientenprofil
   const payerNameDefault = patient.billRecipientName
@@ -65,37 +130,6 @@ export function AbrechnenClient({
   const vatAmount  = totalNet * form.vatRate
   const totalGross = totalNet + vatAmount
 
-  // Live-Vorschau VOR dem Erstellen - rein lesend, speichert nichts
-  const [previewHtml, setPreviewHtml] = useState('')
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const previewDebounce = useRef<NodeJS.Timeout>()
-
-  useEffect(() => {
-    clearTimeout(previewDebounce.current)
-    if (selectedIds.size === 0) { setPreviewHtml(''); return }
-    previewDebounce.current = setTimeout(async () => {
-      setPreviewLoading(true)
-      try {
-        const res = await fetch(`/api/patients/${patient.id}/abrechnen/preview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionIds:        [...selectedIds],
-            payerName:         form.payerName,
-            payerAddress:      form.payerAddress,
-            vatRate:           form.vatRate,
-            invoiceTemplateId: form.invoiceTemplateId || null,
-            notes:             form.notes,
-          }),
-        })
-        const data = await res.json()
-        if (res.ok) setPreviewHtml(data.html ?? '')
-      } catch { /* Vorschau ist nicht kritisch */ }
-      setPreviewLoading(false)
-    }, 500)
-    return () => clearTimeout(previewDebounce.current)
-  }, [selectedIds, form.payerName, form.payerAddress, form.vatRate, form.invoiceTemplateId, form.notes, patient.id])
-
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
   const [done,   setDone]     = useState<{ referenceNumber: string; transactionId?: string; invoiceHtml?: string } | null>(null)
@@ -113,6 +147,12 @@ export function AbrechnenClient({
     if (selectedIds.size === 0)  { setError('Keine Sitzungen ausgewählt.'); return }
     setSaving(true); setError('')
     try {
+      // Overrides nur für tatsächlich betroffene (ausgewählte) Positionen mitschicken
+      const lineItemOverrides: Record<string, LineEdit> = {}
+      for (const l of allResolvedLines) {
+        if (lineEdits[l.key]) lineItemOverrides[l.key] = lineEdits[l.key]
+      }
+
       const res = await fetch('/api/transactions/from-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,6 +169,8 @@ export function AbrechnenClient({
           anonymizeInvoice:  form.anonymizeInvoice,
           invoiceTemplateId: form.invoiceTemplateId || null,
           notes:             form.notes,
+          lineItemOverrides,
+          customNoteHtml:    customNoteHtml || undefined,
         }),
       })
       const data = await res.json()
@@ -161,6 +203,12 @@ export function AbrechnenClient({
   const inputStyle = {
     width: '100%', padding: '8px 10px', fontSize: 13,
     border: '0.5px solid var(--border)', borderRadius: 7,
+    background: 'var(--surface-page)', color: 'var(--text-primary)',
+    boxSizing: 'border-box' as const,
+  }
+  const smallInputStyle = {
+    padding: '5px 7px', fontSize: 12.5,
+    border: '0.5px solid var(--border)', borderRadius: 6,
     background: 'var(--surface-page)', color: 'var(--text-primary)',
     boxSizing: 'border-box' as const,
   }
@@ -207,13 +255,13 @@ export function AbrechnenClient({
             </button>
           </div>
 
-          {/* Vorschau */}
+          {/* Vorschau des tatsächlich erstellten Dokuments */}
           {done.invoiceHtml && (
             <div style={{ width: '100%', marginTop: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'left' }}>Vorschau</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'left' }}>Honorarnote</div>
               <iframe
                 srcDoc={done.invoiceHtml}
-                title="Honorarnote-Vorschau"
+                title="Honorarnote"
                 style={{ width: '100%', height: 480, border: '0.5px solid var(--border)', borderRadius: 10, background: '#fff' }}
               />
             </div>
@@ -277,9 +325,11 @@ export function AbrechnenClient({
       {/* Body: zwei Spalten */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Linke Spalte: Sitzungsauswahl */}
+        {/* Linke Spalte: Auswahl + direkt editierbare Positionen */}
         <div style={{ overflowY: 'auto', padding: 24, background: 'var(--surface-page)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+
+          {/* Schritt 1: Sitzungen auswählen (kompakt) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
               Sitzungen auswählen
             </h2>
@@ -294,13 +344,13 @@ export function AbrechnenClient({
               Keine offenen Sitzungen vorhanden.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 28 }}>
               {allUnbilled.map(s => {
                 const checked = selectedIds.has(s.id)
                 return (
                   <label key={s.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                    padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
                     border: `1.5px solid ${checked ? 'var(--color-primary)' : 'var(--border)'}`,
                     background: checked ? 'var(--color-primary-light)' : 'var(--surface-card)',
                     transition: 'all 0.15s',
@@ -340,37 +390,98 @@ export function AbrechnenClient({
             </div>
           )}
 
+          {/* Schritt 2: Positionen — direkt editierbar, keine Tabelle, keine separate Vorschau nötig */}
+          {selected.length > 0 && (
+            <div>
+              <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
+                Positionen
+              </h2>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+                So erscheint es auf der Honorarnote — Beschreibung, Menge und Preis direkt bearbeitbar.
+              </div>
+
+              {selected.map(s => {
+                const lines = resolveLinesForSession(s)
+                return (
+                  <div key={s.id} style={{
+                    marginBottom: 14, borderRadius: 12, border: '0.5px solid var(--border)',
+                    background: 'var(--surface-card)', overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
+                      background: 'var(--surface-page)', borderBottom: '0.5px solid var(--border)',
+                    }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)' }}>{s.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· {fmtDate(s.sessionDate)}</span>
+                      <button
+                        onClick={() => {
+                          const next = new Set(selectedIds); next.delete(s.id); setSelectedIds(next)
+                        }}
+                        className="btn-ghost" style={{ marginLeft: 'auto', padding: 4, color: 'var(--text-muted)' }}
+                        title="Sitzung entfernen">
+                        <X style={{ width: 13, height: 13 }} />
+                      </button>
+                    </div>
+
+                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {lines.map(line => (
+                        <div key={line.key} style={{
+                          border: '0.5px solid var(--border)', borderRadius: 9, padding: 10,
+                          background: 'var(--surface-page)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, flexWrap: 'wrap' }}>
+                            <input type="date" style={{ ...smallInputStyle, width: 128 }}
+                              value={line.lineDate ? line.lineDate.slice(0, 10) : ''}
+                              onChange={e => updateLineEdit(line.key, { lineDate: e.target.value || null })} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
+                              <input type="number" step="0.5" style={{ ...smallInputStyle, width: 46, textAlign: 'right' }}
+                                value={line.quantity}
+                                onChange={e => updateLineEdit(line.key, { quantity: parseFloat(e.target.value) || 0 })} />
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>×</span>
+                              <input type="number" step="0.01" style={{ ...smallInputStyle, width: 76, textAlign: 'right' }}
+                                value={line.unitPriceNet}
+                                onChange={e => updateLineEdit(line.key, { unitPriceNet: parseFloat(e.target.value) || 0 })} />
+                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', minWidth: 68, textAlign: 'right' }}>
+                                {fmtEUR(line.quantity * line.unitPriceNet)}
+                              </span>
+                            </div>
+                          </div>
+                          <RichTextEditor
+                            value={line.descriptionHtml || line.description}
+                            onChange={html => updateLineEdit(line.key, { descriptionHtml: html })}
+                            placeholder="Beschreibung…"
+                            minHeight={36}
+                            compact
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Freitext-Bereich, erscheint unter den Positionen auf der Honorarnote */}
+              <div style={{ marginTop: 4, marginBottom: 20 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-primary)' }}>Freitext / Anmerkungen</h2>
+                <RichTextEditor
+                  value={customNoteHtml}
+                  onChange={setCustomNoteHtml}
+                  placeholder="Optionaler Freitext, der unter den Positionen auf der Honorarnote erscheint (Fettdruck, Listen, Farben…)"
+                  minHeight={90}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Summe */}
           {selected.length > 0 && (
-            <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} ausgewählt</span>
+            <div style={{ padding: '12px 16px', background: 'var(--surface-card)', borderRadius: 10, border: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{selected.length} Sitzung{selected.length !== 1 ? 'en' : ''} · {allResolvedLines.length} Position{allResolvedLines.length !== 1 ? 'en' : ''}</span>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Netto: {fmtEUR(totalNet)}</div>
                 {form.vatRate > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>MwSt. {Math.round(form.vatRate * 100)}%: {fmtEUR(vatAmount)}</div>}
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>Gesamt: {fmtEUR(totalGross)}</div>
               </div>
-            </div>
-          )}
-
-          {/* Live-Vorschau */}
-          {selected.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <Eye style={{ width: 14, height: 14, color: 'var(--text-muted)' }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Vorschau</span>
-                {previewLoading && <RefreshCw style={{ width: 12, height: 12, color: 'var(--text-muted)' }} />}
-              </div>
-              {previewHtml ? (
-                <iframe
-                  srcDoc={previewHtml}
-                  title="Honorarnote-Vorschau"
-                  style={{ width: '100%', height: 600, border: '0.5px solid var(--border)', borderRadius: 10, background: '#fff' }}
-                />
-              ) : (
-                <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--surface-card)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
-                  {previewLoading ? 'Lade Vorschau…' : 'Vorschau erscheint hier'}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -456,11 +567,11 @@ export function AbrechnenClient({
             </div>
           </div>
 
-          {/* Notiz */}
+          {/* Interne Notiz (erscheint NICHT auf der Honorarnote) */}
           <div>
-            <div style={sectionStyle}>Notiz (optional)</div>
+            <div style={sectionStyle}>Interne Notiz (optional)</div>
             <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
-              value={form.notes} placeholder="Interne Notiz zur Rechnung"
+              value={form.notes} placeholder="Nur intern sichtbar, nicht auf der Honorarnote"
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
 
