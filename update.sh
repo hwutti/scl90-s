@@ -47,15 +47,20 @@ success "Commit: $COMMIT"
 step "NEXTAUTH_URL prüfen"
 ENV_FILE="$APP_DIR/.env"
 
-# Nginx-Domain suchen (|| true verhindert Abbruch wenn nichts gefunden)
+# Nginx-Domain aus sites-enabled UND sites-available suchen
 NGINX_DOMAIN=""
-if [[ -d /etc/nginx/sites-enabled ]]; then
-  NGINX_DOMAIN=$(grep -rh "server_name" /etc/nginx/sites-enabled/ 2>/dev/null \
-    | grep -v "localhost\|127\.0\.0\.1\| _\b" \
-    | awk '{print $2}' | tr -d ';' \
-    | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
-    | head -1 || true)
-fi
+for DIR in /etc/nginx/sites-enabled /etc/nginx/sites-available; do
+  if [[ -d "$DIR" ]]; then
+    FOUND=$(grep -rh "server_name" "$DIR"/ 2>/dev/null \
+      | grep -v "localhost\|127\.0\.0\.1\| _\b" \
+      | awk '{print $2}' | tr -d ';' \
+      | grep -E "^[a-zA-Z0-9].*\.[a-zA-Z]{2,}$" \
+      | head -1 || true)
+    [[ -n "$FOUND" ]] && NGINX_DOMAIN="$FOUND" && break
+  fi
+done
+
+echo "  → nginx-Domain erkannt: '${NGINX_DOMAIN:-KEINE}'"
 
 if [[ -n "$NGINX_DOMAIN" ]]; then
   if [[ -f "/etc/letsencrypt/live/$NGINX_DOMAIN/fullchain.pem" ]]; then
@@ -63,16 +68,27 @@ if [[ -n "$NGINX_DOMAIN" ]]; then
   else
     NEW_URL="http://$NGINX_DOMAIN"
   fi
-  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || echo "")
+  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "")
   if [[ "$CURRENT_URL" != "$NEW_URL" ]]; then
-    sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
-    warn "NEXTAUTH_URL aktualisiert: $CURRENT_URL → $NEW_URL"
+    # Zeile vorhanden: ersetzen; nicht vorhanden: anhängen
+    if grep -q "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null; then
+      sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=$NEW_URL|" "$ENV_FILE"
+    else
+      echo "NEXTAUTH_URL=$NEW_URL" >> "$ENV_FILE"
+    fi
+    warn "NEXTAUTH_URL aktualisiert: '${CURRENT_URL:-nicht vorhanden}' → $NEW_URL"
   else
     success "NEXTAUTH_URL korrekt: $CURRENT_URL"
   fi
 else
-  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- || echo "nicht gesetzt")
-  success "NEXTAUTH_URL unverändert: $CURRENT_URL"
+  # Kein nginx-Domain gefunden: aktuellen Wert zeigen, aber nicht überschreiben
+  CURRENT_URL=$(grep "^NEXTAUTH_URL=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "nicht gesetzt")
+  if [[ "$CURRENT_URL" == "nicht gesetzt" || "$CURRENT_URL" == *"localhost"* ]]; then
+    warn "NEXTAUTH_URL = '$CURRENT_URL' — konnte nginx-Domain nicht automatisch erkennen."
+    warn "Bitte in $ENV_FILE manuell setzen: NEXTAUTH_URL=https://IHRE_DOMAIN"
+  else
+    success "NEXTAUTH_URL unverändert: $CURRENT_URL"
+  fi
 fi
 
 # ─── 3. Dependencies ──────────────────────────────────────────────────────────
